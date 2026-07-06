@@ -95,8 +95,26 @@ export const api = {
     create: (data) => request("/api/cartes-cadeaux", { method: "POST", body: data }),
     verifier: (numero) => request(`/api/cartes-cadeaux/${encodeURIComponent(numero)}/verifier`),
   },
-  retours: {
+ retours: {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
     create: (data) => request("/api/retours", { method: "POST", body: data }),
+  },
+  etats: {
+    parDate: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/par-date${qs ? `?${qs}` : ""}`);
+    },
+    parModePaiement: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/par-mode-paiement${qs ? `?${qs}` : ""}`);
+    },
+    parType: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/par-type${qs ? `?${qs}` : ""}`);
+    },
+    fermetureCaisse: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/fermeture-caisse${qs ? `?${qs}` : ""}`);
+    },
   },
 };

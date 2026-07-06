@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3 } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import UtilisateursSection from "./sections/UtilisateursSection.jsx";
@@ -6,26 +6,24 @@ import StockSection from "./sections/StockSection.jsx";
 import ClientsSection from "./sections/ClientsSection.jsx";
 import VentesSection from "./sections/VentesSection.jsx";
 import RolesSection from "./sections/RolesSection.jsx";
+import EtatsSection from "./sections/EtatsSection.jsx";
 import { useState } from "react";
 
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
   const [tab, setTab] = useState("ventes");
-
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
-
   const NAV = [
     { id: "ventes", label: "Ventes", icon: ShoppingCart, perm: "ventes" },
+    { id: "etats", label: "États", icon: BarChart3, perm: "ventes" },
     { id: "clients", label: "Clients", icon: Heart, perm: "clients" },
     { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
     { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
   ].filter((n) => permissions[n.perm]);
-
   // Si l'onglet actuellement sélectionné n'est plus accessible (changement de rôle, etc.), on retombe sur le premier disponible
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
-
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320" }}>
       <header className="no-print px-6 py-5 sm:px-10" style={{ borderBottom: "1px solid #DDD3C4", background: "#FFFDF9" }}>
@@ -50,9 +48,9 @@ function Shell() {
           </div>
         </div>
       </header>
-
       <div className="max-w-6xl mx-auto px-6 sm:px-10 py-8">
         {activeTab === "ventes" && <VentesSection />}
+        {activeTab === "etats" && <EtatsSection />}
         {activeTab === "clients" && <ClientsSection />}
         {activeTab === "utilisateurs" && <UtilisateursSection />}
         {activeTab === "stock" && <StockSection />}
