@@ -68,8 +68,16 @@ export const api = {
     create: (data) => request("/api/articles", { method: "POST", body: data }),
     update: (id, data) => request(`/api/articles/${id}`, { method: "PUT", body: data }),
     remove: (id) => request(`/api/articles/${id}`, { method: "DELETE" }),
+historiqueMouvements: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/articles/mouvements/historique${qs ? `?${qs}` : ""}`);
+    },
     updateStock: (id, boutique, pointure, quantite) =>
       request(`/api/articles/${id}/stock`, { method: "PUT", body: { boutique, pointure, quantite } }),
+ajouterStock: (id, boutique, pointure, quantite) =>
+      request(`/api/articles/${id}/stock/ajouter`, { method: "POST", body: { boutique, pointure, quantite } }),
+    virementStock: (id, boutiqueSource, boutiqueDestination, pointure, quantite) =>
+      request(`/api/articles/${id}/stock/virement`, { method: "POST", body: { boutiqueSource, boutiqueDestination, pointure, quantite } }),
   },
   clients: {
     list: () => request("/api/clients"),

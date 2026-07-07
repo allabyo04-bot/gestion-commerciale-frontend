@@ -139,8 +139,13 @@ export default function VentesSection() {
           <div className="lg:col-span-3">
             <div className="rounded-xl p-5 mb-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Boutique"><select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={inputStyle}>{BOUTIQUES.map((b) => <option key={b}>{b}</option>)}</select></Field>
-                <Field label="Vendeur"><div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{user?.prenom} {user?.nom}</div></Field>
+                <Field label="Boutique">
+                  {user?.role?.systeme ? (
+                    <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={inputStyle}>{BOUTIQUES.map((b) => <option key={b}>{b}</option>)}</select>
+                  ) : (
+                    <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{boutique}</div>
+                  )}
+                </Field>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Mode de vente"><select value={modeVente} onChange={(e) => setModeVente(e.target.value)} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select></Field>

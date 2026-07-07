@@ -26,6 +26,16 @@ export default function StockSection() {
   const [newBrand, setNewBrand] = useState("");
   const [filterFamille, setFilterFamille] = useState("Tous");
   const [filterBrand, setFilterBrand] = useState("Toutes");
+  const [mouvements, setMouvements] = useState([]);
+  const [loadingMouvements, setLoadingMouvements] = useState(false);
+
+  const loadMouvements = useCallback(async () => {
+    setLoadingMouvements(true);
+    try {
+      const m = await api.articles.historiqueMouvements();
+      setMouvements(m);
+    } catch (e) { setError(e.message); } finally { setLoadingMouvements(false); }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,6 +46,7 @@ export default function StockSection() {
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
+useEffect(() => { if (tab === "historique") loadMouvements(); }, [tab, loadMouvements]);
 
   const brandName = (id) => brands.find((b) => b.id === id)?.nom || "—";
 
@@ -67,7 +78,13 @@ export default function StockSection() {
   const updateStock = async (articleId, boutique, pointure, quantite) => {
     try { await api.articles.updateStock(articleId, boutique, pointure, quantite); load(); } catch (e) { setError(e.message); }
   };
+const ajouterStock = async (articleId, boutique, pointure, quantite) => {
+    try { await api.articles.ajouterStock(articleId, boutique, pointure, quantite); load(); } catch (e) { setError(e.message); }
+  };
 
+  const virementStock = async (articleId, boutiqueSource, boutiqueDestination, pointure, quantite) => {
+    try { await api.articles.virementStock(articleId, boutiqueSource, boutiqueDestination, pointure, quantite); load(); } catch (e) { setError(e.message); }
+  };
   const filteredArticles = useMemo(() => (articles || []).filter((a) => {
     if (filterFamille !== "Tous" && a.famille !== filterFamille) return false;
     if (filterBrand !== "Toutes" && a.marqueId !== filterBrand) return false;
@@ -80,7 +97,7 @@ export default function StockSection() {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -149,14 +166,62 @@ export default function StockSection() {
               <div key={b.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
                 <p className="font-medium text-sm">{b.nom}</p>
                 <button onClick={() => deleteBrand(b.id)} style={{ color: "#B04A3B" }}><Trash2 size={15} /></button>
+
               </div>
             ))}
           </div>
         </div>
       )}
-
+{!loading && tab === "historique" && (
+        <div>
+          {loadingMouvements && <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>}
+          {!loadingMouvements && (
+            <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                    <th className="text-left px-4 py-2">Date</th>
+                    <th className="text-left px-4 py-2">Article</th>
+                    <th className="text-left px-4 py-2">Type</th>
+                    <th className="text-left px-4 py-2">Boutique</th>
+                    <th className="text-left px-4 py-2">Pointure</th>
+                    <th className="text-right px-4 py-2">Quantité</th>
+                    <th className="text-right px-4 py-2">Avant → Après</th>
+                    <th className="text-left px-4 py-2">Par</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mouvements.map((m) => (
+                    <tr key={m.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                      <td className="px-4 py-2">{new Date(m.date).toLocaleString("fr-FR")}</td>
+                      <td className="px-4 py-2">{m.article?.designation}</td>
+                      <td className="px-4 py-2">{m.type}</td>
+                      <td className="px-4 py-2">{m.type === "Virement" ? `${m.boutiqueSource} → ${m.boutique}` : m.boutique}</td>
+                      <td className="px-4 py-2">{m.pointure ? `T${m.pointure}` : "—"}</td>
+                      <td className="text-right px-4 py-2">{m.quantite}</td>
+                      <td className="text-right px-4 py-2">{m.quantiteAvant} → {m.quantiteApres}</td>
+                      <td className="px-4 py-2">{m.effectuePar?.prenom} {m.effectuePar?.nom}</td>
+                    </tr>
+                  ))}
+                  {mouvements.length === 0 && (
+                    <tr><td colSpan={8} className="px-4 py-6 text-center" style={{ color: "#6B5D52" }}>Aucun mouvement enregistré pour l'instant.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
-      {editingArticle && <StockEditorModal article={editingArticle} onClose={() => setStockEditor(null)} onChange={(b, p, q) => updateStock(editingArticle.id, b, p, q)} />}
+      {editingArticle && (
+        <StockEditorModal
+          article={editingArticle}
+          onClose={() => setStockEditor(null)}
+          onCorriger={(b, p, q) => updateStock(editingArticle.id, b, p, q)}
+          onAjouter={(b, p, q) => ajouterStock(editingArticle.id, b, p, q)}
+          onVirement={(bs, bd, p, q) => virementStock(editingArticle.id, bs, bd, p, q)}
+        />
+      )}
       {confirmDelete && (
         <ConfirmModal title="Supprimer cet article ?" message={`${confirmDelete.designation} sera retiré du stock.`} onCancel={() => setConfirmDelete(null)} onConfirm={() => removeArticle(confirmDelete)} />
       )}
@@ -191,7 +256,7 @@ function ArticleModal({ article, brands, onCancel, onSubmit }) {
         </div>
         {!form.isNew && (
           <p className="text-xs mt-3" style={{ color: "#6B5D52" }}>La famille et la marque ne sont pas modifiables après création (ça changerait la structure du stock déjà en place).</p>
-        )}
+     )}
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
           <button onClick={() => onSubmit(form)} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer</button>
@@ -200,41 +265,105 @@ function ArticleModal({ article, brands, onCancel, onSubmit }) {
     </div>
   );
 }
-
-function StockEditorModal({ article, onClose, onChange }) {
+function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement }) {
+  const [mode, setMode] = useState("corriger");
   const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [boutiqueDestination, setBoutiqueDestination] = useState(BOUTIQUES[1] || BOUTIQUES[0]);
   const isChaussure = article.famille === "Chaussure";
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+
   const [values, setValues] = useState(() => {
     const init = {};
-    if (isChaussure) POINTURES.forEach((p) => { init[`${boutique}__${p}`] = stockQty(article, boutique, p); });
-    else init[`${boutique}__`] = stockQty(article, boutique, null);
+    if (isChaussure) POINTURES.forEach((p) => { init[`${boutique}__${p}`] = mode === "corriger" ? stockQty(article, boutique, p) : 0; });
+    else init[`${boutique}__`] = mode === "corriger" ? stockQty(article, boutique, null) : 0;
     return init;
   });
-  const [saved, setSaved] = useState(false);
 
   const key = (b, p) => `${b}__${p || ""}`;
-  const getValue = (b, p) => (key(b, p) in values ? values[key(b, p)] : stockQty(article, b, p));
+  const getValue = (b, p) => (key(b, p) in values ? values[key(b, p)] : 0);
   const setValue = (b, p, v) => setValues((prev) => ({ ...prev, [key(b, p)]: v }));
+
+  const changerMode = (m) => {
+    setMode(m);
+    setError("");
+    const init = {};
+    if (isChaussure) POINTURES.forEach((p) => { init[key(boutique, p)] = m === "corriger" ? stockQty(article, boutique, p) : 0; });
+    else init[key(boutique, null)] = m === "corriger" ? stockQty(article, boutique, null) : 0;
+    setValues(init);
+  };
 
   const changerBoutique = (b) => {
     setBoutique(b);
-    setValues((prev) => {
-      const next = { ...prev };
-      if (isChaussure) POINTURES.forEach((p) => { if (!(key(b, p) in next)) next[key(b, p)] = stockQty(article, b, p); });
-      else if (!(key(b, null) in next)) next[key(b, null)] = stockQty(article, b, null);
-      return next;
-    });
+    if (b === boutiqueDestination) {
+      const autre = BOUTIQUES.find((x) => x !== b);
+      if (autre) setBoutiqueDestination(autre);
+    }
+    const init = {};
+    if (isChaussure) POINTURES.forEach((p) => { init[key(b, p)] = mode === "corriger" ? stockQty(article, b, p) : 0; });
+    else init[key(b, null)] = mode === "corriger" ? stockQty(article, b, null) : 0;
+    setValues(init);
   };
 
-  const enregistrer = async () => {
-    if (isChaussure) {
-      for (const p of POINTURES) await onChange(boutique, p, getValue(boutique, p));
-    } else {
-      await onChange(boutique, null, getValue(boutique, null));
-    }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const soumettreCorriger = async () => {
+    if (envoi) return;
+    setEnvoi(true);
+    setError("");
+    try {
+      if (isChaussure) {
+        for (const p of POINTURES) await onCorriger(boutique, p, getValue(boutique, p));
+      } else {
+        await onCorriger(boutique, null, getValue(boutique, null));
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) { setError(e.message); } finally { setEnvoi(false); }
   };
+
+  const soumettreAjouter = async () => {
+    if (envoi) return;
+    setEnvoi(true);
+    setError("");
+    try {
+      if (isChaussure) {
+        for (const p of POINTURES) {
+          const q = Number(getValue(boutique, p)) || 0;
+          if (q > 0) await onAjouter(boutique, p, q);
+        }
+      } else {
+        const q = Number(getValue(boutique, null)) || 0;
+        if (q > 0) await onAjouter(boutique, null, q);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      changerMode("ajouter");
+    } catch (e) { setError(e.message); } finally { setEnvoi(false); }
+  };
+
+  const soumettreVirement = async () => {
+    if (envoi) return;
+    setEnvoi(true);
+    setError("");
+    try {
+      if (isChaussure) {
+        for (const p of POINTURES) {
+          const q = Number(getValue(boutique, p)) || 0;
+          if (q > 0) await onVirement(boutique, boutiqueDestination, p, q);
+        }
+      } else {
+        const q = Number(getValue(boutique, null)) || 0;
+        if (q > 0) await onVirement(boutique, boutiqueDestination, null, q);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      changerMode("virement");
+    } catch (e) { setError(e.message); } finally { setEnvoi(false); }
+  };
+
+  const total = isChaussure
+    ? POINTURES.reduce((s, p) => s + (Number(getValue(boutique, p)) || 0), 0)
+    : Number(getValue(boutique, null)) || 0;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
@@ -244,11 +373,36 @@ function StockEditorModal({ article, onClose, onChange }) {
           <button onClick={onClose}><X size={18} color="#6B5D52" /></button>
         </div>
         <p className="text-xs font-mono mb-5" style={{ color: "#6B5D52" }}>{article.reference}</p>
+
         <div className="flex gap-2 mb-5">
-          {BOUTIQUES.map((b) => (
-            <button key={b} onClick={() => changerBoutique(b)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={boutique === b ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{b}</button>
+          {[["corriger", "Corriger (inventaire)"], ["ajouter", "Ajouter du stock"], ["virement", "Virement"]].map(([id, label]) => (
+            <button key={id} onClick={() => changerMode(id)} className="px-3 py-1.5 rounded-full text-xs font-medium"
+              style={mode === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+              {label}
+            </button>
           ))}
         </div>
+
+        {mode === "virement" ? (
+          <div className="flex items-center gap-2 mb-5">
+            <select value={boutique} onChange={(e) => changerBoutique(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }}>
+              {BOUTIQUES.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <span className="text-sm" style={{ color: "#6B5D52" }}>vers</span>
+            <select value={boutiqueDestination} onChange={(e) => setBoutiqueDestination(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }}>
+              {BOUTIQUES.filter((b) => b !== boutique).map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-5">
+            {BOUTIQUES.map((b) => (
+              <button key={b} onClick={() => changerBoutique(b)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={boutique === b ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{b}</button>
+            ))}
+          </div>
+        )}
+
+        {error && <p className="text-sm mb-4" style={{ color: "#B04A3B" }}>{error}</p>}
+
         {isChaussure ? (
           <div>
             <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -260,8 +414,10 @@ function StockEditorModal({ article, onClose, onChange }) {
               ))}
             </div>
             <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
-              <p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>Total pour {boutique}</p>
-              <p className="font-display text-xl font-semibold">{POINTURES.reduce((s, p) => s + (Number(getValue(boutique, p)) || 0), 0)}</p>
+              <p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>
+                {mode === "corriger" ? `Total pour ${boutique}` : mode === "ajouter" ? "Total à ajouter" : "Total à transférer"}
+              </p>
+              <p className="font-display text-xl font-semibold">{total}</p>
             </div>
           </div>
         ) : (
@@ -270,8 +426,13 @@ function StockEditorModal({ article, onClose, onChange }) {
             <input className="qty-input" style={{ width: "80px" }} type="number" min="0" value={getValue(boutique, null)} onChange={(e) => setValue(boutique, null, e.target.value)} />
           </div>
         )}
-        <button onClick={enregistrer} className="w-full mt-5 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: saved ? "#3F6B4A" : "#8C3B2E", color: "#FBF3EC" }}>
-          {saved ? "Enregistré ✓" : `Enregistrer le stock pour ${boutique}`}
+
+        <button
+          onClick={mode === "corriger" ? soumettreCorriger : mode === "ajouter" ? soumettreAjouter : soumettreVirement}
+          disabled={envoi}
+          className="w-full mt-5 px-4 py-2.5 rounded-lg text-sm font-medium"
+          style={{ background: saved ? "#3F6B4A" : envoi ? "#B8A88F" : "#8C3B2E", color: "#FBF3EC", opacity: envoi ? 0.7 : 1 }}>
+          {saved ? "Enregistré ✓" : mode === "corriger" ? `Enregistrer le stock pour ${boutique}` : mode === "ajouter" ? `Ajouter au stock de ${boutique}` : `Transférer vers ${boutiqueDestination}`}
         </button>
       </div>
     </div>
