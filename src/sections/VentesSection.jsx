@@ -49,7 +49,7 @@ const [typeVente, setTypeVente] = useState("Comptant");
   const currentArticle = articles.find((a) => a.id === selArticle);
   const disponibilite = (article, b, pointure) => {
     if (!article) return 0;
-    const item = article.stocks?.find((s) => s.boutique === b && s.pointure === (pointure || null));
+    const item = article.stocks?.find((s) => s.boutique === b && s.pointure === (pointure || ""));
     return item?.quantite || 0;
   };
 
