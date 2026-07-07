@@ -40,7 +40,8 @@ setDonnees(null);
       let res;
       if (sousOnglet === "date") res = await api.etats.parDate(params);
       else if (sousOnglet === "mode") res = await api.etats.parModePaiement(params);
-      else res = await api.etats.parType(params);
+      else if (sousOnglet === "type") res = await api.etats.parType(params);
+      else res = await api.etats.recapBoutiques({ dateDebut, dateFin });
       setDonnees(res);
     } catch (e) {
       setErreur(e.message || "Erreur lors du chargement de l'état.");
@@ -71,6 +72,7 @@ setDonnees(null);
     { id: "date", label: "Par date", icon: Calendar },
     { id: "mode", label: "Par mode de paiement", icon: CreditCard },
     { id: "type", label: "Par type", icon: Store },
+...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
   ];
 
   return (
@@ -249,6 +251,37 @@ setDonnees(null);
           </table>
         </div>
       )}
-    </div>
-  );
+{!chargement && donnees?.parBoutique && sousOnglet === "recap" && (
+        <div className="space-y-4">
+          {donnees.parBoutique.map((b) => (
+            <div key={b.boutique} className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="font-display text-lg font-semibold mb-3">{b.boutique}</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des ventes ({b.nombreVentes})</p>
+                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalVentes)}</p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des règlements encaissés</p>
+                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalReglements)}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="rounded-2xl p-5" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
+            <p className="font-display text-lg font-semibold mb-3">Cumul des 2 boutiques</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs opacity-80">Total des ventes ({donnees.cumul.nombreVentes})</p>
+                <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalVentes)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-80">Total des règlements encaissés</p>
+                <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalReglements)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+ </div> );
 }

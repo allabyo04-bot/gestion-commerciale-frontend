@@ -131,3 +131,7 @@ creditListe: (params = {}) => {
     },
   },
 };
+recapBoutiques: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/recap-boutiques${qs ? `?${qs}` : ""}`);
+    },
