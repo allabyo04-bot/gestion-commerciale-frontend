@@ -21,10 +21,13 @@ export const MESSAGE_FIN_TICKET = "Aucun remboursement n'est effectué après ac
 export const POINTURES = ["36", "37", "38", "39", "40", "41", "42"];
 export const MODES_VENTE = ["Boutique", "Livraison", "Expédition"];
 export const MODES_PAIEMENT = [
-  { id: "especes", label: "Espèces" },
-  { id: "mobile", label: "Mobile Money" },
-  { id: "carte", label: "Carte bancaire" },
-  { id: "bon_achat", label: "Bon d'achat" },
+  { id: "especes", label: "Espèces", liquide: true },
+  { id: "moov_money", label: "Moov Money", liquide: false },
+  { id: "mtn_money", label: "MTN Money", liquide: false },
+  { id: "orange_money", label: "Orange Money", liquide: false },
+  { id: "wave", label: "Wave", liquide: false },
+  { id: "carte", label: "Carte bancaire", liquide: false },
+  { id: "bon_achat", label: "Bon d'achat", liquide: false },
 ];
 export const CIVILITES = ["Monsieur", "Madame", "Mademoiselle"];
 export const JOURS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
