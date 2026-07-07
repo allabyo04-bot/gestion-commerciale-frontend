@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Calendar, CreditCard, Store, Lock } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { MODES_PAIEMENT } from "../constants.js";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -177,36 +178,50 @@ setDonnees(null);
         </div>
       )}
 
-      {!chargement && donnees?.recap && sousOnglet === "mode" && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
-                <th className="text-left px-4 py-2">Mode de paiement</th>
-                <th className="text-right px-4 py-2">Nombre</th>
-                <th className="text-right px-4 py-2">Montant</th>
-              </tr>
-            </thead>
-            <tbody>
-              {donnees.recap.map((r) => (
-                <tr key={r.mode} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
-                  <td className="px-4 py-2">{r.mode}</td>
-                  <td className="text-right px-4 py-2">{r.nombre}</td>
-                  <td className="text-right px-4 py-2">{formatFCFA(r.montant)}</td>
+  {!chargement && donnees?.recap && sousOnglet === "mode" && (
+        <>
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Liquidités (Espèces)</p>
+              <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>
+                {formatFCFA(donnees.recap.filter((r) => MODES_PAIEMENT.find((m) => m.id === r.mode)?.liquide).reduce((s, r) => s + r.montant, 0))}
+              </p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Non liquidités (Mobile Money, Carte, Bon d'achat...)</p>
+              <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>
+                {formatFCFA(donnees.recap.filter((r) => !MODES_PAIEMENT.find((m) => m.id === r.mode)?.liquide).reduce((s, r) => s + r.montant, 0))}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
+                  <th className="text-left px-4 py-2">Mode de paiement</th>
+                  <th className="text-right px-4 py-2">Nombre</th>
+                  <th className="text-right px-4 py-2">Montant</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
-                <td className="px-4 py-2" colSpan={2}>Total</td>
-                <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-
-      {!chargement && donnees?.recap && sousOnglet === "type" && (
+              </thead>
+              <tbody>
+                {donnees.recap.map((r) => (
+                  <tr key={r.mode} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                    <td className="px-4 py-2">{MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}</td>
+                    <td className="text-right px-4 py-2">{r.nombre}</td>
+                    <td className="text-right px-4 py-2">{formatFCFA(r.montant)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
+                  <td className="px-4 py-2" colSpan={2}>Total</td>
+                  <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      )}      {!chargement && donnees?.recap && sousOnglet === "type" && (
         <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
           <table className="w-full text-sm">
             <thead>
