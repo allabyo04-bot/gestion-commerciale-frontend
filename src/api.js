@@ -92,6 +92,11 @@ ajouterStock: (id, boutique, pointure, quantite) =>
       return request(`/api/ventes${qs ? `?${qs}` : ""}`);
     },
     create: (data) => request("/api/ventes", { method: "POST", body: data }),
+creditListe: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/ventes/credit/liste${qs ? `?${qs}` : ""}`);
+    },
+    reglement: (id, data) => request(`/api/ventes/${id}/reglement`, { method: "POST", body: data }),
   },
   ventesAttente: {
     list: (boutique) => request(`/api/ventes-attente${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),

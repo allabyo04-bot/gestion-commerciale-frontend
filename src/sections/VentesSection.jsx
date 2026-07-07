@@ -15,6 +15,7 @@ export default function VentesSection() {
   const [clients, setClients] = useState([]);
   const [ventes, setVentes] = useState([]);
   const [attentes, setAttentes] = useState([]);
+const [ventesCredit, setVentesCredit] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [receipt, setReceipt] = useState(null);
@@ -23,6 +24,7 @@ export default function VentesSection() {
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
+const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
   const [paiements, setPaiements] = useState([]);
 
@@ -35,11 +37,11 @@ export default function VentesSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, b, c, v, at] = await Promise.all([
+      const [a, b, c, v, at, vc] = await Promise.all([
         api.articles.list(), api.brands.list(), api.clients.list(),
-        api.ventes.list({ boutique }), api.ventesAttente.list(boutique),
+        api.ventes.list({ boutique }), api.ventesAttente.list(boutique), api.ventes.creditListe({ boutique }),
       ]);
-      setArticles(a); setBrands(b); setClients(c); setVentes(v); setAttentes(at);
+      setArticles(a); setBrands(b); setClients(c); setVentes(v); setAttentes(at); setVentesCredit(vc);
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, [boutique]);
   useEffect(() => { load(); }, [load]);
@@ -81,10 +83,11 @@ export default function VentesSection() {
 
   const validerVente = async () => {
     if (lignes.length === 0) { setError("Ajoute au moins un article à la vente."); return; }
-    if (totalPaye < total) { setError("Le total payé est inférieur au total de la vente."); return; }
+if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente à crédit."); return; }
+    if (typeVente === "Comptant" && totalPaye < total) { setError("Le total payé est inférieur au total de la vente."); return; }
     try {
       const vente = await api.ventes.create({
-        boutique, vendeurId: user.id, modeVente, clientId: clientId || null,
+        boutique, vendeurId: user.id, modeVente, typeVente, clientId: clientId || null,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: p.mode === "bon_achat" ? p.carteNumero : undefined })),
       });
@@ -129,11 +132,11 @@ export default function VentesSection() {
       <ErrorBanner error={error} onClose={() => setError("")} />
 
       <div className="flex gap-2 mb-6 no-print flex-wrap">
-        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["historique", "Historique"], ["retours", "Retours / Échanges"], ["cartes", "Cartes cadeaux"]].map(([id, label]) => (
-          <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
+        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes à crédit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Échanges"], ["cartes", "Cartes cadeaux"]].map(([id, label]) => (
+
+<button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
-
       {subTab === "nouvelle" && (
         <div className="grid lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
@@ -149,6 +152,12 @@ export default function VentesSection() {
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Mode de vente"><select value={modeVente} onChange={(e) => setModeVente(e.target.value)} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select></Field>
+<Field label="Type de vente">
+                  <div className="flex gap-2 mt-1">
+                    <button type="button" onClick={() => setTypeVente("Comptant")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Comptant" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Comptant</button>
+                    <button type="button" onClick={() => setTypeVente("Credit")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Credit" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Crédit</button>
+                  </div>
+                </Field>
                 <Field label="Client (nom ou n° carte)">
                   {clientId ? (
                     <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
@@ -282,6 +291,7 @@ export default function VentesSection() {
 
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
       {subTab === "cartes" && <CartesCadeauxSection />}
+{subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
 
       {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
     </div>
@@ -290,6 +300,7 @@ export default function VentesSection() {
 
 function ReceiptModal({ vente, onClose }) {
   const infos = INFOS_BOUTIQUE[vente.boutique] || {};
+const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
       <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
@@ -312,6 +323,12 @@ function ReceiptModal({ vente, onClose }) {
           {vente.lignes.map((l) => <div key={l.id} className="flex justify-between text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span>{fmt(l.sousTotal)} F</span></div>)}
         </div>
         <div className="flex justify-between font-semibold mt-3 text-sm"><span>TOTAL</span><span>{fmt(vente.total)} F</span></div>
+{vente.typeVente === "Credit" && (
+          <div className="mt-1 space-y-1">
+            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Payé</span><span>{fmt(totalPayeRecu)} F</span></div>
+            <div className="flex justify-between text-xs font-semibold" style={{ color: "#B04A3B" }}><span>Reste à payer</span><span>{fmt(vente.total - totalPayeRecu)} F</span></div>
+          </div>
+        )}
         <div className="mt-2 space-y-1">
           {vente.paiements.map((p) => <div key={p.id} className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>{MODES_PAIEMENT.find((m) => m.id === p.mode)?.label}</span><span>{fmt(p.montant)} F</span></div>)}
           {vente.monnaieRendue > 0 && <div className="flex justify-between text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Monnaie rendue</span><span>{fmt(vente.monnaieRendue)} F</span></div>}
@@ -437,6 +454,104 @@ function CartesCadeauxSection() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+function CreditSection({ ventesCredit, onDone }) {
+  const [venteSel, setVenteSel] = useState(null);
+  const [mode, setMode] = useState("especes");
+  const [montant, setMontant] = useState("");
+  const [carteNumero, setCarteNumero] = useState("");
+  const [error, setError] = useState("");
+  const [succes, setSucces] = useState("");
+
+  const nonSoldees = ventesCredit.filter((v) => v.resteAPayer > 0);
+  const soldees = ventesCredit.filter((v) => v.resteAPayer <= 0);
+
+  const ouvrirReglement = (v) => {
+    setVenteSel(v);
+    setMontant(v.resteAPayer);
+    setMode("especes");
+    setCarteNumero("");
+    setError("");
+    setSucces("");
+  };
+
+  const enregistrerReglement = async () => {
+    if (!montant || Number(montant) <= 0) { setError("Le montant doit être positif."); return; }
+    try {
+      await api.ventes.reglement(venteSel.id, {
+        mode, montant: Number(montant), carteNumero: mode === "bon_achat" ? carteNumero : undefined,
+      });
+      setSucces("Règlement enregistré.");
+      setVenteSel(null);
+      onDone();
+    } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <div>
+      {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
+
+      <p className="font-display font-semibold mb-3">Non soldées ({nonSoldees.length})</p>
+      <div className="space-y-2 mb-6">
+        {nonSoldees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune vente à crédit en attente de règlement.</p>}
+        {nonSoldees.map((v) => (
+          <div key={v.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div>
+              <p className="font-mono text-sm font-medium">{v.numero}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{v.client?.nomPrenoms || "Client inconnu"} · {new Date(v.date).toLocaleDateString("fr-FR")} · {v.boutique}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs" style={{ color: "#6B5D52" }}>Total {fmt(v.total)} F · Payé {fmt(v.totalPaye)} F</p>
+                <p className="text-sm font-semibold" style={{ color: "#B04A3B" }}>Reste {fmt(v.resteAPayer)} F</p>
+              </div>
+              <button onClick={() => ouvrirReglement(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer un règlement</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="font-display font-semibold mb-3">Soldées ({soldees.length})</p>
+      <div className="space-y-2">
+        {soldees.map((v) => (
+          <div key={v.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div>
+              <p className="font-mono text-sm font-medium">{v.numero}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{v.client?.nomPrenoms || "Client inconnu"} · {new Date(v.date).toLocaleDateString("fr-FR")} · {v.boutique}</p>
+            </div>
+            <p className="text-sm font-semibold" style={{ color: "#3F6B4A" }}>Soldée · {fmt(v.total)} F</p>
+          </div>
+        ))}
+      </div>
+
+      {venteSel && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+          <div className="rounded-xl p-6 max-w-sm w-full" style={{ background: "#FFFDF9" }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-semibold">Règlement — {venteSel.numero}</p>
+              <button onClick={() => setVenteSel(null)}><X size={18} color="#6B5D52" /></button>
+            </div>
+            {error && <p className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+            <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Reste à payer : {fmt(venteSel.resteAPayer)} F</p>
+            <Field label="Mode de paiement">
+              <select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>
+                {MODES_PAIEMENT.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Montant (F CFA)">
+              <input type="number" min="0" max={venteSel.resteAPayer} value={montant} onChange={(e) => setMontant(e.target.value)} style={inputStyle} />
+            </Field>
+            {mode === "bon_achat" && (
+              <Field label="Numéro de la carte cadeau">
+                <input value={carteNumero} onChange={(e) => setCarteNumero(e.target.value)} style={inputStyle} />
+              </Field>
+            )}
+            <button onClick={enregistrerReglement} className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider le règlement</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
