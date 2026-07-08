@@ -131,7 +131,7 @@ setDonnees(null);
           <p className="text-sm mb-1">Nombre de ventes : <strong>{fermeture.nombreVentes}</strong></p>
           <p className="text-sm mb-1">Total des ventes (net) : <strong>{formatFCFA(fermeture.totalVentes)}</strong></p>
           <p className="text-sm mb-1">Cartes cadeaux utilisées : <strong>{formatFCFA(fermeture.totalCartesCadeauxUtilisees)}</strong></p>
-          <p className="text-sm mb-1">Retours traités (avoirs générés) : <strong>{formatFCFA(fermeture.totalRetours)}</strong></p>
+          <p className="text-sm mb-1">Retours traités (avoirs générés) : <strong>- {formatFCFA(fermeture.totalRetours)}</strong></p>
           <p className="text-sm mb-3">Total monnaie rendue : <strong>{formatFCFA(fermeture.totalMonnaieRendue)}</strong></p>
           <table className="w-full text-sm">
             <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
@@ -158,7 +158,7 @@ setDonnees(null);
             </div>
             <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Retours traités (avoirs générés)</p>
-              <p className="font-display text-lg font-semibold">{formatFCFA(donnees.totalRetours)}</p>
+              <p className="font-display text-lg font-semibold" style={{ color: COULEUR.accent }}>- {formatFCFA(donnees.totalRetours)}</p>
             </div>
           </div>
           <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
@@ -325,7 +325,7 @@ setDonnees(null);
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Retours traités</p>
-                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalRetours)}</p>
+                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>- {formatFCFA(b.totalRetours)}</p>
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des règlements encaissés</p>
@@ -343,7 +343,7 @@ setDonnees(null);
               </div>
               <div>
                 <p className="text-xs opacity-80">Retours traités</p>
-                <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalRetours)}</p>
+                <p className="font-display text-xl font-semibold">- {formatFCFA(donnees.cumul.totalRetours)}</p>
               </div>
               <div>
                 <p className="text-xs opacity-80">Total des règlements encaissés</p>
