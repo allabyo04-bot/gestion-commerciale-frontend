@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift } from "lucide-react";
+import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, fmt } from "../constants.js";
@@ -9,6 +9,7 @@ function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 
 export default function VentesSection() {
   const { user } = useAuth();
+  const estAdmin = !!user?.role?.systeme;
   const [subTab, setSubTab] = useState("nouvelle");
   const [articles, setArticles] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -18,6 +19,12 @@ export default function VentesSection() {
   const [ventesCredit, setVentesCredit] = useState([]);
   const [vendeurs, setVendeurs] = useState([]);
   const [vendeurId, setVendeurId] = useState("");
+  const [demandeRemise, setDemandeRemise] = useState(null);
+  const [remiseFormOuvert, setRemiseFormOuvert] = useState(false);
+  const [remiseType, setRemiseType] = useState("MONTANT");
+  const [remiseValeur, setRemiseValeur] = useState("");
+  const [remiseChargement, setRemiseChargement] = useState(false);
+  const [nbRemisesEnAttente, setNbRemisesEnAttente] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [receipt, setReceipt] = useState(null);
@@ -50,9 +57,8 @@ export default function VentesSection() {
   }, [boutique]);
   useEffect(() => { load(); }, [load]);
 
-  // Le vendeur sélectionné n'est valable que pour sa propre boutique : on réinitialise si on change de boutique
   useEffect(() => { setVendeurId(""); }, [boutique]);
-// Pré-sélectionne automatiquement le client tout juste créé depuis l'écran Clients
+
   useEffect(() => {
     const dernierClientId = localStorage.getItem("gc_dernier_client_id");
     if (dernierClientId && clients.some((c) => c.id === dernierClientId)) {
@@ -60,6 +66,27 @@ export default function VentesSection() {
       localStorage.removeItem("gc_dernier_client_id");
     }
   }, [clients]);
+
+  useEffect(() => {
+    if (!demandeRemise || demandeRemise.statut !== "EN_ATTENTE") return;
+    const interval = setInterval(async () => {
+      try {
+        const maj = await api.remises.get(demandeRemise.id);
+        if (maj.statut !== "EN_ATTENTE") setDemandeRemise(maj);
+      } catch { /* erreur reseau ponctuelle */ }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [demandeRemise]);
+
+  useEffect(() => {
+    if (!estAdmin) return;
+    const rafraichir = async () => {
+      try { setNbRemisesEnAttente((await api.remises.list("EN_ATTENTE")).length); } catch { /* ignore */ }
+    };
+    rafraichir();
+    const interval = setInterval(rafraichir, 5000);
+    return () => clearInterval(interval);
+  }, [estAdmin]);
 
   const currentArticle = articles.find((a) => a.id === selArticle);
   const disponibilite = (article, b, pointure) => {
@@ -69,8 +96,19 @@ export default function VentesSection() {
   };
 
   const total = lignes.reduce((s, l) => s + l.sousTotal, 0);
+
+  useEffect(() => {
+    if (demandeRemise && demandeRemise.totalVente !== total) {
+      setDemandeRemise(null);
+      setError("Le panier a change depuis la demande de remise : elle a ete annulee. Refais une demande si besoin.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
+
+  const montantRemiseApplique = demandeRemise?.statut === "APPROUVEE" ? demandeRemise.montantRemise : 0;
+  const totalNet = total - montantRemiseApplique;
   const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
-  const reste = total - totalPaye;
+  const reste = totalNet - totalPaye;
 
   const addLigne = () => {
     if (!currentArticle) { setError("Choisis un article."); return; }
@@ -94,16 +132,37 @@ export default function VentesSection() {
   const updatePaiement = (id, patch) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const removePaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
-  const resetVente = () => { setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]); setVendeurId(""); };
+  const resetVente = () => {
+    setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
+    setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
+  };
+
+  const demanderRemise = async () => {
+    if (!remiseValeur || Number(remiseValeur) <= 0) { setError("Indique une valeur de remise valide."); return; }
+    if (remiseType === "POURCENTAGE" && Number(remiseValeur) > 100) { setError("Un pourcentage ne peut pas depasser 100."); return; }
+    setRemiseChargement(true);
+    try {
+      const clientSel = clients.find((c) => c.id === clientId);
+      const demande = await api.remises.create({
+        totalVente: total, type: remiseType, valeur: Number(remiseValeur),
+        clientNom: clientSel ? clientSel.nomPrenoms : undefined,
+      });
+      setDemandeRemise(demande);
+      setRemiseFormOuvert(false);
+      setRemiseValeur("");
+      setError("");
+    } catch (e) { setError(e.message); } finally { setRemiseChargement(false); }
+  };
 
   const validerVente = async () => {
-    if (lignes.length === 0) { setError("Ajoute au moins un article à la vente."); return; }
-    if (!vendeurId) { setError("Choisis le vendeur qui a réalisé cette vente."); return; }
-    if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente à crédit."); return; }
-    if (typeVente === "Comptant" && totalPaye < total) { setError("Le total payé est inférieur au total de la vente."); return; }
+    if (lignes.length === 0) { setError("Ajoute au moins un article a la vente."); return; }
+    if (!vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
+    if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente a credit."); return; }
+    if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
+        demandeRemiseId: demandeRemise?.statut === "APPROUVEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: (p.mode === "bon_achat" || p.mode === "avoir") ? p.carteNumero : undefined })),
       });
@@ -116,7 +175,7 @@ export default function VentesSection() {
 
   const mettreEnAttente = async () => {
     if (lignes.length === 0) { setError("Le panier est vide."); return; }
-    if (!vendeurId) { setError("Choisis le vendeur qui a réalisé cette vente."); return; }
+    if (!vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
     try {
       const clientSel = clients.find((c) => c.id === clientId);
       await api.ventesAttente.create({
@@ -136,7 +195,7 @@ export default function VentesSection() {
     setClientId(ticket.clientId || "");
     setModeVente(ticket.modeVente || MODES_VENTE[0]);
     setVendeurId(ticket.vendeurId || "");
-    try { await api.ventesAttente.remove(ticket.id); } catch { /* déjà supprimé, tant pis */ }
+    try { await api.ventesAttente.remove(ticket.id); } catch { /* deja supprime, tant pis */ }
     setSubTab("nouvelle");
     load();
   };
@@ -150,7 +209,8 @@ export default function VentesSection() {
       <ErrorBanner error={error} onClose={() => setError("")} />
 
       <div className="flex gap-2 mb-6 no-print flex-wrap">
-        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes à crédit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Échanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"]].map(([id, label]) => (
+        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
+          ...(estAdmin ? [["remises-admin", `Demandes de remise${nbRemisesEnAttente > 0 ? ` (${nbRemisesEnAttente})` : ""}`]] : [])].map(([id, label]) => (
 
 <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
@@ -179,7 +239,7 @@ export default function VentesSection() {
 <Field label="Type de vente">
                   <div className="flex gap-2 mt-1">
                     <button type="button" onClick={() => setTypeVente("Comptant")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Comptant" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Comptant</button>
-                    <button type="button" onClick={() => setTypeVente("Credit")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Credit" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Crédit</button>
+                    <button type="button" onClick={() => setTypeVente("Credit")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Credit" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Credit</button>
                   </div>
                 </Field>
                 <Field label="Client (nom ou n° carte)">
@@ -226,7 +286,7 @@ export default function VentesSection() {
                 ) : (
                   <Field label="Disponible"><div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{currentArticle ? `${disponibilite(currentArticle, boutique)} en stock` : "—"}</div></Field>
                 )}
-                <Field label="Quantité"><input type="number" min="1" value={selQty} onChange={(e) => setSelQty(e.target.value)} style={inputStyle} /></Field>
+                <Field label="Quantite"><input type="number" min="1" value={selQty} onChange={(e) => setSelQty(e.target.value)} style={inputStyle} /></Field>
               </div>
               <button onClick={addLigne} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Ajouter au panier</button>
             </div>
@@ -235,7 +295,7 @@ export default function VentesSection() {
           <div className="lg:col-span-2">
             <div className="rounded-xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <p className="font-display font-semibold mb-3 flex items-center gap-2"><ShoppingCart size={16} /> Panier</p>
-              {lignes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun article ajouté.</p>}
+              {lignes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun article ajoute.</p>}
               <div className="space-y-2">
                 {lignes.map((l) => (
                   <div key={l.id} className="flex items-center justify-between text-sm pb-2" style={{ borderBottom: "1px solid #EFE7D9" }}>
@@ -246,6 +306,49 @@ export default function VentesSection() {
               </div>
               <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid #EAE1D2" }}>
                 <p className="font-display font-semibold">Total</p><p className="font-display text-xl font-semibold" style={{ color: "#8C3B2E" }}>{fmt(total)} F</p>
+              </div>
+
+              <div className="mt-3 pt-3" style={{ borderTop: "1px solid #EFE7D9" }}>
+                {!demandeRemise && !remiseFormOuvert && (
+                  <button onClick={() => setRemiseFormOuvert(true)} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#8C3B2E" }}>
+                    <Percent size={13} /> Demander une remise
+                  </button>
+                )}
+                {!demandeRemise && remiseFormOuvert && (
+                  <div className="rounded-lg p-3" style={{ background: "#F1E9DC" }}>
+                    <div className="flex gap-2 mb-2">
+                      <button type="button" onClick={() => setRemiseType("MONTANT")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "MONTANT" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Montant (F)</button>
+                      <button type="button" onClick={() => setRemiseType("POURCENTAGE")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "POURCENTAGE" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Pourcentage (%)</button>
+                    </div>
+                    <input type="number" min="0" value={remiseValeur} onChange={(e) => setRemiseValeur(e.target.value)} placeholder={remiseType === "MONTANT" ? "Ex : 5000" : "Ex : 10"} style={{ ...inputStyle, marginTop: 0 }} />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => { setRemiseFormOuvert(false); setRemiseValeur(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                      <button onClick={demanderRemise} disabled={remiseChargement} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{remiseChargement ? "Envoi..." : "Envoyer a Djenie"}</button>
+                    </div>
+                  </div>
+                )}
+                {demandeRemise?.statut === "EN_ATTENTE" && (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                    <Clock size={13} /> En attente de validation par Djenie ({demandeRemise.numero})…
+                  </div>
+                )}
+                {demandeRemise?.statut === "APPROUVEE" && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={13} /> Remise approuvee : - {fmt(demandeRemise.montantRemise)} F</span>
+                    <button onClick={() => setDemandeRemise(null)} style={{ color: "#B04A3B" }}><X size={13} /></button>
+                  </div>
+                )}
+                {demandeRemise?.statut === "REFUSEE" && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>
+                    <span className="flex items-center gap-1.5"><XCircle size={13} /> Remise refusee par Djenie</span>
+                    <button onClick={() => setDemandeRemise(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
+                  </div>
+                )}
+                {montantRemiseApplique > 0 && (
+                  <div className="flex items-center justify-between mt-2 text-sm font-semibold">
+                    <span style={{ color: "#6B5D52" }}>Net a payer</span><span style={{ color: "#3F6B4A" }}>{fmt(totalNet)} F</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -267,14 +370,14 @@ export default function VentesSection() {
                         <button onClick={() => removePaiement(p.id)} style={{ color: "#B04A3B" }}><Minus size={14} /></button>
                       </div>
                       {(p.mode === "bon_achat" || p.mode === "avoir") && (
-                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} placeholder={p.mode === "avoir" ? "Numéro de l'avoir" : "Numéro de la carte cadeau"} style={{ ...inputStyle, marginTop: "6px" }} />
+                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} placeholder={p.mode === "avoir" ? "Numero de l'avoir" : "Numero de la carte cadeau"} style={{ ...inputStyle, marginTop: "6px" }} />
                       )}
                     </div>
                   );
                 })}
               </div>
-              <div className="flex items-center justify-between mt-3 text-sm"><span style={{ color: "#6B5D52" }}>Payé</span><span className="font-mono">{fmt(totalPaye)} F</span></div>
-              <div className="flex items-center justify-between text-sm"><span style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{reste > 0 ? "Reste à payer" : "Monnaie à rendre"}</span><span className="font-mono" style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{fmt(Math.abs(reste))} F</span></div>
+              <div className="flex items-center justify-between mt-3 text-sm"><span style={{ color: "#6B5D52" }}>Paye</span><span className="font-mono">{fmt(totalPaye)} F</span></div>
+              <div className="flex items-center justify-between text-sm"><span style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{reste > 0 ? "Reste a payer" : "Monnaie a rendre"}</span><span className="font-mono" style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{fmt(Math.abs(reste))} F</span></div>
               <div className="flex gap-2 mt-4">
                 <button onClick={mettreEnAttente} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}><PauseCircle size={16} /> Mettre en attente</button>
                 <button onClick={validerVente} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider la vente</button>
@@ -306,7 +409,7 @@ export default function VentesSection() {
         <div className="space-y-3">
           {ventes.map((v) => (
             <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }} onClick={() => setReceipt(v)}>
-              <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}</p></div>
+              <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquee" : ""}</p></div>
               <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
             </div>
           ))}
@@ -316,7 +419,8 @@ export default function VentesSection() {
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
       {subTab === "cartes" && <CartesCadeauxSection />}
       {subTab === "avoirs" && <AvoirsSection />}
-{subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
+      {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
+      {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
 
       {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
     </div>
@@ -329,7 +433,7 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
       <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
-        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Reçu de vente</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
+        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Recu de vente</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
 
         <div className="text-center mb-3">
           <p className="font-display font-bold text-sm leading-tight">{infos.nom}</p>
@@ -348,11 +452,19 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1.5">
           {vente.lignes.map((l) => <div key={l.id} className="flex justify-between text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span>{fmt(l.sousTotal)} F</span></div>)}
         </div>
-        <div className="flex justify-between font-semibold mt-3 text-sm"><span>TOTAL</span><span>{fmt(vente.total)} F</span></div>
+        {vente.montantRemise > 0 ? (
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Sous-total</span><span>{fmt(vente.total + vente.montantRemise)} F</span></div>
+            <div className="flex justify-between text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Remise accordee</span><span>- {fmt(vente.montantRemise)} F</span></div>
+            <div className="flex justify-between font-semibold text-sm"><span>NET A PAYER</span><span>{fmt(vente.total)} F</span></div>
+          </div>
+        ) : (
+          <div className="flex justify-between font-semibold mt-3 text-sm"><span>TOTAL</span><span>{fmt(vente.total)} F</span></div>
+        )}
 {vente.typeVente === "Credit" && (
           <div className="mt-1 space-y-1">
-            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Payé</span><span>{fmt(totalPayeRecu)} F</span></div>
-            <div className="flex justify-between text-xs font-semibold" style={{ color: "#B04A3B" }}><span>Reste à payer</span><span>{fmt(vente.total - totalPayeRecu)} F</span></div>
+            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Paye</span><span>{fmt(totalPayeRecu)} F</span></div>
+            <div className="flex justify-between text-xs font-semibold" style={{ color: "#B04A3B" }}><span>Reste a payer</span><span>{fmt(vente.total - totalPayeRecu)} F</span></div>
           </div>
         )}
         <div className="mt-2 space-y-1">
@@ -365,6 +477,57 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
         </div>
 
         <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+      </div>
+    </div>
+  );
+}
+
+function RemisesAdminSection({ onTraite }) {
+  const [demandes, setDemandes] = useState([]);
+  const [error, setError] = useState("");
+  const [traitementId, setTraitementId] = useState(null);
+
+  const load = useCallback(async () => {
+    try { setDemandes(await api.remises.list("EN_ATTENTE")); } catch (e) { setError(e.message); }
+  }, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  const traiter = async (demande, statut) => {
+    setTraitementId(demande.id);
+    try {
+      await api.remises.traiter(demande.id, statut);
+      setDemandes((d) => d.filter((x) => x.id !== demande.id));
+      onTraite?.();
+    } catch (e) { setError(e.message); } finally { setTraitementId(null); }
+  };
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Cette liste se met a jour automatiquement toutes les 5 secondes.</p>
+      {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+      {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune demande en attente pour le moment.</p>}
+      <div className="space-y-3">
+        {demandes.map((d) => (
+          <div key={d.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div>
+              <p className="font-mono text-sm font-medium">{d.numero} · {d.boutique}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>
+                Demandee par {d.demandePar?.prenom} {d.demandePar?.nom}{d.clientNom ? ` · Client : ${d.clientNom}` : ""}
+              </p>
+              <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>
+                Panier {fmt(d.totalVente)} F · Remise demandee : {d.type === "POURCENTAGE" ? `${d.valeur}%` : `${fmt(d.valeur)} F`} → <strong style={{ color: "#8C3B2E" }}>-{fmt(d.montantRemise)} F</strong>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => traiter(d, "REFUSEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Refuser</button>
+              <button onClick={() => traiter(d, "APPROUVEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Approuver</button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -389,7 +552,6 @@ function RetoursSection({ ventes, boutique, onDone }) {
   const resultats = numero.trim() ? ventes.filter((v) => v.numero.toLowerCase().includes(numero.toLowerCase())) : [];
   const ligne = venteChoisie?.lignes.find((l) => l.id === ligneChoisie);
 
-  // Pré-remplit le montant de l'avoir dès que la ligne ou la quantité change — reste modifiable par la caissière
   useEffect(() => {
     if (type === "Retour" && ligne) {
       setMontantRembourse(String(ligne.prixUnitaire * Math.max(1, parseInt(quantite, 10) || 1)));
@@ -397,11 +559,11 @@ function RetoursSection({ ventes, boutique, onDone }) {
   }, [type, ligne, quantite]);
 
   const submit = async () => {
-    if (!venteChoisie || !ligneChoisie) { setError("Choisis la vente et la ligne concernée."); return; }
+    if (!venteChoisie || !ligneChoisie) { setError("Choisis la vente et la ligne concernee."); return; }
     if (type === "Retour") {
-      if (!venteChoisie.clientId) { setError("Un client doit être associé à cette vente pour générer un avoir. Ajoute d'abord le client sur la vente."); return; }
+      if (!venteChoisie.clientId) { setError("Un client doit etre associe a cette vente pour generer un avoir. Ajoute d'abord le client sur la vente."); return; }
       if (!montantRembourse) { setError("Le montant de l'avoir est obligatoire."); return; }
-      if (!dateValiditeAvoir) { setError("La date de validité de l'avoir est obligatoire."); return; }
+      if (!dateValiditeAvoir) { setError("La date de validite de l'avoir est obligatoire."); return; }
     }
     const clientNomAvantReset = venteChoisie.client?.nomPrenoms || "";
     try {
@@ -416,7 +578,7 @@ function RetoursSection({ ventes, boutique, onDone }) {
         setAvoirClientNom(clientNomAvantReset);
         setSucces("");
       } else {
-        setSucces("Échange enregistré et stock mis à jour.");
+        setSucces("Echange enregistre et stock mis a jour.");
         setAvoirGenere(null);
       }
       setError("");
@@ -430,8 +592,8 @@ function RetoursSection({ ventes, boutique, onDone }) {
     <div className="max-w-lg">
       {avoirGenere && (
         <div className="mb-4 px-4 py-3 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
-          <p className="font-semibold mb-1">Retour enregistré — avoir généré pour la cliente</p>
-          <p className="text-sm">Numéro : <span className="font-mono font-semibold">{avoirGenere.numero}</span></p>
+          <p className="font-semibold mb-1">Retour enregistre — avoir genere pour la cliente</p>
+          <p className="text-sm">Numero : <span className="font-mono font-semibold">{avoirGenere.numero}</span></p>
           <p className="text-sm">Montant : <span className="font-semibold">{fmt(avoirGenere.montant)} F</span></p>
           <p className="text-sm">Valable jusqu'au : <span className="font-semibold">{new Date(avoirGenere.dateValidite).toLocaleDateString("fr-FR")}</span></p>
           <button onClick={() => setAvoirReceipt(avoirGenere)} className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}><Printer size={14} /> Imprimer le bon d'avoir</button>
@@ -440,7 +602,7 @@ function RetoursSection({ ventes, boutique, onDone }) {
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
 
-      <Field label="Numéro de reçu">
+      <Field label="Numero de recu">
         <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} style={inputStyle} placeholder="REC-000123" />
       </Field>
       {resultats.length > 0 && !venteChoisie && (
@@ -453,7 +615,7 @@ function RetoursSection({ ventes, boutique, onDone }) {
 
       {venteChoisie && (
         <>
-          <Field label="Article concerné">
+          <Field label="Article concerne">
             <select value={ligneChoisie} onChange={(e) => setLigneChoisie(e.target.value)} style={inputStyle}>
               <option value="">— Choisir —</option>
               {venteChoisie.lignes.map((l) => <option key={l.id} value={l.id}>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} (×{l.quantite})</option>)}
@@ -461,7 +623,7 @@ function RetoursSection({ ventes, boutique, onDone }) {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Type"><select value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}><option>Retour</option><option>Echange</option></select></Field>
-            <Field label="Quantité"><input type="number" min="1" max={ligne?.quantite || 1} value={quantite} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} /></Field>
+            <Field label="Quantite"><input type="number" min="1" max={ligne?.quantite || 1} value={quantite} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} /></Field>
           </div>
           {type === "Echange" && (
             <Field label="Nouvelle pointure">
@@ -472,19 +634,19 @@ function RetoursSection({ ventes, boutique, onDone }) {
           )}
           {type === "Retour" && (
             <div className="rounded-lg p-3 mt-1 mb-1" style={{ background: "#F1E9DC" }}>
-              <p className="text-xs font-medium mb-2" style={{ color: "#6B5D52" }}>Un avoir sera généré automatiquement pour la cliente — aucun remboursement en espèces.</p>
+              <p className="text-xs font-medium mb-2" style={{ color: "#6B5D52" }}>Un avoir sera genere automatiquement pour la cliente — aucun remboursement en especes.</p>
               {!venteChoisie.clientId && (
-                <p className="text-xs mb-2" style={{ color: "#B04A3B" }}>Cette vente n'a pas de client associé : l'avoir ne pourra pas être créé.</p>
+                <p className="text-xs mb-2" style={{ color: "#B04A3B" }}>Cette vente n'a pas de client associe : l'avoir ne pourra pas etre cree.</p>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Montant de l'avoir (F CFA)"><input type="number" min="0" value={montantRembourse} onChange={(e) => setMontantRembourse(e.target.value)} style={inputStyle} /></Field>
-                <Field label="Date de validité de l'avoir"><input type="date" value={dateValiditeAvoir} onChange={(e) => setDateValiditeAvoir(e.target.value)} style={inputStyle} /></Field>
+                <Field label="Date de validite de l'avoir"><input type="date" value={dateValiditeAvoir} onChange={(e) => setDateValiditeAvoir(e.target.value)} style={inputStyle} /></Field>
               </div>
-              <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Montant pré-rempli selon le prix de l'article — modifiable si besoin.</p>
+              <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Montant pre-rempli selon le prix de l'article — modifiable si besoin.</p>
             </div>
           )}
           <Field label="Motif (optionnel)"><input value={motif} onChange={(e) => setMotif(e.target.value)} style={inputStyle} /></Field>
-          <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer le {type === "Retour" ? "retour" : "échange"}</button>
+          <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer le {type === "Retour" ? "retour" : "echange"}</button>
         </>
       )}
 
@@ -510,7 +672,7 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
 
         <p className="text-center font-display text-lg font-semibold">BON D'AVOIR</p>
         <p className="text-center font-mono text-base font-semibold mt-1">{avoir.numero}</p>
-        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>Émis le {new Date(avoir.createdAt || Date.now()).toLocaleDateString("fr-FR")}</p>
+        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>Emis le {new Date(avoir.createdAt || Date.now()).toLocaleDateString("fr-FR")}</p>
 
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-2">
           <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Client</span><span className="font-medium">{clientNom || "—"}</span></div>
@@ -520,7 +682,7 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
 
         <div className="mt-3 pt-3">
           <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>
-            Ce bon est valable dans les deux boutiques La Pointure Espagnole (Angré et Koumassi), en une seule fois, jusqu'à sa date de validité. Il doit être présenté en caisse — numéro obligatoire pour l'utiliser.
+            Ce bon est valable dans les deux boutiques La Pointure Espagnole (Angre et Koumassi), en une seule fois, jusqu'a sa date de validite. Il doit etre presente en caisse — numero obligatoire pour l'utiliser.
           </p>
         </div>
 
@@ -528,7 +690,9 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
       </div>
     </div>
   );
-}function CartesCadeauxSection() {
+}
+
+function CartesCadeauxSection() {
   const [cartes, setCartes] = useState([]);
   const [numero, setNumero] = useState("");
   const [montant, setMontant] = useState("");
@@ -551,12 +715,12 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
       <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau</p>
-        <Field label="Numéro (laisser vide pour générer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>
+        <Field label="Numero (laisser vide pour generer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Montant (F CFA)"><input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
-          <Field label="Validité (optionnel)"><input type="date" value={dateValidite} onChange={(e) => setDateValidite(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Validite (optionnel)"><input type="date" value={dateValidite} onChange={(e) => setDateValidite(e.target.value)} style={inputStyle} /></Field>
         </div>
-        <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Créer la carte</button>
+        <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Creer la carte</button>
       </div>
 
       <div className="space-y-2">
@@ -565,7 +729,7 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
             <div><p className="font-mono text-sm font-medium">{c.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p></div>
             <div className="text-right">
               <p className="font-mono text-sm">{fmt(c.montant)} F</p>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisée" : "Disponible"}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisee" : "Disponible"}</span>
             </div>
           </div>
         ))}
@@ -584,7 +748,7 @@ function AvoirsSection() {
   return (
     <div>
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
-      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Les avoirs sont générés automatiquement lors d'un retour — cette liste est en lecture seule.</p>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Les avoirs sont generes automatiquement lors d'un retour — cette liste est en lecture seule.</p>
       <div className="space-y-2">
         {avoirs.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun avoir pour le moment.</p>}
         {avoirs.map((a) => (
@@ -595,7 +759,7 @@ function AvoirsSection() {
             </div>
             <div className="text-right">
               <p className="font-mono text-sm">{fmt(a.montant)} F</p>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: a.utilisee ? "#FBEAE7" : "#E9F0EA", color: a.utilisee ? "#B04A3B" : "#3F6B4A" }}>{a.utilisee ? "Utilisé" : "Disponible"}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: a.utilisee ? "#FBEAE7" : "#E9F0EA", color: a.utilisee ? "#B04A3B" : "#3F6B4A" }}>{a.utilisee ? "Utilise" : "Disponible"}</span>
             </div>
           </div>
         ))}
@@ -624,12 +788,12 @@ function CreditSection({ ventesCredit, onDone }) {
   };
 
   const enregistrerReglement = async () => {
-    if (!montant || Number(montant) <= 0) { setError("Le montant doit être positif."); return; }
+    if (!montant || Number(montant) <= 0) { setError("Le montant doit etre positif."); return; }
     try {
       await api.ventes.reglement(venteSel.id, {
         mode, montant: Number(montant), carteNumero: (mode === "bon_achat" || mode === "avoir") ? carteNumero : undefined,
       });
-      setSucces("Règlement enregistré.");
+      setSucces("Reglement enregistre.");
       setVenteSel(null);
       onDone();
     } catch (e) { setError(e.message); }
@@ -639,9 +803,9 @@ function CreditSection({ ventesCredit, onDone }) {
     <div>
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
 
-      <p className="font-display font-semibold mb-3">Non soldées ({nonSoldees.length})</p>
+      <p className="font-display font-semibold mb-3">Non soldees ({nonSoldees.length})</p>
       <div className="space-y-2 mb-6">
-        {nonSoldees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune vente à crédit en attente de règlement.</p>}
+        {nonSoldees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune vente a credit en attente de reglement.</p>}
         {nonSoldees.map((v) => (
           <div key={v.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
             <div>
@@ -650,16 +814,16 @@ function CreditSection({ ventesCredit, onDone }) {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-xs" style={{ color: "#6B5D52" }}>Total {fmt(v.total)} F · Payé {fmt(v.totalPaye)} F</p>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>Total {fmt(v.total)} F · Paye {fmt(v.totalPaye)} F</p>
                 <p className="text-sm font-semibold" style={{ color: "#B04A3B" }}>Reste {fmt(v.resteAPayer)} F</p>
               </div>
-              <button onClick={() => ouvrirReglement(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer un règlement</button>
+              <button onClick={() => ouvrirReglement(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer un reglement</button>
             </div>
           </div>
         ))}
       </div>
 
-      <p className="font-display font-semibold mb-3">Soldées ({soldees.length})</p>
+      <p className="font-display font-semibold mb-3">Soldees ({soldees.length})</p>
       <div className="space-y-2">
         {soldees.map((v) => (
           <div key={v.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -667,7 +831,7 @@ function CreditSection({ ventesCredit, onDone }) {
               <p className="font-mono text-sm font-medium">{v.numero}</p>
               <p className="text-xs" style={{ color: "#6B5D52" }}>{v.client?.nomPrenoms || "Client inconnu"} · {new Date(v.date).toLocaleDateString("fr-FR")} · {v.boutique}</p>
             </div>
-            <p className="text-sm font-semibold" style={{ color: "#3F6B4A" }}>Soldée · {fmt(v.total)} F</p>
+            <p className="text-sm font-semibold" style={{ color: "#3F6B4A" }}>Soldee · {fmt(v.total)} F</p>
           </div>
         ))}
       </div>
@@ -676,11 +840,11 @@ function CreditSection({ ventesCredit, onDone }) {
         <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
           <div className="rounded-xl p-6 max-w-sm w-full" style={{ background: "#FFFDF9" }}>
             <div className="flex items-center justify-between mb-4">
-              <p className="font-display font-semibold">Règlement — {venteSel.numero}</p>
+              <p className="font-display font-semibold">Reglement — {venteSel.numero}</p>
               <button onClick={() => setVenteSel(null)}><X size={18} color="#6B5D52" /></button>
             </div>
             {error && <p className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
-            <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Reste à payer : {fmt(venteSel.resteAPayer)} F</p>
+            <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Reste a payer : {fmt(venteSel.resteAPayer)} F</p>
             <Field label="Mode de paiement">
               <select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>
                 {MODES_PAIEMENT.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -690,11 +854,11 @@ function CreditSection({ ventesCredit, onDone }) {
               <input type="number" min="0" max={venteSel.resteAPayer} value={montant} onChange={(e) => setMontant(e.target.value)} style={inputStyle} />
             </Field>
             {(mode === "bon_achat" || mode === "avoir") && (
-              <Field label={mode === "avoir" ? "Numéro de l'avoir" : "Numéro de la carte cadeau"}>
+              <Field label={mode === "avoir" ? "Numero de l'avoir" : "Numero de la carte cadeau"}>
                 <input value={carteNumero} onChange={(e) => setCarteNumero(e.target.value)} style={inputStyle} />
               </Field>
             )}
-            <button onClick={enregistrerReglement} className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider le règlement</button>
+            <button onClick={enregistrerReglement} className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider le reglement</button>
           </div>
         </div>
       )}

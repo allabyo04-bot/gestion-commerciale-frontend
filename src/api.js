@@ -117,6 +117,12 @@ vendeurs: {
     create: (data) => request("/api/vendeurs", { method: "POST", body: data }),
     update: (id, data) => request(`/api/vendeurs/${id}`, { method: "PATCH", body: data }),
   },
+remises: {
+    create: (data) => request("/api/remises", { method: "POST", body: data }),
+    get: (id) => request(`/api/remises/${id}`),
+    list: (statut) => request(`/api/remises${statut ? `?statut=${encodeURIComponent(statut)}` : ""}`),
+    traiter: (id, statut) => request(`/api/remises/${id}`, { method: "PATCH", body: { statut } }),
+  },
   etats: {
     parDate: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
