@@ -112,6 +112,11 @@ creditListe: (params = {}) => {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
     create: (data) => request("/api/retours", { method: "POST", body: data }),
   },
+vendeurs: {
+    list: (boutique) => request(`/api/vendeurs${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
+    create: (data) => request("/api/vendeurs", { method: "POST", body: data }),
+    update: (id, data) => request(`/api/vendeurs/${id}`, { method: "PATCH", body: data }),
+  },
   etats: {
     parDate: (params = {}) => {
       const qs = new URLSearchParams(params).toString();

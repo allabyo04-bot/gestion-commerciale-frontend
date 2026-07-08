@@ -15,7 +15,9 @@ export default function VentesSection() {
   const [clients, setClients] = useState([]);
   const [ventes, setVentes] = useState([]);
   const [attentes, setAttentes] = useState([]);
-const [ventesCredit, setVentesCredit] = useState([]);
+  const [ventesCredit, setVentesCredit] = useState([]);
+  const [vendeurs, setVendeurs] = useState([]);
+  const [vendeurId, setVendeurId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [receipt, setReceipt] = useState(null);
@@ -24,7 +26,7 @@ const [ventesCredit, setVentesCredit] = useState([]);
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
-const [typeVente, setTypeVente] = useState("Comptant");
+  const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
   const [paiements, setPaiements] = useState([]);
 
@@ -37,14 +39,19 @@ const [typeVente, setTypeVente] = useState("Comptant");
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, b, c, v, at, vc] = await Promise.all([
+      const [a, b, c, v, at, vc, vd] = await Promise.all([
         api.articles.list(), api.brands.list(), api.clients.list(),
         api.ventes.list({ boutique }), api.ventesAttente.list(boutique), api.ventes.creditListe({ boutique }),
+        api.vendeurs.list(boutique),
       ]);
       setArticles(a); setBrands(b); setClients(c); setVentes(v); setAttentes(at); setVentesCredit(vc);
+      setVendeurs(vd);
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, [boutique]);
   useEffect(() => { load(); }, [load]);
+
+  // Le vendeur sélectionné n'est valable que pour sa propre boutique : on réinitialise si on change de boutique
+  useEffect(() => { setVendeurId(""); }, [boutique]);
 
   const currentArticle = articles.find((a) => a.id === selArticle);
   const disponibilite = (article, b, pointure) => {
@@ -79,15 +86,16 @@ const [typeVente, setTypeVente] = useState("Comptant");
   const updatePaiement = (id, patch) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const removePaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
-  const resetVente = () => { setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]); };
+  const resetVente = () => { setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]); setVendeurId(""); };
 
   const validerVente = async () => {
     if (lignes.length === 0) { setError("Ajoute au moins un article à la vente."); return; }
-if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente à crédit."); return; }
+    if (!vendeurId) { setError("Choisis le vendeur qui a réalisé cette vente."); return; }
+    if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente à crédit."); return; }
     if (typeVente === "Comptant" && totalPaye < total) { setError("Le total payé est inférieur au total de la vente."); return; }
     try {
       const vente = await api.ventes.create({
-        boutique, vendeurId: user.id, modeVente, typeVente, clientId: clientId || null,
+        boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: p.mode === "bon_achat" ? p.carteNumero : undefined })),
       });
@@ -100,10 +108,11 @@ if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire p
 
   const mettreEnAttente = async () => {
     if (lignes.length === 0) { setError("Le panier est vide."); return; }
+    if (!vendeurId) { setError("Choisis le vendeur qui a réalisé cette vente."); return; }
     try {
       const clientSel = clients.find((c) => c.id === clientId);
       await api.ventesAttente.create({
-        boutique, vendeurId: user.id, clientId: clientId || null, modeVente,
+        boutique, vendeurId, clientId: clientId || null, modeVente,
         label: clientSel ? clientSel.nomPrenoms : undefined,
         panier: lignes, paiements,
       });
@@ -118,6 +127,7 @@ if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire p
     setPaiements(ticket.paiements || []);
     setClientId(ticket.clientId || "");
     setModeVente(ticket.modeVente || MODES_VENTE[0]);
+    setVendeurId(ticket.vendeurId || "");
     try { await api.ventesAttente.remove(ticket.id); } catch { /* déjà supprimé, tant pis */ }
     setSubTab("nouvelle");
     load();
@@ -148,6 +158,12 @@ if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire p
                   ) : (
                     <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{boutique}</div>
                   )}
+                </Field>
+                <Field label="Vendeur">
+                  <select value={vendeurId} onChange={(e) => setVendeurId(e.target.value)} style={inputStyle}>
+                    <option value="">— Choisir —</option>
+                    {vendeurs.filter((v) => v.actif !== false).map((v) => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                  </select>
                 </Field>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -282,7 +298,7 @@ if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire p
         <div className="space-y-3">
           {ventes.map((v) => (
             <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }} onClick={() => setReceipt(v)}>
-              <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · {v.vendeur?.prenom} {v.vendeur?.nom} · {v.modeVente}</p></div>
+              <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}</p></div>
               <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
             </div>
           ))}
@@ -316,7 +332,8 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
 
         <p className="text-center font-display text-lg font-semibold">{vente.numero}</p>
         <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>{new Date(vente.date).toLocaleString("fr-FR")} · {vente.boutique}</p>
-        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Vendeur : {vente.vendeur?.prenom} {vente.vendeur?.nom}</div>
+        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Vendeur : {vente.vendeur?.nom}</div>
+        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Caissier : {vente.caissier?.prenom} {vente.caissier?.nom}</div>
         <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Mode : {vente.modeVente}</div>
         {vente.client && <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {vente.client.nomPrenoms}</div>}
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1.5">
