@@ -374,9 +374,19 @@ function RetoursSection({ ventes, boutique, onDone }) {
   const [dateValiditeAvoir, setDateValiditeAvoir] = useState("");
   const [error, setError] = useState("");
   const [succes, setSucces] = useState("");
+  const [avoirGenere, setAvoirGenere] = useState(null);
+  const [avoirClientNom, setAvoirClientNom] = useState("");
+  const [avoirReceipt, setAvoirReceipt] = useState(null);
 
   const resultats = numero.trim() ? ventes.filter((v) => v.numero.toLowerCase().includes(numero.toLowerCase())) : [];
   const ligne = venteChoisie?.lignes.find((l) => l.id === ligneChoisie);
+
+  // Pré-remplit le montant de l'avoir dès que la ligne ou la quantité change — reste modifiable par la caissière
+  useEffect(() => {
+    if (type === "Retour" && ligne) {
+      setMontantRembourse(String(ligne.prixUnitaire * Math.max(1, parseInt(quantite, 10) || 1)));
+    }
+  }, [type, ligne, quantite]);
 
   const submit = async () => {
     if (!venteChoisie || !ligneChoisie) { setError("Choisis la vente et la ligne concernée."); return; }
@@ -385,14 +395,22 @@ function RetoursSection({ ventes, boutique, onDone }) {
       if (!montantRembourse) { setError("Le montant de l'avoir est obligatoire."); return; }
       if (!dateValiditeAvoir) { setError("La date de validité de l'avoir est obligatoire."); return; }
     }
+    const clientNomAvantReset = venteChoisie.client?.nomPrenoms || "";
     try {
-      await api.retours.create({
+      const retourCree = await api.retours.create({
         venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite),
         nouvellePointure: type === "Echange" ? nouvellePointure : undefined, motif, boutique,
         montantRembourse: type === "Retour" ? Number(montantRembourse) : undefined,
         dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : undefined,
       });
-      setSucces(type === "Retour" ? "Retour enregistré, stock mis à jour et avoir généré pour la cliente." : "Échange enregistré et stock mis à jour.");
+      if (type === "Retour" && retourCree.bonValeurGenere) {
+        setAvoirGenere(retourCree.bonValeurGenere);
+        setAvoirClientNom(clientNomAvantReset);
+        setSucces("");
+      } else {
+        setSucces("Échange enregistré et stock mis à jour.");
+        setAvoirGenere(null);
+      }
       setError("");
       setVenteChoisie(null); setLigneChoisie(""); setNumero(""); setMotif(""); setQuantite(1); setNouvellePointure("");
       setMontantRembourse(""); setDateValiditeAvoir("");
@@ -402,11 +420,20 @@ function RetoursSection({ ventes, boutique, onDone }) {
 
   return (
     <div className="max-w-lg">
+      {avoirGenere && (
+        <div className="mb-4 px-4 py-3 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+          <p className="font-semibold mb-1">Retour enregistré — avoir généré pour la cliente</p>
+          <p className="text-sm">Numéro : <span className="font-mono font-semibold">{avoirGenere.numero}</span></p>
+          <p className="text-sm">Montant : <span className="font-semibold">{fmt(avoirGenere.montant)} F</span></p>
+          <p className="text-sm">Valable jusqu'au : <span className="font-semibold">{new Date(avoirGenere.dateValidite).toLocaleDateString("fr-FR")}</span></p>
+          <button onClick={() => setAvoirReceipt(avoirGenere)} className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}><Printer size={14} /> Imprimer le bon d'avoir</button>
+        </div>
+      )}
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
 
       <Field label="Numéro de reçu">
-        <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); }} style={inputStyle} placeholder="REC-000123" />
+        <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} style={inputStyle} placeholder="REC-000123" />
       </Field>
       {resultats.length > 0 && !venteChoisie && (
         <div className="mt-2 rounded-lg overflow-hidden" style={{ border: "1px solid #DDD3C4" }}>
@@ -445,17 +472,55 @@ function RetoursSection({ ventes, boutique, onDone }) {
                 <Field label="Montant de l'avoir (F CFA)"><input type="number" min="0" value={montantRembourse} onChange={(e) => setMontantRembourse(e.target.value)} style={inputStyle} /></Field>
                 <Field label="Date de validité de l'avoir"><input type="date" value={dateValiditeAvoir} onChange={(e) => setDateValiditeAvoir(e.target.value)} style={inputStyle} /></Field>
               </div>
+              <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Montant pré-rempli selon le prix de l'article — modifiable si besoin.</p>
             </div>
           )}
           <Field label="Motif (optionnel)"><input value={motif} onChange={(e) => setMotif(e.target.value)} style={inputStyle} /></Field>
           <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer le {type === "Retour" ? "retour" : "échange"}</button>
         </>
       )}
+
+      {avoirReceipt && <AvoirReceiptModal avoir={avoirReceipt} boutique={boutique} clientNom={avoirClientNom} onClose={() => setAvoirReceipt(null)} />}
     </div>
   );
 }
 
-function CartesCadeauxSection() {
+function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
+  const infos = INFOS_BOUTIQUE[boutique] || {};
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+      <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
+        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Bon d'avoir</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
+
+        <div className="text-center mb-3">
+          <p className="font-display font-bold text-sm leading-tight">{infos.nom}</p>
+          <p className="font-display font-bold text-sm leading-tight">{infos.ligne2}</p>
+          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{infos.adresse}</p>
+          <p className="text-xs" style={{ color: "#6B5D52" }}>{infos.telephone}</p>
+        </div>
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="my-2" />
+
+        <p className="text-center font-display text-lg font-semibold">BON D'AVOIR</p>
+        <p className="text-center font-mono text-base font-semibold mt-1">{avoir.numero}</p>
+        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>Émis le {new Date(avoir.createdAt || Date.now()).toLocaleDateString("fr-FR")}</p>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-2">
+          <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Client</span><span className="font-medium">{clientNom || "—"}</span></div>
+          <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Montant</span><span className="font-semibold">{fmt(avoir.montant)} F</span></div>
+          <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Valable jusqu'au</span><span className="font-medium">{new Date(avoir.dateValidite).toLocaleDateString("fr-FR")}</span></div>
+        </div>
+
+        <div className="mt-3 pt-3">
+          <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>
+            Ce bon est valable dans les deux boutiques La Pointure Espagnole (Angré et Koumassi), en une seule fois, jusqu'à sa date de validité. Il doit être présenté en caisse — numéro obligatoire pour l'utiliser.
+          </p>
+        </div>
+
+        <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+      </div>
+    </div>
+  );
+}function CartesCadeauxSection() {
   const [cartes, setCartes] = useState([]);
   const [numero, setNumero] = useState("");
   const [montant, setMontant] = useState("");
