@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Cake, Search, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal } from "lucide-react";
 import { api } from "../api.js";
 import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, QUARTIERS_PAR_COMMUNE, BOUTIQUES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
@@ -12,6 +12,12 @@ export default function ClientsSection() {
   const [modalClient, setModalClient] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [search, setSearch] = useState("");
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
+  const [filtrePointure, setFiltrePointure] = useState("");
+  const [filtreMois, setFiltreMois] = useState("");
+  const [filtreVille, setFiltreVille] = useState("");
+  const [filtreCommune, setFiltreCommune] = useState("");
+  const [filtrePays, setFiltrePays] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -21,7 +27,7 @@ export default function ClientsSection() {
 
   const openNewClient = () => setModalClient({
     isNew: true, nomPrenoms: "", jourAnniv: "01", moisAnniv: "Janvier", civilite: "Monsieur",
-    adresse: "", commune: COMMUNES[0], quartier: "", telephone: "", whatsapp: "",
+    adresse: "", ville: "", commune: COMMUNES[0], quartier: "", telephone: "", whatsapp: "",
     pointure: "", pays: "Côte d'Ivoire", carteFidelite: "", dateDelivrance: new Date().toISOString().slice(0, 10), observation: "",
   });
   const openEditClient = (c) => setModalClient({ ...c, isNew: false, dateDelivrance: c.dateDelivrance ? c.dateDelivrance.slice(0, 10) : "" });
@@ -43,11 +49,26 @@ export default function ClientsSection() {
     try { await api.clients.remove(c.id); setConfirmDelete(null); load(); } catch (e) { setError(e.message); }
   };
 
-  const filtered = clients.filter((c) =>
-    c.nomPrenoms.toLowerCase().includes(search.toLowerCase()) ||
-    (c.carteFidelite || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.telephone || "").includes(search)
-  );
+  const reinitialiserFiltres = () => {
+    setFiltrePointure(""); setFiltreMois(""); setFiltreVille(""); setFiltreCommune(""); setFiltrePays("");
+  };
+  const nbFiltresActifs = [filtrePointure, filtreMois, filtreVille, filtreCommune, filtrePays].filter(Boolean).length;
+
+  const villesConnues = [...new Set(clients.map((c) => c.ville).filter(Boolean))].sort();
+
+  const filtered = clients.filter((c) => {
+    const matchSearch =
+      c.nomPrenoms.toLowerCase().includes(search.toLowerCase()) ||
+      (c.carteFidelite || "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.telephone || "").includes(search);
+    if (!matchSearch) return false;
+    if (filtrePointure && c.pointure !== filtrePointure) return false;
+    if (filtreMois && c.moisAnniv !== filtreMois) return false;
+    if (filtreVille && (c.ville || "").toLowerCase() !== filtreVille.toLowerCase()) return false;
+    if (filtreCommune && c.commune !== filtreCommune) return false;
+    if (filtrePays && c.pays !== filtrePays) return false;
+    return true;
+  });
 
   return (
     <div>
@@ -62,12 +83,58 @@ export default function ClientsSection() {
 
       {!loading && subTab === "fiche" && (
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher nom, téléphone ou carte…" style={{ ...selectStyle, minWidth: "260px" }} />
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher nom, téléphone ou carte…" style={{ ...selectStyle, paddingLeft: "32px", minWidth: "260px" }} />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+              </div>
+              <button onClick={() => setFiltresOuverts((v) => !v)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={filtresOuverts || nbFiltresActifs > 0 ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>
+                <SlidersHorizontal size={14} /> Filtres avancés{nbFiltresActifs > 0 ? ` (${nbFiltresActifs})` : ""}
+              </button>
+            </div>
             <button onClick={openNewClient} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
               <Plus size={16} /> Nouveau client
             </button>
           </div>
+
+          {filtresOuverts && (
+            <div className="rounded-xl p-4 mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+              <div className="grid sm:grid-cols-5 gap-3">
+                <Field label="Pointure">
+                  <select value={filtrePointure} onChange={(e) => setFiltrePointure(e.target.value)} style={selectStyle}>
+                    <option value="">Toutes</option>{CLIENT_POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                  </select>
+                </Field>
+                <Field label="Mois anniversaire">
+                  <select value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} style={selectStyle}>
+                    <option value="">Tous</option>{MOIS.map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                </Field>
+                <Field label="Ville">
+                  <select value={filtreVille} onChange={(e) => setFiltreVille(e.target.value)} style={selectStyle}>
+                    <option value="">Toutes</option>{villesConnues.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </Field>
+                <Field label="Commune">
+                  <select value={filtreCommune} onChange={(e) => setFiltreCommune(e.target.value)} style={selectStyle}>
+                    <option value="">Toutes</option>{COMMUNES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="Pays">
+                  <select value={filtrePays} onChange={(e) => setFiltrePays(e.target.value)} style={selectStyle}>
+                    <option value="">Tous</option>{PAYS_LIST.map((p) => <option key={p}>{p}</option>)}
+                  </select>
+                </Field>
+              </div>
+              {nbFiltresActifs > 0 && (
+                <button onClick={reinitialiserFiltres} className="mt-3 text-xs font-medium" style={{ color: "#B04A3B" }}>Réinitialiser les filtres</button>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>{filtered.length} client{filtered.length > 1 ? "s" : ""} {nbFiltresActifs > 0 || search ? "correspondant(s)" : "au total"}</p>
+
           <div className="grid sm:grid-cols-2 gap-4">
             {filtered.map((c) => (
               <div key={c.id} className="stitch card-hover rounded-xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -80,8 +147,9 @@ export default function ClientsSection() {
                 </div>
                 <div className="mt-3 text-xs space-y-1" style={{ color: "#6B5D52" }}>
                   <p>{c.telephone || "— pas de téléphone"}{c.whatsapp ? ` · WhatsApp ${c.whatsapp}` : ""}</p>
-                  <p>{c.commune}{c.quartier ? `, ${c.quartier}` : ""}</p>
+                  <p>{[c.ville, c.commune, c.quartier].filter(Boolean).join(", ") || "— pas d'adresse"}{c.pays ? ` · ${c.pays}` : ""}</p>
                   <p className="flex items-center gap-1"><Cake size={11} /> {c.jourAnniv} {c.moisAnniv}</p>
+                  {c.pointure && <p>Pointure T{c.pointure}</p>}
                 </div>
                 {c.carteFidelite && <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-full font-mono" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>Carte {c.carteFidelite}</span>}
                 <div className="flex items-center justify-end gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
@@ -90,6 +158,7 @@ export default function ClientsSection() {
                 </div>
               </div>
             ))}
+            {filtered.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun client ne correspond à ces critères.</p>}
           </div>
         </div>
       )}
@@ -213,17 +282,18 @@ function ClientModal({ client, onCancel, onSubmit }) {
         </div>
         <Field label="Adresse"><input value={form.adresse} onChange={(e) => set("adresse", e.target.value)} style={inputStyle} /></Field>
         <div className="grid grid-cols-2 gap-3">
+          <Field label="Ville"><input value={form.ville} onChange={(e) => set("ville", e.target.value)} style={inputStyle} placeholder="Ex : Abidjan, Cotonou, Paris…" /></Field>
           <Field label="Commune"><select value={form.commune} onChange={(e) => handleCommuneChange(e.target.value)} style={inputStyle}>{COMMUNES.map((c) => <option key={c}>{c}</option>)}</select></Field>
-          <Field label="Quartier">
-            {quartierLibre || quartiersConnus.length === 0 ? (
-              <input value={form.quartier} onChange={(e) => set("quartier", e.target.value)} style={inputStyle} />
-            ) : (
-              <select value={form.quartier} onChange={(e) => handleQuartierSelect(e.target.value)} style={inputStyle}>
-                <option value="">— Choisir —</option>{quartiersConnus.map((q) => <option key={q} value={q}>{q}</option>)}<option value="__autre__">Autre (préciser)</option>
-              </select>
-            )}
-          </Field>
         </div>
+        <Field label="Quartier">
+          {quartierLibre || quartiersConnus.length === 0 ? (
+            <input value={form.quartier} onChange={(e) => set("quartier", e.target.value)} style={inputStyle} />
+          ) : (
+            <select value={form.quartier} onChange={(e) => handleQuartierSelect(e.target.value)} style={inputStyle}>
+              <option value="">— Choisir —</option>{quartiersConnus.map((q) => <option key={q} value={q}>{q}</option>)}<option value="__autre__">Autre (préciser)</option>
+            </select>
+          )}
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Téléphone"><input value={form.telephone} onChange={(e) => set("telephone", e.target.value)} style={inputStyle} /></Field>
           <Field label="Whatsapp"><input value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} style={inputStyle} /></Field>
