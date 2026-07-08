@@ -138,6 +138,8 @@ vendeurs: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/recap-boutiques${qs ? `?${qs}` : ""}`);
     },
+    parVendeur: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/par-vendeur${qs ? `?${qs}` : ""}`);
+    },
   },
-};
-
