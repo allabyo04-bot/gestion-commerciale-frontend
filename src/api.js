@@ -128,10 +128,11 @@ creditListe: (params = {}) => {
     fermetureCaisse: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/fermeture-caisse${qs ? `?${qs}` : ""}`);
-    },
-  },
-};
-recapBoutiques: (params = {}) => {
+},
+    recapBoutiques: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/recap-boutiques${qs ? `?${qs}` : ""}`);
     },
+  },
+};
+
