@@ -8,6 +8,7 @@ import VentesSection from "./sections/VentesSection.jsx";
 import RolesSection from "./sections/RolesSection.jsx";
 import EtatsSection from "./sections/EtatsSection.jsx";
 import { useState } from "react";
+import logo from "./assets/logo.png";
 
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
@@ -28,9 +29,12 @@ function Shell() {
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320" }}>
       <header className="no-print px-6 py-5 sm:px-10" style={{ borderBottom: "1px solid #DDD3C4", background: "#FFFDF9" }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale</p>
-            <h1 className="font-display text-2xl sm:text-3xl font-semibold mt-1">Chaussures & Maroquinerie</h1>
+         <div className="flex items-center gap-4">
+            <img src={logo} alt="La Pointure Espagnole" style={{ height: "56px", width: "auto" }} />
+            <div>
+              <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale</p>
+              <p className="text-xs italic mt-0.5" style={{ color: "#B8A88F", fontFamily: "'Georgia', serif" }}>by Phil et Osée</p>
+            </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex gap-2 flex-wrap">
