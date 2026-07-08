@@ -143,3 +143,4 @@ vendeurs: {
       return request(`/api/etats/par-vendeur${qs ? `?${qs}` : ""}`);
     },
   },
+};
