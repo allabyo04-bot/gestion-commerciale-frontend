@@ -103,10 +103,10 @@ creditListe: (params = {}) => {
     create: (data) => request("/api/ventes-attente", { method: "POST", body: data }),
     remove: (id) => request(`/api/ventes-attente/${id}`, { method: "DELETE" }),
   },
-  cartesCadeaux: {
-    list: () => request("/api/cartes-cadeaux"),
-    create: (data) => request("/api/cartes-cadeaux", { method: "POST", body: data }),
-    verifier: (numero) => request(`/api/cartes-cadeaux/${encodeURIComponent(numero)}/verifier`),
+  bonsValeur: {
+    list: (type) => request(`/api/bons-valeur${type ? `?type=${encodeURIComponent(type)}` : ""}`),
+    create: (data) => request("/api/bons-valeur", { method: "POST", body: data }),
+    verifier: (numero) => request(`/api/bons-valeur/${encodeURIComponent(numero)}/verifier`),
   },
  retours: {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),

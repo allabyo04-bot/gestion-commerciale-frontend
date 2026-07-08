@@ -97,7 +97,7 @@ export default function VentesSection() {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
-        paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: p.mode === "bon_achat" ? p.carteNumero : undefined })),
+        paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: (p.mode === "bon_achat" || p.mode === "avoir") ? p.carteNumero : undefined })),
       });
       setReceipt(vente);
       resetVente();
@@ -142,7 +142,7 @@ export default function VentesSection() {
       <ErrorBanner error={error} onClose={() => setError("")} />
 
       <div className="flex gap-2 mb-6 no-print flex-wrap">
-        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes à crédit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Échanges"], ["cartes", "Cartes cadeaux"]].map(([id, label]) => (
+        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes à crédit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Échanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"]].map(([id, label]) => (
 
 <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
@@ -258,8 +258,8 @@ export default function VentesSection() {
                         <input type="number" min="0" value={p.montant} onChange={(e) => updatePaiement(p.id, { montant: e.target.value })} style={{ ...inputStyle, marginTop: 0 }} />
                         <button onClick={() => removePaiement(p.id)} style={{ color: "#B04A3B" }}><Minus size={14} /></button>
                       </div>
-                      {p.mode === "bon_achat" && (
-                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} placeholder="Numéro de la carte cadeau" style={{ ...inputStyle, marginTop: "6px" }} />
+                      {(p.mode === "bon_achat" || p.mode === "avoir") && (
+                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} placeholder={p.mode === "avoir" ? "Numéro de l'avoir" : "Numéro de la carte cadeau"} style={{ ...inputStyle, marginTop: "6px" }} />
                       )}
                     </div>
                   );
@@ -307,6 +307,7 @@ export default function VentesSection() {
 
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
       {subTab === "cartes" && <CartesCadeauxSection />}
+      {subTab === "avoirs" && <AvoirsSection />}
 {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
 
       {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
@@ -369,6 +370,8 @@ function RetoursSection({ ventes, boutique, onDone }) {
   const [quantite, setQuantite] = useState(1);
   const [nouvellePointure, setNouvellePointure] = useState("");
   const [motif, setMotif] = useState("");
+  const [montantRembourse, setMontantRembourse] = useState("");
+  const [dateValiditeAvoir, setDateValiditeAvoir] = useState("");
   const [error, setError] = useState("");
   const [succes, setSucces] = useState("");
 
@@ -377,11 +380,22 @@ function RetoursSection({ ventes, boutique, onDone }) {
 
   const submit = async () => {
     if (!venteChoisie || !ligneChoisie) { setError("Choisis la vente et la ligne concernée."); return; }
+    if (type === "Retour") {
+      if (!venteChoisie.clientId) { setError("Un client doit être associé à cette vente pour générer un avoir. Ajoute d'abord le client sur la vente."); return; }
+      if (!montantRembourse) { setError("Le montant de l'avoir est obligatoire."); return; }
+      if (!dateValiditeAvoir) { setError("La date de validité de l'avoir est obligatoire."); return; }
+    }
     try {
-      await api.retours.create({ venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite), nouvellePointure: type === "Echange" ? nouvellePointure : undefined, motif, boutique });
-      setSucces("Retour enregistré et stock mis à jour.");
+      await api.retours.create({
+        venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite),
+        nouvellePointure: type === "Echange" ? nouvellePointure : undefined, motif, boutique,
+        montantRembourse: type === "Retour" ? Number(montantRembourse) : undefined,
+        dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : undefined,
+      });
+      setSucces(type === "Retour" ? "Retour enregistré, stock mis à jour et avoir généré pour la cliente." : "Échange enregistré et stock mis à jour.");
       setError("");
       setVenteChoisie(null); setLigneChoisie(""); setNumero(""); setMotif(""); setQuantite(1); setNouvellePointure("");
+      setMontantRembourse(""); setDateValiditeAvoir("");
       onDone();
     } catch (e) { setError(e.message); }
   };
@@ -421,6 +435,18 @@ function RetoursSection({ ventes, boutique, onDone }) {
               </select>
             </Field>
           )}
+          {type === "Retour" && (
+            <div className="rounded-lg p-3 mt-1 mb-1" style={{ background: "#F1E9DC" }}>
+              <p className="text-xs font-medium mb-2" style={{ color: "#6B5D52" }}>Un avoir sera généré automatiquement pour la cliente — aucun remboursement en espèces.</p>
+              {!venteChoisie.clientId && (
+                <p className="text-xs mb-2" style={{ color: "#B04A3B" }}>Cette vente n'a pas de client associé : l'avoir ne pourra pas être créé.</p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Montant de l'avoir (F CFA)"><input type="number" min="0" value={montantRembourse} onChange={(e) => setMontantRembourse(e.target.value)} style={inputStyle} /></Field>
+                <Field label="Date de validité de l'avoir"><input type="date" value={dateValiditeAvoir} onChange={(e) => setDateValiditeAvoir(e.target.value)} style={inputStyle} /></Field>
+              </div>
+            </div>
+          )}
           <Field label="Motif (optionnel)"><input value={motif} onChange={(e) => setMotif(e.target.value)} style={inputStyle} /></Field>
           <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer le {type === "Retour" ? "retour" : "échange"}</button>
         </>
@@ -433,17 +459,17 @@ function CartesCadeauxSection() {
   const [cartes, setCartes] = useState([]);
   const [numero, setNumero] = useState("");
   const [montant, setMontant] = useState("");
-  const [dateExpiration, setDateExpiration] = useState("");
+  const [dateValidite, setDateValidite] = useState("");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => { try { setCartes(await api.cartesCadeaux.list()); } catch (e) { setError(e.message); } }, []);
+  const load = useCallback(async () => { try { setCartes(await api.bonsValeur.list("CADEAU")); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { load(); }, [load]);
 
   const creer = async () => {
-    if (!numero.trim() || !montant) { setError("Numéro et montant sont obligatoires."); return; }
+    if (!montant) { setError("Le montant est obligatoire."); return; }
     try {
-      await api.cartesCadeaux.create({ numero: numero.trim(), montant: Number(montant), dateExpiration: dateExpiration || undefined });
-      setNumero(""); setMontant(""); setDateExpiration(""); setError(""); load();
+      await api.bonsValeur.create({ numero: numero.trim() || undefined, montant: Number(montant), dateValidite: dateValidite || undefined });
+      setNumero(""); setMontant(""); setDateValidite(""); setError(""); load();
     } catch (e) { setError(e.message); }
   };
 
@@ -452,10 +478,10 @@ function CartesCadeauxSection() {
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
       <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau</p>
-        <Field label="Numéro (manuel)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} /></Field>
+        <Field label="Numéro (laisser vide pour générer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Montant (F CFA)"><input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
-          <Field label="Expiration (optionnel)"><input type="date" value={dateExpiration} onChange={(e) => setDateExpiration(e.target.value)} style={inputStyle} /></Field>
+          <Field label="Validité (optionnel)"><input type="date" value={dateValidite} onChange={(e) => setDateValidite(e.target.value)} style={inputStyle} /></Field>
         </div>
         <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Créer la carte</button>
       </div>
@@ -463,10 +489,40 @@ function CartesCadeauxSection() {
       <div className="space-y-2">
         {cartes.map((c) => (
           <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-            <div><p className="font-mono text-sm font-medium">{c.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateExpiration ? `Expire le ${new Date(c.dateExpiration).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p></div>
+            <div><p className="font-mono text-sm font-medium">{c.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p></div>
             <div className="text-right">
               <p className="font-mono text-sm">{fmt(c.montant)} F</p>
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisée" : "Disponible"}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AvoirsSection() {
+  const [avoirs, setAvoirs] = useState([]);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => { try { setAvoirs(await api.bonsValeur.list("AVOIR")); } catch (e) { setError(e.message); } }, []);
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Les avoirs sont générés automatiquement lors d'un retour — cette liste est en lecture seule.</p>
+      <div className="space-y-2">
+        {avoirs.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun avoir pour le moment.</p>}
+        {avoirs.map((a) => (
+          <div key={a.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div>
+              <p className="font-mono text-sm font-medium">{a.numero}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{a.client?.nomPrenoms || "Client inconnu"} · {a.dateValidite ? `Valide jusqu'au ${new Date(a.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-mono text-sm">{fmt(a.montant)} F</p>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: a.utilisee ? "#FBEAE7" : "#E9F0EA", color: a.utilisee ? "#B04A3B" : "#3F6B4A" }}>{a.utilisee ? "Utilisé" : "Disponible"}</span>
             </div>
           </div>
         ))}
@@ -498,7 +554,7 @@ function CreditSection({ ventesCredit, onDone }) {
     if (!montant || Number(montant) <= 0) { setError("Le montant doit être positif."); return; }
     try {
       await api.ventes.reglement(venteSel.id, {
-        mode, montant: Number(montant), carteNumero: mode === "bon_achat" ? carteNumero : undefined,
+        mode, montant: Number(montant), carteNumero: (mode === "bon_achat" || mode === "avoir") ? carteNumero : undefined,
       });
       setSucces("Règlement enregistré.");
       setVenteSel(null);
@@ -560,8 +616,8 @@ function CreditSection({ ventesCredit, onDone }) {
             <Field label="Montant (F CFA)">
               <input type="number" min="0" max={venteSel.resteAPayer} value={montant} onChange={(e) => setMontant(e.target.value)} style={inputStyle} />
             </Field>
-            {mode === "bon_achat" && (
-              <Field label="Numéro de la carte cadeau">
+            {(mode === "bon_achat" || mode === "avoir") && (
+              <Field label={mode === "avoir" ? "Numéro de l'avoir" : "Numéro de la carte cadeau"}>
                 <input value={carteNumero} onChange={(e) => setCarteNumero(e.target.value)} style={inputStyle} />
               </Field>
             )}

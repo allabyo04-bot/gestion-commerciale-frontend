@@ -28,6 +28,7 @@ export const MODES_PAIEMENT = [
   { id: "wave", label: "Wave", liquide: false },
   { id: "carte", label: "Carte bancaire", liquide: false },
   { id: "bon_achat", label: "Bon d'achat", liquide: false },
+{ id: "avoir", label: "Avoir", liquide: false },
 ];
 export const CIVILITES = ["Monsieur", "Madame", "Mademoiselle"];
 export const JOURS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
