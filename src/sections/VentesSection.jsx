@@ -52,6 +52,14 @@ export default function VentesSection() {
 
   // Le vendeur sélectionné n'est valable que pour sa propre boutique : on réinitialise si on change de boutique
   useEffect(() => { setVendeurId(""); }, [boutique]);
+// Pré-sélectionne automatiquement le client tout juste créé depuis l'écran Clients
+  useEffect(() => {
+    const dernierClientId = localStorage.getItem("gc_dernier_client_id");
+    if (dernierClientId && clients.some((c) => c.id === dernierClientId)) {
+      setClientId(dernierClientId);
+      localStorage.removeItem("gc_dernier_client_id");
+    }
+  }, [clients]);
 
   const currentArticle = articles.find((a) => a.id === selArticle);
   const disponibilite = (article, b, pointure) => {

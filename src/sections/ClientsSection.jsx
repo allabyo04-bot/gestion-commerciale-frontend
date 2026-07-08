@@ -29,8 +29,12 @@ export default function ClientsSection() {
   const submitClient = async (form) => {
     if (!form.nomPrenoms.trim()) { setError("Le nom et prénoms du client sont obligatoires."); return; }
     try {
-      if (form.isNew) await api.clients.create(form);
-      else await api.clients.update(form.id, form);
+      if (form.isNew) {
+        const cree = await api.clients.create(form);
+        localStorage.setItem("gc_dernier_client_id", cree.id);
+      } else {
+        await api.clients.update(form.id, form);
+      }
       setModalClient(null); setError(""); load();
     } catch (e) { setError(e.message); }
   };
