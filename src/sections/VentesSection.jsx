@@ -20,6 +20,7 @@ export default function VentesSection() {
   const [vendeurs, setVendeurs] = useState([]);
   const [vendeurId, setVendeurId] = useState("");
   const [demandeRemise, setDemandeRemise] = useState(null);
+  const [historiqueSearch, setHistoriqueSearch] = useState("");
   const [remiseFormOuvert, setRemiseFormOuvert] = useState(false);
   const [remiseType, setRemiseType] = useState("MONTANT");
   const [remiseValeur, setRemiseValeur] = useState("");
@@ -405,14 +406,24 @@ export default function VentesSection() {
         </div>
       )}
 
-      {subTab === "historique" && (
-        <div className="space-y-3">
-          {ventes.map((v) => (
-            <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }} onClick={() => setReceipt(v)}>
-              <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquee" : ""}</p></div>
-              <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
-            </div>
-          ))}
+     {subTab === "historique" && (
+        <div>
+          <div className="relative mb-4 max-w-md">
+            <input value={historiqueSearch} onChange={(e) => setHistoriqueSearch(e.target.value)} placeholder="Rechercher par n° de reçu ou nom du client…" style={{ ...inputStyle, marginTop: 0, paddingLeft: "32px" }} />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+          </div>
+          <div className="space-y-3">
+            {ventes.filter((v) => {
+              if (!historiqueSearch.trim()) return true;
+              const q = historiqueSearch.trim().toLowerCase();
+              return v.numero.toLowerCase().includes(q) || (v.client?.nomPrenoms || "").toLowerCase().includes(q);
+            }).map((v) => (
+              <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }} onClick={() => setReceipt(v)}>
+                <div><p className="font-mono text-sm font-medium">{v.numero}{v.client ? ` · ${v.client.nomPrenoms}` : ""}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquée" : ""}</p></div>
+                <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
