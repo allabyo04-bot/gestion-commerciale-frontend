@@ -28,11 +28,12 @@ export default function StockSection() {
   const [filterBrand, setFilterBrand] = useState("Toutes");
   const [mouvements, setMouvements] = useState([]);
   const [loadingMouvements, setLoadingMouvements] = useState(false);
+  const [articleFiltreId, setArticleFiltreId] = useState("");
 
-  const loadMouvements = useCallback(async () => {
+  const loadMouvements = useCallback(async (articleId) => {
     setLoadingMouvements(true);
     try {
-      const m = await api.articles.historiqueMouvements();
+      const m = await api.articles.historiqueMouvements(articleId ? { articleId } : {});
       setMouvements(m);
     } catch (e) { setError(e.message); } finally { setLoadingMouvements(false); }
   }, []);
@@ -46,7 +47,7 @@ export default function StockSection() {
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
-useEffect(() => { if (tab === "historique") loadMouvements(); }, [tab, loadMouvements]);
+useEffect(() => { if (tab === "historique") loadMouvements(articleFiltreId); }, [tab, loadMouvements, articleFiltreId]);
 
   const brandName = (id) => brands.find((b) => b.id === id)?.nom || "—";
 
@@ -97,7 +98,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -174,6 +175,38 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
 {!loading && tab === "historique" && (
         <div>
+          <div className="flex items-center gap-3 mb-5">
+            <p className="text-sm" style={{ color: "#6B5D52" }}>Filtrer par article :</p>
+            <select value={articleFiltreId} onChange={(e) => setArticleFiltreId(e.target.value)} style={selectStyle}>
+              <option value="">Tous les articles</option>
+              {(articles || []).map((a) => <option key={a.id} value={a.id}>{a.designation} · {a.reference}</option>)}
+            </select>
+          </div>
+
+          {articleFiltreId && (() => {
+            const art = (articles || []).find((a) => a.id === articleFiltreId);
+            if (!art) return null;
+            return (
+              <div className="rounded-xl p-4 mb-5" style={{ background: "#F1E9DC" }}>
+                <p className="text-xs font-mono uppercase tracking-wide mb-2" style={{ color: "#8C3B2E" }}>Stock actuel — {art.designation}</p>
+                <div className="flex gap-6 flex-wrap">
+                  {BOUTIQUES.map((b) => (
+                    <div key={b}>
+                      <p className="text-xs" style={{ color: "#6B5D52" }}>{b}</p>
+                      <p className="font-display text-lg font-semibold">
+                        {(art.stocks || []).filter((s) => s.boutique === b).reduce((s, i) => s + i.quantite, 0)}
+                      </p>
+                    </div>
+                  ))}
+                  <div>
+                    <p className="text-xs" style={{ color: "#6B5D52" }}>Total</p>
+                    <p className="font-display text-lg font-semibold" style={{ color: "#8C3B2E" }}>{totalStock(art)}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {loadingMouvements && <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>}
           {!loadingMouvements && (
             <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -212,6 +245,8 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
           )}
         </div>
       )}
+
+      {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
@@ -243,6 +278,7 @@ function ArticleModal({ article, brands, onCancel, onSubmit }) {
         <Field label="Famille">
           <select value={form.famille} onChange={(e) => set("famille", e.target.value)} style={inputStyle} disabled={!form.isNew}>
             {FAMILLES.map((f) => <option key={f}>{f}</option>)}
+{FAMILLES.map((f) => <option key={f}>{f}</option>)}
           </select>
         </Field>
         <Field label="Désignation"><input value={form.designation} onChange={(e) => set("designation", e.target.value)} style={inputStyle} /></Field>
@@ -434,6 +470,78 @@ function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement 
           style={{ background: saved ? "#3F6B4A" : envoi ? "#B8A88F" : "#8C3B2E", color: "#FBF3EC", opacity: envoi ? 0.7 : 1 }}>
           {saved ? "Enregistré ✓" : mode === "corriger" ? `Enregistrer le stock pour ${boutique}` : mode === "ajouter" ? `Ajouter au stock de ${boutique}` : `Transférer vers ${boutiqueDestination}`}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function EtatStockSection({ articles }) {
+  const [filtreFamille, setFiltreFamille] = useState("Tous");
+
+  const filtered = articles.filter((a) => filtreFamille === "Tous" || a.famille === filtreFamille);
+
+  const totalPourBoutiqueEtFamille = (b, f) =>
+    articles.filter((a) => a.famille === f).reduce((s, a) => s + (a.stocks || []).filter((si) => si.boutique === b).reduce((s2, i) => s2 + i.quantite, 0), 0);
+
+  const totalFamille = (f) => articles.filter((a) => a.famille === f).reduce((s, a) => s + totalStock(a), 0);
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-5">
+        {["Tous", ...FAMILLES].map((f) => (
+          <button key={f} onClick={() => setFiltreFamille(f)} className="px-4 py-2 rounded-full text-sm font-medium"
+            style={filtreFamille === f ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+            {f}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4 mb-6">
+        {FAMILLES.map((f) => (
+          <div key={f} className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <p className="text-xs font-mono uppercase tracking-wide mb-2" style={{ color: "#8C3B2E" }}>{f}s en stock</p>
+            <div className="flex gap-6 items-end">
+              {BOUTIQUES.map((b) => (
+                <div key={b}>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{b}</p>
+                  <p className="font-display text-lg font-semibold">{totalPourBoutiqueEtFamille(b, f)}</p>
+                </div>
+              ))}
+              <div>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>Total</p>
+                <p className="font-display text-xl font-semibold" style={{ color: "#8C3B2E" }}>{totalFamille(f)}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+              <th className="text-left px-4 py-2">Article</th>
+              <th className="text-left px-4 py-2">Famille</th>
+              {BOUTIQUES.map((b) => <th key={b} className="text-right px-4 py-2">{b}</th>)}
+              <th className="text-right px-4 py-2">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((a) => (
+              <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                <td className="px-4 py-2">{a.designation} <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {a.reference}</span></td>
+                <td className="px-4 py-2">{a.famille}</td>
+                {BOUTIQUES.map((b) => (
+                  <td key={b} className="text-right px-4 py-2">{(a.stocks || []).filter((s) => s.boutique === b).reduce((s, i) => s + i.quantite, 0)}</td>
+                ))}
+                <td className="text-right px-4 py-2 font-semibold">{totalStock(a)}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={2 + BOUTIQUES.length + 1} className="px-4 py-6 text-center" style={{ color: "#6B5D52" }}>Aucun article.</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
