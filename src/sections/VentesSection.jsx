@@ -209,15 +209,16 @@ export default function VentesSection() {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
 
-      <div className="flex gap-2 mb-6 no-print flex-wrap">
-        {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
-          ...(estAdmin ? [["remises-admin", `Demandes de remise${nbRemisesEnAttente > 0 ? ` (${nbRemisesEnAttente})` : ""}`]] : [])].map(([id, label]) => (
+      <div className="flex gap-6 items-start">
+        <div className="flex flex-col gap-2 no-print shrink-0" style={{ width: "200px" }}>
+          {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
+            ...(estAdmin ? [["remises-admin", `Demandes de remise${nbRemisesEnAttente > 0 ? ` (${nbRemisesEnAttente})` : ""}`]] : [])].map(([id, label]) => (
+            <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-lg text-sm font-medium text-left" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
+          ))}
+        </div>
 
-<button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
-        ))}
-      </div>
-      {subTab === "nouvelle" && (
-        <div className="grid lg:grid-cols-5 gap-6">
+        <div className="flex-1 min-w-0">
+        {subTab === "nouvelle" && (        <div className="grid lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
             <div className="rounded-xl p-5 mb-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -432,9 +433,10 @@ export default function VentesSection() {
       {subTab === "avoirs" && <AvoirsSection />}
       {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
       {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
+        </div>
+      </div>
 
-      {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
-    </div>
+      {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}    </div>
   );
 }
 
