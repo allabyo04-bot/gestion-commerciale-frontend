@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X, Search } from "lucide-react";
 import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
@@ -26,6 +26,7 @@ export default function StockSection() {
   const [newBrand, setNewBrand] = useState("");
   const [filterFamille, setFilterFamille] = useState("Tous");
   const [filterBrand, setFilterBrand] = useState("Toutes");
+  const [searchArticle, setSearchArticle] = useState("");
   const [mouvements, setMouvements] = useState([]);
   const [loadingMouvements, setLoadingMouvements] = useState(false);
   const [articleFiltreId, setArticleFiltreId] = useState("");
@@ -86,11 +87,15 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
   const virementStock = async (articleId, boutiqueSource, boutiqueDestination, pointure, quantite) => {
     try { await api.articles.virementStock(articleId, boutiqueSource, boutiqueDestination, pointure, quantite); load(); } catch (e) { setError(e.message); }
   };
-  const filteredArticles = useMemo(() => (articles || []).filter((a) => {
+ const filteredArticles = useMemo(() => (articles || []).filter((a) => {
     if (filterFamille !== "Tous" && a.famille !== filterFamille) return false;
     if (filterBrand !== "Toutes" && a.marqueId !== filterBrand) return false;
+    if (searchArticle.trim()) {
+      const q = searchArticle.trim().toLowerCase();
+      if (!a.designation.toLowerCase().includes(q) && !a.reference.toLowerCase().includes(q)) return false;
+    }
     return true;
-  }), [articles, filterFamille, filterBrand]);
+  }), [articles, filterFamille, filterBrand, searchArticle]);
 
   const editingArticle = stockEditor ? articles.find((a) => a.id === stockEditor) : null;
 
@@ -108,7 +113,11 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {!loading && tab === "articles" && (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap items-center">
+              <div className="relative">
+                <input value={searchArticle} onChange={(e) => setSearchArticle(e.target.value)} placeholder="Rechercher un article ou une référence…" style={{ ...selectStyle, paddingLeft: "32px", minWidth: "240px" }} />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+              </div>
               <select value={filterFamille} onChange={(e) => setFilterFamille(e.target.value)} style={selectStyle}>
                 <option>Tous</option>{FAMILLES.map((f) => <option key={f}>{f}</option>)}
               </select>
@@ -275,10 +284,9 @@ function ArticleModal({ article, brands, onCancel, onSubmit }) {
           <button onClick={onCancel}><X size={18} color="#6B5D52" /></button>
         </div>
         {!form.isNew && <Field label="Référence"><div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{form.reference}</div></Field>}
-        <Field label="Famille">
+      <Field label="Famille">
           <select value={form.famille} onChange={(e) => set("famille", e.target.value)} style={inputStyle} disabled={!form.isNew}>
             {FAMILLES.map((f) => <option key={f}>{f}</option>)}
-{FAMILLES.map((f) => <option key={f}>{f}</option>)}
           </select>
         </Field>
         <Field label="Désignation"><input value={form.designation} onChange={(e) => set("designation", e.target.value)} style={inputStyle} /></Field>
