@@ -78,6 +78,19 @@ ajouterStock: (id, boutique, pointure, quantite) =>
       request(`/api/articles/${id}/stock/ajouter`, { method: "POST", body: { boutique, pointure, quantite } }),
     virementStock: (id, boutiqueSource, boutiqueDestination, pointure, quantite) =>
       request(`/api/articles/${id}/stock/virement`, { method: "POST", body: { boutiqueSource, boutiqueDestination, pointure, quantite } }),
+    importApercu: async (formData) => {
+      const token = localStorage.getItem("gc_token");
+      const res = await fetch(`${API_URL}/api/articles/import/apercu`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      let data;
+      try { data = await res.json(); } catch { data = null; }
+      if (!res.ok) { const err = new Error(data?.error || `Erreur ${res.status}`); err.status = res.status; throw err; }
+      return data;
+    },
+    importConfirmer: (data) => request("/api/articles/import/confirmer", { method: "POST", body: data }),
   },
   clients: {
     list: () => request("/api/clients"),

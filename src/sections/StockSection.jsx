@@ -103,7 +103,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -256,6 +256,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
 
       {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
+      {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
@@ -485,8 +486,14 @@ function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement 
 
 function EtatStockSection({ articles }) {
   const [filtreFamille, setFiltreFamille] = useState("Tous");
+  const [filtreQuantite, setFiltreQuantite] = useState("tous");
 
-  const filtered = articles.filter((a) => filtreFamille === "Tous" || a.famille === filtreFamille);
+  const filtered = articles.filter((a) => {
+    if (filtreFamille !== "Tous" && a.famille !== filtreFamille) return false;
+    if (filtreQuantite === "nulle" && totalStock(a) !== 0) return false;
+    if (filtreQuantite === "stock" && totalStock(a) === 0) return false;
+    return true;
+  });
 
   const totalPourBoutiqueEtFamille = (b, f) =>
     articles.filter((a) => a.famille === f).reduce((s, a) => s + (a.stocks || []).filter((si) => si.boutique === b).reduce((s2, i) => s2 + i.quantite, 0), 0);
@@ -495,11 +502,19 @@ function EtatStockSection({ articles }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-3">
         {["Tous", ...FAMILLES].map((f) => (
           <button key={f} onClick={() => setFiltreFamille(f)} className="px-4 py-2 rounded-full text-sm font-medium"
             style={filtreFamille === f ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
             {f}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2 mb-5">
+        {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"]].map(([id, label]) => (
+          <button key={id} onClick={() => setFiltreQuantite(id)} className="px-4 py-2 rounded-full text-sm font-medium"
+            style={filtreQuantite === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+            {label}
           </button>
         ))}
       </div>
@@ -551,6 +566,160 @@ function EtatStockSection({ articles }) {
           </tbody>
         </table>
       </div>
+   </div>
+  );
+}
+
+function ImportSection({ brands, onImported }) {
+  const [marqueId, setMarqueId] = useState(brands?.[0]?.id || "");
+  const [famille, setFamille] = useState("Chaussure");
+  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [fichier, setFichier] = useState(null);
+  const [apercu, setApercu] = useState(null);
+  const [lignesEdit, setLignesEdit] = useState([]);
+  const [chargement, setChargement] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [resultat, setResultat] = useState(null);
+
+  useEffect(() => {
+    if (resultat || erreur) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [resultat, erreur]);
+
+  const analyser = async () => {
+    if (!fichier || !marqueId) { setErreur("Choisis une marque et un fichier."); return; }
+    setChargement(true); setErreur(""); setResultat(null);
+    try {
+      const fd = new FormData();
+      fd.append("fichier", fichier);
+      fd.append("marqueId", marqueId);
+      fd.append("famille", famille);
+      fd.append("boutique", boutique);
+      const res = await api.articles.importApercu(fd);
+      setApercu(res);
+      setLignesEdit(res.lignes.map((l) => ({ ...l, prixVente: l.ecartPrix ? l.ancienPrix : (l.nouveauPrix ?? l.ancienPrix) })));
+    } catch (e) { setErreur(e.message); } finally { setChargement(false); }
+  };
+
+  const confirmer = async () => {
+    setChargement(true); setErreur("");
+    try {
+      const res = await api.articles.importConfirmer({
+        marqueId, famille, boutique,
+        lignes: lignesEdit.map((l) => ({ designation: l.designation, articleId: l.articleId, prixVente: l.prixVente, quantites: l.quantites })),
+      });
+      setResultat(res);
+      setApercu(null);
+      setFichier(null);
+      onImported();
+    } catch (e) { setErreur(e.message); } finally { setChargement(false); }
+  };
+
+  const choisirPrix = (idx, prix) => {
+    setLignesEdit((prev) => prev.map((l, i) => (i === idx ? { ...l, prixVente: prix } : l)));
+  };
+
+  return (
+    <div>
+      <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-4">Importer un arrivage (mise en stock)</p>
+        <div className="grid sm:grid-cols-3 gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Marque</label>
+            <select value={marqueId} onChange={(e) => setMarqueId(e.target.value)} style={selectStyle}>
+              <option value="">— Choisir —</option>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Famille</label>
+            <select value={famille} onChange={(e) => setFamille(e.target.value)} style={selectStyle}>
+              {FAMILLES.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+            <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+              {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="file" accept=".xls,.xlsx" onChange={(e) => setFichier(e.target.files?.[0] || null)} className="text-sm" />
+          <button onClick={analyser} disabled={chargement || !fichier} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: chargement || !fichier ? 0.6 : 1 }}>
+            {chargement ? "Analyse..." : "Analyser le fichier"}
+          </button>
+        </div>
+        <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
+          {famille === "Chaussure" ? "Colonnes attendues : REFERENCES, T35 à T42, PRIX DE VENTE." : "Colonnes attendues : REFERENCES, QUANTITE, PRIX DE VENTE."}
+        </p>
+      </div>
+
+      {erreur && <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#B04A3B", background: "#FBEAE7" }}>⚠ {erreur}</p>}
+
+      {resultat && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: "#E9F0EA", border: "1px solid #C9DECD" }}>
+          <p className="font-medium text-sm" style={{ color: "#3F6B4A" }}>
+            Import terminé : {resultat.articlesCreees} article(s) créé(s), {resultat.articlesMisesAJour} prix mis à jour, {resultat.mouvements} mouvement(s) de stock enregistré(s).
+          </p>
+        </div>
+      )}
+
+      {apercu && (
+        <div>
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <p className="text-sm" style={{ color: "#6B5D52" }}>
+              <strong>{apercu.marque}</strong> · {apercu.famille} · {apercu.boutique} — {apercu.nbNouveaux} nouveau(x), {apercu.nbExistants} existant(s)
+              {apercu.nbEcartsPrix > 0 && <span style={{ color: "#B04A3B" }}> · {apercu.nbEcartsPrix} écart(s) de prix à valider</span>}
+            </p>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                  <th className="text-left px-4 py-2">Désignation</th>
+                  <th className="text-left px-4 py-2">Statut</th>
+                  <th className="text-right px-4 py-2">Quantité à ajouter</th>
+                  <th className="text-right px-4 py-2">Prix</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignesEdit.map((l, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="px-4 py-2">{l.designation}</td>
+                    <td className="px-4 py-2">
+                      {l.existant
+                        ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#F1E9DC", color: "#6B5D52" }}>Existant</span>
+                        : <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Nouveau</span>}
+                    </td>
+                    <td className="text-right px-4 py-2">{l.quantiteTotale}</td>
+                    <td className="text-right px-4 py-2">
+                      {l.ecartPrix ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-xs" style={{ color: "#B04A3B" }}>{l.ancienPrix} F → {l.nouveauPrix} F</span>
+                          <select value={l.prixVente} onChange={(e) => choisirPrix(i, Number(e.target.value))} className="text-xs px-2 py-1 rounded" style={{ border: "1px solid #DDD3C4" }}>
+                            <option value={l.ancienPrix}>Garder {l.ancienPrix} F</option>
+                            <option value={l.nouveauPrix}>Prendre {l.nouveauPrix} F</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <span>{l.prixVente ? `${l.prixVente} F` : "—"}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button onClick={() => { setApercu(null); setFichier(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
+            <button onClick={confirmer} disabled={chargement} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: chargement ? 0.6 : 1 }}>
+              {chargement ? "Import en cours..." : "Confirmer l'import"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
