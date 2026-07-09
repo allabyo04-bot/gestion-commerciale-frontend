@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import UtilisateursSection from "./sections/UtilisateursSection.jsx";
@@ -8,6 +8,7 @@ import VentesSection from "./sections/VentesSection.jsx";
 import RolesSection from "./sections/RolesSection.jsx";
 import EtatsSection from "./sections/EtatsSection.jsx";
 import DashboardSection from "./sections/DashboardSection.jsx";
+import DepensesSection from "./sections/DepensesSection.jsx";
 import { useState } from "react";
 import logo from "./assets/logo.png";
 
@@ -20,12 +21,12 @@ function Shell() {
     { id: "accueil", label: "Accueil", icon: LayoutDashboard },
     { id: "ventes", label: "Ventes", icon: ShoppingCart, perm: "ventes" },
     { id: "etats", label: "États", icon: BarChart3, perm: "ventes" },
+    { id: "depenses", label: "Dépenses", icon: Wallet, perm: "ventes" },
     { id: "clients", label: "Clients", icon: Heart, perm: "clients" },
     { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
     { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
   ].filter((n) => !n.perm || permissions[n.perm]);
-  // Si l'onglet actuellement sélectionné n'est plus accessible (changement de rôle, etc.), on retombe sur le premier disponible
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320" }}>
@@ -58,6 +59,7 @@ function Shell() {
         {activeTab === "accueil" && <DashboardSection />}
         {activeTab === "ventes" && <VentesSection />}
         {activeTab === "etats" && <EtatsSection />}
+        {activeTab === "depenses" && <DepensesSection />}
         {activeTab === "clients" && <ClientsSection />}
         {activeTab === "utilisateurs" && <UtilisateursSection />}
         {activeTab === "stock" && <StockSection />}

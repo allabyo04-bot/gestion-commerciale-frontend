@@ -136,7 +136,30 @@ remises: {
     list: (statut) => request(`/api/remises${statut ? `?statut=${encodeURIComponent(statut)}` : ""}`),
     traiter: (id, statut) => request(`/api/remises/${id}`, { method: "PATCH", body: { statut } }),
   },
-  etats: {
+depenses: {
+    categories: {
+      list: (params = {}) => {
+        const qs = new URLSearchParams(params).toString();
+        return request(`/api/depenses/categories${qs ? `?${qs}` : ""}`);
+      },
+      create: (nom) => request("/api/depenses/categories", { method: "POST", body: { nom } }),
+      update: (id, data) => request(`/api/depenses/categories/${id}`, { method: "PUT", body: data }),
+    },
+    list: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/depenses${qs ? `?${qs}` : ""}`);
+    },
+    create: (data) => request("/api/depenses", { method: "POST", body: data }),
+    budget: {
+      get: (annee, params = {}) => {
+        const qs = new URLSearchParams(params).toString();
+        return request(`/api/depenses/budget/${annee}${qs ? `?${qs}` : ""}`);
+      },
+      set: (data) => request("/api/depenses/budget", { method: "POST", body: data }),
+    },
+  },
+
+etats: {
     parDate: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/par-date${qs ? `?${qs}` : ""}`);
