@@ -21,6 +21,9 @@ export default function VentesSection() {
   const [vendeurId, setVendeurId] = useState("");
   const [demandeRemise, setDemandeRemise] = useState(null);
   const [historiqueSearch, setHistoriqueSearch] = useState("");
+  const [venteAAnnuler, setVenteAAnnuler] = useState(null);
+  const [motifAnnulation, setMotifAnnulation] = useState("");
+  const [annulationChargement, setAnnulationChargement] = useState(false);
   const [remiseFormOuvert, setRemiseFormOuvert] = useState(false);
   const [remiseType, setRemiseType] = useState("MONTANT");
   const [remiseValeur, setRemiseValeur] = useState("");
@@ -94,6 +97,10 @@ export default function VentesSection() {
     if (!article) return 0;
     const item = article.stocks?.find((s) => s.boutique === b && s.pointure === (pointure || ""));
     return item?.quantite || 0;
+  };
+  const articleADuStock = (article, b) => {
+    if (article.famille === "Chaussure") return POINTURES.some((p) => disponibilite(article, b, p) > 0);
+    return disponibilite(article, b) > 0;
   };
 
   const total = lignes.reduce((s, l) => s + l.sousTotal, 0);
@@ -205,6 +212,18 @@ export default function VentesSection() {
     try { await api.ventesAttente.remove(ticket.id); load(); } catch (e) { setError(e.message); }
   };
 
+  const annulerVente = async () => {
+    if (!motifAnnulation.trim()) { setError("Le motif d'annulation est obligatoire."); return; }
+    setAnnulationChargement(true);
+    try {
+      await api.ventes.annuler(venteAAnnuler.id, { motif: motifAnnulation.trim() });
+      setVenteAAnnuler(null);
+      setMotifAnnulation("");
+      setError("");
+      load();
+    } catch (e) { setError(e.message); } finally { setAnnulationChargement(false); }
+  };
+
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
@@ -275,17 +294,17 @@ export default function VentesSection() {
                 <Field label="Article">
                   <select value={selArticle} onChange={(e) => { setSelArticle(e.target.value); setSelPointure(""); }} style={inputStyle}>
                     <option value="">— Choisir —</option>
-                    {articles.filter((a) => a.actif !== false).map((a) => <option key={a.id} value={a.id}>{a.designation} · {brandName(a.marqueId)}</option>)}
+                    {articles.filter((a) => a.actif !== false && articleADuStock(a, boutique)).map((a) => <option key={a.id} value={a.id}>{a.designation} · {brandName(a.marqueId)}</option>)}
                   </select>
                 </Field>
                 {currentArticle?.famille === "Chaussure" ? (
                   <Field label="Pointure">
                     <select value={selPointure} onChange={(e) => setSelPointure(e.target.value)} style={inputStyle}>
                       <option value="">— Choisir —</option>
-                      {POINTURES.map((p) => { const dispo = disponibilite(currentArticle, boutique, p); return <option key={p} value={p} disabled={dispo <= 0}>T{p} ({dispo} dispo.)</option>; })}
+                      {POINTURES.filter((p) => disponibilite(currentArticle, boutique, p) > 0).map((p) => { const dispo = disponibilite(currentArticle, boutique, p); return <option key={p} value={p}>T{p} ({dispo} dispo.)</option>; })}
                     </select>
                   </Field>
-                ) : (
+                 ) : (
                   <Field label="Disponible"><div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{currentArticle ? `${disponibilite(currentArticle, boutique)} en stock` : "—"}</div></Field>
                 )}
                 <Field label="Quantite"><input type="number" min="1" value={selQty} onChange={(e) => setSelQty(e.target.value)} style={inputStyle} /></Field>
@@ -419,9 +438,21 @@ export default function VentesSection() {
               const q = historiqueSearch.trim().toLowerCase();
               return v.numero.toLowerCase().includes(q) || (v.client?.nomPrenoms || "").toLowerCase().includes(q);
             }).map((v) => (
-              <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }} onClick={() => setReceipt(v)}>
-                <div><p className="font-mono text-sm font-medium">{v.numero}{v.client ? ` · ${v.client.nomPrenoms}` : ""}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquée" : ""}</p></div>
-                <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
+              <div key={v.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-2 cursor-pointer card-hover" style={{ background: v.statut === "Annulee" ? "#FBEAE7" : "#FFFFFF", border: "1px solid #EAE1D2", opacity: v.statut === "Annulee" ? 0.7 : 1 }} onClick={() => setReceipt(v)}>
+                <div>
+                  <p className="font-mono text-sm font-medium">
+                    {v.numero}{v.client ? ` · ${v.client.nomPrenoms}` : ""}
+                    {v.statut === "Annulee" && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>ANNULÉE</span>}
+                  </p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquée" : ""}</p>
+                  {v.statut === "Annulee" && <p className="text-xs mt-1" style={{ color: "#8C3B2E" }}>Motif : {v.motifAnnulation} · par {v.annuleePar?.prenom} {v.annuleePar?.nom}</p>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <p className="font-display font-semibold" style={{ color: "#8C3B2E", textDecoration: v.statut === "Annulee" ? "line-through" : "none" }}>{fmt(v.total)} F</p>
+                  {v.statut !== "Annulee" && (
+                    <button onClick={(e) => { e.stopPropagation(); setVenteAAnnuler(v); setMotifAnnulation(""); setError(""); }} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Annuler</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -436,7 +467,29 @@ export default function VentesSection() {
         </div>
       </div>
 
-      {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}    </div>
+      {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
+
+      {venteAAnnuler && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+          <div className="rounded-xl p-6 max-w-sm w-full" style={{ background: "#FFFDF9" }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-semibold">Annuler {venteAAnnuler.numero}</p>
+              <button onClick={() => setVenteAAnnuler(null)}><X size={18} color="#6B5D52" /></button>
+            </div>
+            <p className="text-sm mb-3" style={{ color: "#6B5D52" }}>
+              Cette vente sera marquée annulée, le stock sera remis, et le total sera exclu du chiffre d'affaires du jour. Cette action est tracée avec ton nom.
+            </p>
+            <Field label="Motif de l'annulation">
+              <textarea value={motifAnnulation} onChange={(e) => setMotifAnnulation(e.target.value)} style={{ ...inputStyle, minHeight: "70px" }} placeholder="Ex : erreur de saisie, client absent, mauvais article…" />
+            </Field>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setVenteAAnnuler(null)} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Retour</button>
+              <button onClick={annulerVente} disabled={annulationChargement} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#B04A3B", color: "#FBF3EC" }}>{annulationChargement ? "Annulation..." : "Confirmer l'annulation"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

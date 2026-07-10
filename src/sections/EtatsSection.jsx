@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT } from "../constants.js";
@@ -29,6 +29,7 @@ export default function EtatsSection() {
 
   const [fermeture, setFermeture] = useState(null);
   const [chargementFermeture, setChargementFermeture] = useState(false);
+  const [periodeOuverte, setPeriodeOuverte] = useState(false);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -53,6 +54,104 @@ setDonnees(null);
   }, [sousOnglet, dateDebut, dateFin, boutique, estAdmin]);
 
   useEffect(() => { charger(); }, [charger]);
+
+  const iso = (d) => d.toISOString().slice(0, 10);
+
+  const appliquerPeriode = (type) => {
+    const aujourdhui = new Date();
+    let debut = new Date(aujourdhui);
+    let fin = new Date(aujourdhui);
+
+    if (type === "aujourdhui") {
+      // debut = fin = aujourd'hui
+    } else if (type === "hier") {
+      debut.setDate(debut.getDate() - 1);
+      fin.setDate(fin.getDate() - 1);
+    } else if (type === "semaine-cours") {
+      const jour = (debut.getDay() + 6) % 7; // lundi = 0
+      debut.setDate(debut.getDate() - jour);
+    } else if (type === "semaine-precedente") {
+      const jour = (debut.getDay() + 6) % 7;
+      debut.setDate(debut.getDate() - jour - 7);
+      fin = new Date(debut);
+      fin.setDate(fin.getDate() + 6);
+    } else if (type === "mois-cours") {
+      debut = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), 1);
+    } else if (type === "mois-precedent") {
+      debut = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth() - 1, 1);
+      fin = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), 0);
+    } else if (type === "deux-derniers-mois") {
+      debut = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth() - 1, 1);
+    } else if (type === "annee-cours") {
+      debut = new Date(aujourdhui.getFullYear(), 0, 1);
+    }
+
+    setDateDebut(iso(debut));
+    setDateFin(iso(fin));
+    setPeriodeOuverte(false);
+  };
+
+  const PERIODES = [
+    { id: "aujourdhui", label: "Aujourd'hui" },
+    { id: "hier", label: "Hier" },
+    { id: "semaine-cours", label: "Semaine en cours" },
+    { id: "semaine-precedente", label: "Semaine précédente" },
+    { id: "mois-cours", label: "Mois en cours" },
+    { id: "mois-precedent", label: "Mois précédent" },
+    { id: "deux-derniers-mois", label: "Deux derniers mois" },
+    { id: "annee-cours", label: "Année en cours" },
+  ];
+const exportCSV = () => {
+    let lignes = [];
+    let nomFichier = "export";
+
+    if (sousOnglet === "date" && donnees?.ventes) {
+      lignes.push(["N°", "Date", "Boutique", "Vendeur", "Type", "Total"]);
+      donnees.ventes.forEach((v) => {
+        lignes.push([v.numero, new Date(v.date).toLocaleString("fr-FR"), v.boutique, v.vendeur?.nom || "", v.modeVente, v.total]);
+      });
+      lignes.push(["", "", "", "", "Total net", donnees.total]);
+      nomFichier = `etat-par-date_${dateDebut}_${dateFin}`;
+    } else if (sousOnglet === "mode" && donnees?.recap) {
+      lignes.push(["Mode de paiement", "Nombre", "Montant"]);
+      donnees.recap.forEach((r) => {
+        lignes.push([MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode, r.nombre, r.montant]);
+      });
+      lignes.push(["", "Total", donnees.total]);
+      nomFichier = `etat-par-mode-paiement_${dateDebut}_${dateFin}`;
+    } else if (sousOnglet === "type" && donnees?.recap) {
+      lignes.push(["Type de vente", "Nombre", "Montant"]);
+      donnees.recap.forEach((r) => {
+        lignes.push([r.modeVente, r.nombre, r.montant]);
+      });
+      lignes.push(["", "Total", donnees.total]);
+      nomFichier = `etat-par-type_${dateDebut}_${dateFin}`;
+    } else if (sousOnglet === "vendeur" && donnees?.classement) {
+      lignes.push(["Rang", "Vendeuse", "Boutique", "Nombre de ventes", "Panier moyen", "Montant vendu"]);
+      donnees.classement.forEach((v, i) => {
+        lignes.push([i + 1, v.nom, v.boutique, v.nombre, v.panierMoyen, v.montant]);
+      });
+      nomFichier = `etat-par-vendeur_${dateDebut}_${dateFin}`;
+    } else if (sousOnglet === "recap" && donnees?.parBoutique) {
+      lignes.push(["Boutique", "Nombre de ventes", "Total des ventes", "Retours traités", "Total règlements"]);
+      donnees.parBoutique.forEach((b) => {
+        lignes.push([b.boutique, b.nombreVentes, b.totalVentes, b.totalRetours, b.totalReglements]);
+      });
+      lignes.push(["Cumul", donnees.cumul.nombreVentes, donnees.cumul.totalVentes, donnees.cumul.totalRetours, donnees.cumul.totalReglements]);
+      nomFichier = `etat-recap-boutiques_${dateDebut}_${dateFin}`;
+    } else {
+      return;
+    }
+
+    const csv = lignes.map((ligne) => ligne.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${nomFichier}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const ouvrirFermeture = async () => {
     setChargementFermeture(true);
@@ -89,14 +188,46 @@ setDonnees(null);
             </button>
           ))}
         </div>
-        <button onClick={ouvrirFermeture} disabled={chargementFermeture}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
-          style={{ background: COULEUR.accent, color: "#FBF3EC" }}>
-          <Lock size={14} /> {chargementFermeture ? "Calcul..." : "Fermeture de caisse"}
-        </button>
+       <div className="flex gap-2">
+          <button onClick={exportCSV} disabled={chargement || !donnees}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+            style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.texteDoux, opacity: (chargement || !donnees) ? 0.5 : 1 }}>
+            <Download size={14} /> Exporter CSV
+          </button>
+    <button onClick={ouvrirFermeture} disabled={chargementFermeture}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+            style={{ background: COULEUR.accent, color: "#FBF3EC" }}>
+            <Lock size={14} /> {chargementFermeture ? "Calcul..." : "Fermeture de caisse"}
+          </button>
+        </div>
       </div>
 
+      
       <div className="flex items-end gap-3 flex-wrap mb-6 p-4 rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+        <div className="relative">
+          <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Période</label>
+          <button type="button" onClick={() => setPeriodeOuverte((o) => !o)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
+            style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff", color: COULEUR.texte }}>
+            Choisir <ChevronDown size={14} />
+          </button>
+          {periodeOuverte && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setPeriodeOuverte(false)} />
+              <div className="absolute z-20 mt-1 rounded-lg overflow-hidden" style={{ background: "#fff", border: `1px solid ${COULEUR.bordure}`, minWidth: "180px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+                {PERIODES.map((p) => (
+                  <button key={p.id} type="button" onClick={() => appliquerPeriode(p.id)}
+                    className="w-full text-left px-3 py-2 text-sm"
+                    style={{ background: "#fff", color: COULEUR.texte }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = COULEUR.fond)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <div>
           <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Du</label>
           <input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)}

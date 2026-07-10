@@ -110,6 +110,7 @@ creditListe: (params = {}) => {
       return request(`/api/ventes/credit/liste${qs ? `?${qs}` : ""}`);
     },
     reglement: (id, data) => request(`/api/ventes/${id}/reglement`, { method: "POST", body: data }),
+    annuler: (id, data) => request(`/api/ventes/${id}/annuler`, { method: "POST", body: data }),
   },
   ventesAttente: {
     list: (boutique) => request(`/api/ventes-attente${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
