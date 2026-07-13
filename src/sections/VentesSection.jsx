@@ -42,6 +42,7 @@ export default function VentesSection() {
   const [paiements, setPaiements] = useState([]);
 
   const [selArticle, setSelArticle] = useState("");
+  const [articleSearch, setArticleSearch] = useState("");
   const [selPointure, setSelPointure] = useState("");
   const [selQty, setSelQty] = useState(1);
 
@@ -292,10 +293,29 @@ export default function VentesSection() {
               <p className="font-display font-semibold mb-3">Ajouter un article</p>
               <div className="grid sm:grid-cols-3 gap-3">
                 <Field label="Article">
-                  <select value={selArticle} onChange={(e) => { setSelArticle(e.target.value); setSelPointure(""); }} style={inputStyle}>
-                    <option value="">— Choisir —</option>
-                    {articles.filter((a) => a.actif !== false && articleADuStock(a, boutique)).map((a) => <option key={a.id} value={a.id}>{a.designation} · {brandName(a.marqueId)}</option>)}
-                  </select>
+                  {selArticle ? (
+                    <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
+                      <span className="text-sm">{currentArticle?.designation} · {brandName(currentArticle?.marqueId)}</span>
+                      <button onClick={() => { setSelArticle(""); setArticleSearch(""); setSelPointure(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <div className="relative mt-1">
+                      <input value={articleSearch} onChange={(e) => setArticleSearch(e.target.value)} style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px" }} placeholder="Rechercher un article…" />
+                      <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+                      {articleSearch.trim() && (
+                        <div className="absolute z-10 w-full bottom-full mb-1 rounded-lg overflow-hidden max-h-48 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4", boxShadow: "0 -4px 12px rgba(0,0,0,0.1)" }}>
+                          {articles.filter((a) => a.actif !== false && articleADuStock(a, boutique) && (a.designation.toLowerCase().includes(articleSearch.toLowerCase()) || brandName(a.marqueId).toLowerCase().includes(articleSearch.toLowerCase()))).slice(0, 20).map((a) => (
+                            <button key={a.id} onClick={() => { setSelArticle(a.id); setArticleSearch(""); setSelPointure(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>
+                              {a.designation} · {brandName(a.marqueId)}
+                            </button>
+                          ))}
+                          {articles.filter((a) => a.actif !== false && articleADuStock(a, boutique) && (a.designation.toLowerCase().includes(articleSearch.toLowerCase()) || brandName(a.marqueId).toLowerCase().includes(articleSearch.toLowerCase()))).length === 0 && (
+                            <div className="px-3 py-2 text-sm" style={{ color: "#6B5D52" }}>Aucun article trouvé.</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Field>
                 {currentArticle?.famille === "Chaussure" ? (
                   <Field label="Pointure">
