@@ -860,6 +860,7 @@ function CreditSection({ ventesCredit, onDone }) {
   const [carteNumero, setCarteNumero] = useState("");
   const [error, setError] = useState("");
   const [succes, setSucces] = useState("");
+  const [recuReglement, setRecuReglement] = useState(null);
 
   const nonSoldees = ventesCredit.filter((v) => v.resteAPayer > 0);
   const soldees = ventesCredit.filter((v) => v.resteAPayer <= 0);
@@ -876,10 +877,10 @@ function CreditSection({ ventesCredit, onDone }) {
   const enregistrerReglement = async () => {
     if (!montant || Number(montant) <= 0) { setError("Le montant doit etre positif."); return; }
     try {
-      await api.ventes.reglement(venteSel.id, {
+      const resultat = await api.ventes.reglement(venteSel.id, {
         mode, montant: Number(montant), carteNumero: (mode === "bon_achat" || mode === "avoir") ? carteNumero : undefined,
       });
-      setSucces("Reglement enregistre.");
+      setRecuReglement(resultat);
       setVenteSel(null);
       onDone();
     } catch (e) { setError(e.message); }
@@ -948,6 +949,51 @@ function CreditSection({ ventesCredit, onDone }) {
           </div>
         </div>
       )}
+
+      {recuReglement && <RecuReglementModal recu={recuReglement} onClose={() => setRecuReglement(null)} />}
+    </div>
+  );
+}
+
+function RecuReglementModal({ recu, onClose }) {
+  const infos = INFOS_BOUTIQUE[recu.venteBoutique] || {};
+  const modeLabel = MODES_PAIEMENT.find((m) => m.id === recu.paiement.mode)?.label || recu.paiement.mode;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+      <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
+        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Reçu de règlement</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
+
+        <div className="text-center mb-3">
+          <p className="font-display font-bold text-sm leading-tight">{infos.nom}</p>
+          <p className="font-display font-bold text-sm leading-tight">{infos.ligne2}</p>
+          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{infos.adresse}</p>
+          <p className="text-xs" style={{ color: "#6B5D52" }}>{infos.telephone}</p>
+        </div>
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="my-2" />
+
+        <p className="text-center font-display text-lg font-semibold">RÈGLEMENT DE CRÉDIT</p>
+        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>{new Date().toLocaleString("fr-FR")} · {recu.venteBoutique}</p>
+
+        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Vente d'origine : {recu.venteNumero}</div>
+        {recu.clientNom && <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {recu.clientNom}</div>}
+
+        <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-2">
+          <div className="flex justify-between text-sm"><span>Total de la vente</span><span>{fmt(recu.totalVente)} F</span></div>
+          <div className="flex justify-between text-sm font-semibold" style={{ color: "#3F6B4A" }}><span>Montant réglé aujourd'hui</span><span>{fmt(recu.paiement.montant)} F</span></div>
+          <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Mode de paiement</span><span>{modeLabel}</span></div>
+        </div>
+
+        <div className="flex justify-between font-semibold mt-3 text-sm" style={{ color: recu.resteApres > 0 ? "#B04A3B" : "#3F6B4A" }}>
+          <span>{recu.resteApres > 0 ? "RESTE À PAYER" : "SOLDÉ"}</span>
+          <span>{fmt(Math.max(0, recu.resteApres))} F</span>
+        </div>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="mt-3 pt-3">
+          <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>{MESSAGE_FIN_TICKET}</p>
+        </div>
+
+        <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+      </div>
     </div>
   );
 }

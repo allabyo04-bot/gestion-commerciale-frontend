@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT } from "../constants.js";
@@ -34,7 +34,7 @@ export default function EtatsSection() {
   const charger = useCallback(async () => {
     setChargement(true);
     setErreur("");
-setDonnees(null);
+    setDonnees(null);
     const params = { dateDebut, dateFin };
     if (estAdmin && boutique) params.boutique = boutique;
     try {
@@ -54,6 +54,14 @@ setDonnees(null);
   }, [sousOnglet, dateDebut, dateFin, boutique, estAdmin]);
 
   useEffect(() => { charger(); }, [charger]);
+
+  // Impression automatique dès qu'une fermeture de caisse est calculée
+  useEffect(() => {
+    if (fermeture) {
+      const timer = setTimeout(() => window.print(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [fermeture]);
 
   const iso = (d) => d.toISOString().slice(0, 10);
 
@@ -101,7 +109,8 @@ setDonnees(null);
     { id: "deux-derniers-mois", label: "Deux derniers mois" },
     { id: "annee-cours", label: "Année en cours" },
   ];
-const exportCSV = () => {
+
+  const exportCSV = () => {
     let lignes = [];
     let nomFichier = "export";
 
@@ -173,7 +182,7 @@ const exportCSV = () => {
     { id: "mode", label: "Par mode de paiement", icon: CreditCard },
     { id: "type", label: "Par type", icon: Store },
     { id: "vendeur", label: "Meilleur vendeur", icon: Award },
-...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
+    ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
   ];
 
   return (
@@ -188,13 +197,13 @@ const exportCSV = () => {
             </button>
           ))}
         </div>
-       <div className="flex gap-2">
+        <div className="flex gap-2">
           <button onClick={exportCSV} disabled={chargement || !donnees}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
             style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.texteDoux, opacity: (chargement || !donnees) ? 0.5 : 1 }}>
             <Download size={14} /> Exporter CSV
           </button>
-    <button onClick={ouvrirFermeture} disabled={chargementFermeture}
+          <button onClick={ouvrirFermeture} disabled={chargementFermeture}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
             style={{ background: COULEUR.accent, color: "#FBF3EC" }}>
             <Lock size={14} /> {chargementFermeture ? "Calcul..." : "Fermeture de caisse"}
@@ -202,7 +211,6 @@ const exportCSV = () => {
         </div>
       </div>
 
-      
       <div className="flex items-end gap-3 flex-wrap mb-6 p-4 rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
         <div className="relative">
           <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Période</label>
@@ -254,17 +262,25 @@ const exportCSV = () => {
       {erreur && <p className="text-sm mb-4" style={{ color: COULEUR.accent }}>{erreur}</p>}
 
       {fermeture && (
-        <div className="mb-6 p-5 rounded-2xl" style={{ background: "#FFFDF9", border: `1px solid ${COULEUR.accent}` }}>
-          <div className="flex items-center justify-between mb-3">
+        <div className="mb-6 p-5 rounded-2xl print-area" id="fermeture-caisse-print" style={{ background: "#FFFDF9", border: `1px solid ${COULEUR.accent}` }}>
+          <div className="flex items-center justify-between mb-3 no-print">
             <h3 className="font-display text-lg font-semibold">Fermeture de caisse — {fermeture.date} ({fermeture.boutique})</h3>
-            <button onClick={() => setFermeture(null)} className="text-sm" style={{ color: COULEUR.texteDoux }}>Fermer</button>
+            <div className="flex gap-3 items-center">
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg" style={{ background: COULEUR.accent, color: "#FBF3EC" }}><Printer size={14} /> Imprimer</button>
+              <button onClick={() => setFermeture(null)} className="text-sm" style={{ color: COULEUR.texteDoux }}>Fermer</button>
+            </div>
           </div>
+          <p className="text-center font-display font-semibold text-base mb-2 hidden print:block">Fermeture de caisse — {fermeture.date} ({fermeture.boutique})</p>
           <p className="text-sm mb-1">Nombre de ventes : <strong>{fermeture.nombreVentes}</strong></p>
           <p className="text-sm mb-1">Total des ventes (net) : <strong>{formatFCFA(fermeture.totalVentes)}</strong></p>
           <p className="text-sm mb-1">Cartes cadeaux utilisées : <strong>{formatFCFA(fermeture.totalCartesCadeauxUtilisees)}</strong></p>
           <p className="text-sm mb-1">Retours traités (avoirs générés) : <strong>- {formatFCFA(fermeture.totalRetours)}</strong></p>
-          <p className="text-sm mb-3">Total monnaie rendue : <strong>{formatFCFA(fermeture.totalMonnaieRendue)}</strong></p>
-          <table className="w-full text-sm">
+          <p className="text-sm mb-1">Total monnaie rendue : <strong>{formatFCFA(fermeture.totalMonnaieRendue)}</strong></p>
+          <p className="text-sm mb-1">Règlements de crédit reçus aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsRecus)}</strong></p>
+          <p className="text-sm font-semibold mb-3" style={{ borderTop: `1px solid ${COULEUR.bordure}`, paddingTop: "8px" }}>Total encaissé (caisse) : <strong>{formatFCFA(fermeture.totalEncaisseGlobal)}</strong></p>
+
+          <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Répartition par mode de paiement</p>
+          <table className="w-full text-sm mb-4">
             <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
             <tbody>
               {fermeture.parMode.map((m) => (
@@ -275,6 +291,25 @@ const exportCSV = () => {
               ))}
             </tbody>
           </table>
+
+          {fermeture.reglementsDetail.length > 0 && (
+            <>
+              <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des règlements de crédit reçus</p>
+              <table className="w-full text-sm">
+                <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Vente</th><th className="text-left py-1">Client</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
+                <tbody>
+                  {fermeture.reglementsDetail.map((r, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                      <td className="py-1">{r.venteNumero}</td>
+                      <td className="py-1">{r.clientNom}</td>
+                      <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}</td>
+                      <td className="text-right py-1">{formatFCFA(r.montant)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       )}
 
@@ -327,7 +362,7 @@ const exportCSV = () => {
         </>
       )}
 
-  {!chargement && donnees?.recap && sousOnglet === "mode" && (
+      {!chargement && donnees?.recap && sousOnglet === "mode" && (
         <>
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
@@ -370,7 +405,9 @@ const exportCSV = () => {
             </table>
           </div>
         </>
-      )}      {!chargement && donnees?.recap && sousOnglet === "type" && (
+      )}
+
+      {!chargement && donnees?.recap && sousOnglet === "type" && (
         <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
           <table className="w-full text-sm">
             <thead>
@@ -444,7 +481,7 @@ const exportCSV = () => {
         </div>
       )}
 
-{!chargement && donnees?.parBoutique && sousOnglet === "recap" && (
+      {!chargement && donnees?.parBoutique && sousOnglet === "recap" && (
         <div className="space-y-4">
           {donnees.parBoutique.map((b) => (
             <div key={b.boutique} className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
@@ -484,5 +521,6 @@ const exportCSV = () => {
           </div>
         </div>
       )}
- </div> );
+    </div>
+  );
 }
