@@ -165,7 +165,7 @@ export default function VentesSection() {
 
   const validerVente = async () => {
     if (lignes.length === 0) { setError("Ajoute au moins un article a la vente."); return; }
-    if (!vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
+    if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
     if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente a credit."); return; }
     if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }
     try {
@@ -184,7 +184,7 @@ export default function VentesSection() {
 
   const mettreEnAttente = async () => {
     if (lignes.length === 0) { setError("Le panier est vide."); return; }
-    if (!vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
+    if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
     try {
       const clientSel = clients.find((c) => c.id === clientId);
       await api.ventesAttente.create({
@@ -249,12 +249,18 @@ export default function VentesSection() {
                     <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{boutique}</div>
                   )}
                 </Field>
-                <Field label="Vendeur">
-                  <select value={vendeurId} onChange={(e) => setVendeurId(e.target.value)} style={inputStyle}>
-                    <option value="">— Choisir —</option>
-                    {vendeurs.filter((v) => v.actif !== false).map((v) => <option key={v.id} value={v.id}>{v.nom}</option>)}
-                  </select>
-                </Field>
+                {modeVente === "Boutique" ? (
+                  <Field label="Vendeur">
+                    <select value={vendeurId} onChange={(e) => setVendeurId(e.target.value)} style={inputStyle}>
+                      <option value="">— Choisir —</option>
+                      {vendeurs.filter((v) => v.actif !== false).map((v) => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Vendeur">
+                    <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>Non applicable ({modeVente})</div>
+                  </Field>
+                )}
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Mode de vente"><select value={modeVente} onChange={(e) => setModeVente(e.target.value)} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select></Field>
