@@ -30,6 +30,7 @@ export default function StockSection() {
   const [mouvements, setMouvements] = useState([]);
   const [loadingMouvements, setLoadingMouvements] = useState(false);
   const [articleFiltreId, setArticleFiltreId] = useState("");
+  const [articleFiltreSearch, setArticleFiltreSearch] = useState("");
 
   const loadMouvements = useCallback(async (articleId) => {
     setLoadingMouvements(true);
@@ -186,10 +187,29 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
         <div>
           <div className="flex items-center gap-3 mb-5">
             <p className="text-sm" style={{ color: "#6B5D52" }}>Filtrer par article :</p>
-            <select value={articleFiltreId} onChange={(e) => setArticleFiltreId(e.target.value)} style={selectStyle}>
-              <option value="">Tous les articles</option>
-              {(articles || []).map((a) => <option key={a.id} value={a.id}>{a.designation} · {a.reference}</option>)}
-            </select>
+            {articleFiltreId ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
+                <span className="text-sm">{(articles || []).find((a) => a.id === articleFiltreId)?.designation}</span>
+                <button onClick={() => { setArticleFiltreId(""); setArticleFiltreSearch(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
+              </div>
+            ) : (
+              <div className="relative" style={{ minWidth: "280px" }}>
+                <input value={articleFiltreSearch} onChange={(e) => setArticleFiltreSearch(e.target.value)} placeholder="Tous les articles — taper pour filtrer…" style={{ ...selectStyle, paddingLeft: "30px", width: "100%" }} />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+                {articleFiltreSearch.trim() && (
+                  <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden max-h-56 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4" }}>
+                    {(articles || []).filter((a) => a.designation.toLowerCase().includes(articleFiltreSearch.toLowerCase()) || a.reference.toLowerCase().includes(articleFiltreSearch.toLowerCase())).slice(0, 20).map((a) => (
+                      <button key={a.id} onClick={() => { setArticleFiltreId(a.id); setArticleFiltreSearch(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>
+                        {a.designation} · {a.reference}
+                      </button>
+                    ))}
+                    {(articles || []).filter((a) => a.designation.toLowerCase().includes(articleFiltreSearch.toLowerCase()) || a.reference.toLowerCase().includes(articleFiltreSearch.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-sm" style={{ color: "#6B5D52" }}>Aucun article trouvé.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {articleFiltreId && (() => {
