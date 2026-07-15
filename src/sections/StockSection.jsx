@@ -104,7 +104,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -275,6 +275,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
         </div>
       )}
 
+      {!loading && tab === "virements" && <VirementsSection articles={articles || []} onDone={load} />}
       {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
@@ -471,12 +472,30 @@ function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement 
         {isChaussure ? (
           <div>
             <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-              {POINTURES.map((p) => (
-                <div key={p} className="text-center">
-                  <p className="text-xs font-mono mb-1" style={{ color: "#8C3B2E" }}>T{p}</p>
-                  <input className="qty-input" type="number" min="0" value={getValue(boutique, p)} onChange={(e) => setValue(boutique, p, e.target.value)} />
-                </div>
-              ))}
+              {POINTURES.map((p) => {
+                const dispoSource = stockQty(article, boutique, p);
+                return (
+                  <div key={p} className="text-center">
+                    <p className="text-xs font-mono mb-1" style={{ color: "#8C3B2E" }}>T{p}</p>
+                    {mode === "virement" && (
+                      <p className="text-xs mb-1" style={{ color: dispoSource > 0 ? "#3F6B4A" : "#B04A3B" }}>
+                        {dispoSource} dispo.
+                      </p>
+                    )}
+                    <input
+                      className="qty-input"
+                      type="number"
+                      min="0"
+                      max={mode === "virement" ? dispoSource : undefined}
+                      value={getValue(boutique, p)}
+                      onChange={(e) => {
+                        const v = mode === "virement" ? Math.min(Number(e.target.value) || 0, dispoSource) : e.target.value;
+                        setValue(boutique, p, v);
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
               <p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>
@@ -587,6 +606,152 @@ function EtatStockSection({ articles }) {
         </table>
       </div>
    </div>
+  );
+}
+
+function VirementsSection({ articles, onDone }) {
+  const [articleId, setArticleId] = useState("");
+  const [search, setSearch] = useState("");
+  const [boutiqueSource, setBoutiqueSource] = useState(BOUTIQUES[0]);
+  const [boutiqueDestination, setBoutiqueDestination] = useState(BOUTIQUES[1] || BOUTIQUES[0]);
+  const [values, setValues] = useState({});
+  const [error, setError] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const article = articles.find((a) => a.id === articleId);
+  const isChaussure = article?.famille === "Chaussure";
+
+  const choisirArticle = (a) => {
+    setArticleId(a.id);
+    setSearch("");
+    setValues({});
+    setError("");
+  };
+
+  const changerSource = (b) => {
+    setBoutiqueSource(b);
+    if (b === boutiqueDestination) {
+      const autre = BOUTIQUES.find((x) => x !== b);
+      if (autre) setBoutiqueDestination(autre);
+    }
+    setValues({});
+  };
+
+  const getValue = (p) => values[p || ""] || 0;
+  const setValue = (p, v, dispo) => setValues((prev) => ({ ...prev, [p || ""]: Math.min(Number(v) || 0, dispo) }));
+
+  const total = isChaussure
+    ? POINTURES.reduce((s, p) => s + getValue(p), 0)
+    : getValue(null);
+
+  const soumettre = async () => {
+    if (!article) return;
+    if (total <= 0) { setError("Indique au moins une quantité à transférer."); return; }
+    setEnvoi(true);
+    setError("");
+    try {
+      if (isChaussure) {
+        for (const p of POINTURES) {
+          const q = getValue(p);
+          if (q > 0) await api.articles.virementStock(article.id, boutiqueSource, boutiqueDestination, p, q);
+        }
+      } else {
+        const q = getValue(null);
+        if (q > 0) await api.articles.virementStock(article.id, boutiqueSource, boutiqueDestination, null, q);
+      }
+      setSaved(true);
+      setValues({});
+      onDone();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) { setError(e.message); } finally { setEnvoi(false); }
+  };
+
+  const resultats = search.trim()
+    ? articles.filter((a) => a.designation.toLowerCase().includes(search.toLowerCase()) || a.reference.toLowerCase().includes(search.toLowerCase())).slice(0, 20)
+    : [];
+
+  return (
+    <div className="max-w-2xl">
+      <div className="rounded-2xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-4">Transférer du stock entre boutiques</p>
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Article</label>
+          {article ? (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
+              <span className="text-sm">{article.designation} · {article.reference}</span>
+              <button onClick={() => { setArticleId(""); setValues({}); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un article…" style={{ ...selectStyle, paddingLeft: "32px", width: "100%" }} />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+              {search.trim() && (
+                <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden max-h-56 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4" }}>
+                  {resultats.map((a) => (
+                    <button key={a.id} onClick={() => choisirArticle(a)} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>
+                      {a.designation} · {a.reference} <span style={{ color: "#6B5D52" }}>({totalStock(a)} en stock)</span>
+                    </button>
+                  ))}
+                  {resultats.length === 0 && <div className="px-3 py-2 text-sm" style={{ color: "#6B5D52" }}>Aucun article trouvé.</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {article && (
+          <>
+            <div className="flex items-center gap-2 mb-5">
+              <select value={boutiqueSource} onChange={(e) => changerSource(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }}>
+                {BOUTIQUES.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <span className="text-sm" style={{ color: "#6B5D52" }}>vers</span>
+              <select value={boutiqueDestination} onChange={(e) => setBoutiqueDestination(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }}>
+                {BOUTIQUES.filter((b) => b !== boutiqueSource).map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+
+            {error && <p className="text-sm mb-4" style={{ color: "#B04A3B" }}>{error}</p>}
+
+            {isChaussure ? (
+              <div>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {POINTURES.map((p) => {
+                    const dispo = stockQty(article, boutiqueSource, p);
+                    return (
+                      <div key={p} className="text-center">
+                        <p className="text-xs font-mono mb-1" style={{ color: "#8C3B2E" }}>T{p}</p>
+                        <p className="text-xs mb-1" style={{ color: dispo > 0 ? "#3F6B4A" : "#B04A3B" }}>{dispo} dispo.</p>
+                        <input className="qty-input" type="number" min="0" max={dispo} value={getValue(p)} onChange={(e) => setValue(p, e.target.value, dispo)} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
+                  <p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>Total à transférer</p>
+                  <p className="font-display text-xl font-semibold">{total}</p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-mono mb-1" style={{ color: "#8C3B2E" }}>
+                  Disponible à {boutiqueSource} : {stockQty(article, boutiqueSource, null)}
+                </p>
+                <input className="qty-input" style={{ width: "80px" }} type="number" min="0" max={stockQty(article, boutiqueSource, null)} value={getValue(null)} onChange={(e) => setValue(null, e.target.value, stockQty(article, boutiqueSource, null))} />
+              </div>
+            )}
+
+            <button onClick={soumettre} disabled={envoi}
+              className="w-full mt-5 px-4 py-2.5 rounded-lg text-sm font-medium"
+              style={{ background: saved ? "#3F6B4A" : envoi ? "#B8A88F" : "#8C3B2E", color: "#FBF3EC", opacity: envoi ? 0.7 : 1 }}>
+              {saved ? "Transféré ✓" : `Transférer vers ${boutiqueDestination}`}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

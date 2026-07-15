@@ -301,7 +301,14 @@ export default function VentesSection() {
                 <Field label="Article">
                   {selArticle ? (
                     <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
-                      <span className="text-sm">{currentArticle?.designation} · {brandName(currentArticle?.marqueId)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{currentArticle?.designation} · {brandName(currentArticle?.marqueId)}</span>
+                        <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                          {currentArticle?.famille === "Chaussure"
+                            ? POINTURES.reduce((s, p) => s + disponibilite(currentArticle, boutique, p), 0)
+                            : disponibilite(currentArticle, boutique)} en stock
+                        </span>
+                      </div>
                       <button onClick={() => { setSelArticle(""); setArticleSearch(""); setSelPointure(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
                     </div>
                   ) : (
