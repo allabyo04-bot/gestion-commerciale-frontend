@@ -277,6 +277,7 @@ export default function EtatsSection() {
           <p className="text-sm mb-1">Retours traités (avoirs générés) : <strong>- {formatFCFA(fermeture.totalRetours)}</strong></p>
           <p className="text-sm mb-1">Total monnaie rendue : <strong>{formatFCFA(fermeture.totalMonnaieRendue)}</strong></p>
           <p className="text-sm mb-1">Règlements de crédit reçus aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsRecus)}</strong></p>
+          <p className="text-sm mb-1">Cartes cadeaux vendues aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalCartesCadeauxVendues)}</strong></p>
           <p className="text-sm font-semibold mb-3" style={{ borderTop: `1px solid ${COULEUR.bordure}`, paddingTop: "8px" }}>Total encaissé (caisse) : <strong>{formatFCFA(fermeture.totalEncaisseGlobal)}</strong></p>
 
           <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Répartition par mode de paiement</p>
@@ -295,7 +296,7 @@ export default function EtatsSection() {
           {fermeture.reglementsDetail.length > 0 && (
             <>
               <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des règlements de crédit reçus</p>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm mb-4">
                 <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Vente</th><th className="text-left py-1">Client</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
                 <tbody>
                   {fermeture.reglementsDetail.map((r, i) => (
@@ -310,6 +311,24 @@ export default function EtatsSection() {
               </table>
             </>
           )}
+
+          {fermeture.cartesCadeauxVenduesDetail?.length > 0 && (
+            <>
+              <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des cartes cadeaux vendues</p>
+              <table className="w-full text-sm">
+                <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Numéro</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
+                <tbody>
+                  {fermeture.cartesCadeauxVenduesDetail.map((c, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                      <td className="py-1">{c.numero}</td>
+                      <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === c.mode)?.label || c.mode}</td>
+                      <td className="text-right py-1">{formatFCFA(c.montant)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       )}
 
@@ -317,7 +336,11 @@ export default function EtatsSection() {
 
       {!chargement && donnees?.ventes && sousOnglet === "date" && (
         <>
-          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid sm:grid-cols-3 gap-4 mb-4">
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Cartes cadeaux vendues</p>
+              <p className="font-display text-lg font-semibold" style={{ color: COULEUR.accent }}>+ {formatFCFA(donnees.totalCartesCadeauxVendues)}</p>
+            </div>
             <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Cartes cadeaux utilisées</p>
               <p className="font-display text-lg font-semibold">{formatFCFA(donnees.totalCartesCadeauxUtilisees)}</p>
@@ -486,7 +509,7 @@ export default function EtatsSection() {
           {donnees.parBoutique.map((b) => (
             <div key={b.boutique} className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="font-display text-lg font-semibold mb-3">{b.boutique}</p>
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des ventes ({b.nombreVentes})</p>
                   <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalVentes)}</p>
@@ -499,12 +522,16 @@ export default function EtatsSection() {
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des règlements encaissés</p>
                   <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalReglements)}</p>
                 </div>
+                <div>
+                  <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Cartes cadeaux vendues</p>
+                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalCartesCadeauxVendues)}</p>
+                </div>
               </div>
             </div>
           ))}
           <div className="rounded-2xl p-5" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
             <p className="font-display text-lg font-semibold mb-3">Cumul des 2 boutiques</p>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs opacity-80">Total des ventes ({donnees.cumul.nombreVentes})</p>
                 <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalVentes)}</p>
@@ -516,6 +543,10 @@ export default function EtatsSection() {
               <div>
                 <p className="text-xs opacity-80">Total des règlements encaissés</p>
                 <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalReglements)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-80">Cartes cadeaux vendues</p>
+                <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalCartesCadeauxVendues)}</p>
               </div>
             </div>
           </div>
