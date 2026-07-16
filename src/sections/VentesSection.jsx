@@ -493,7 +493,7 @@ export default function VentesSection() {
       )}
 
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
-      {subTab === "cartes" && <CartesCadeauxSection />}
+      {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} />}
       {subTab === "avoirs" && <AvoirsSection />}
       {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
       {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
@@ -791,11 +791,12 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
   );
 }
 
-function CartesCadeauxSection() {
+function CartesCadeauxSection({ boutique }) {
   const [cartes, setCartes] = useState([]);
   const [numero, setNumero] = useState("");
   const [montant, setMontant] = useState("");
   const [dateValidite, setDateValidite] = useState("");
+  const [modePaiement, setModePaiement] = useState("especes");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => { try { setCartes(await api.bonsValeur.list("CADEAU")); } catch (e) { setError(e.message); } }, []);
@@ -804,7 +805,7 @@ function CartesCadeauxSection() {
   const creer = async () => {
     if (!montant) { setError("Le montant est obligatoire."); return; }
     try {
-      await api.bonsValeur.create({ numero: numero.trim() || undefined, montant: Number(montant), dateValidite: dateValidite || undefined });
+      await api.bonsValeur.create({ numero: numero.trim() || undefined, montant: Number(montant), dateValidite: dateValidite || undefined, boutique, modePaiement });
       setNumero(""); setMontant(""); setDateValidite(""); setError(""); load();
     } catch (e) { setError(e.message); }
   };
@@ -819,6 +820,12 @@ function CartesCadeauxSection() {
           <Field label="Montant (F CFA)"><input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
           <Field label="Validite (optionnel)"><input type="date" value={dateValidite} onChange={(e) => setDateValidite(e.target.value)} style={inputStyle} /></Field>
         </div>
+        <Field label="Mode de paiement reçu">
+          <select value={modePaiement} onChange={(e) => setModePaiement(e.target.value)} style={inputStyle}>
+            {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </Field>
+        <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Boutique : <strong>{boutique}</strong> — ce montant sera compté dans le chiffre d'affaires du jour.</p>
         <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Creer la carte</button>
       </div>
 
