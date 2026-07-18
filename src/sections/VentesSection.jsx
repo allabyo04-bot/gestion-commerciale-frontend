@@ -146,6 +146,17 @@ export default function VentesSection() {
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
   };
 
+  // Le client se desiste avant paiement : on vide le panier en cours sans rien
+  // enregistrer (ni en attente, ni en base). Simple confirmation pour eviter
+  // un clic accidentel qui ferait perdre une vente en cours de saisie.
+  const annulerVenteEnCours = () => {
+    if (lignes.length === 0) return;
+    const confirme = window.confirm("Annuler cette vente ? Le panier sera vide et rien ne sera enregistre.");
+    if (!confirme) return;
+    resetVente();
+    setError("");
+  };
+
   const demanderRemise = async () => {
     if (!remiseValeur || Number(remiseValeur) <= 0) { setError("Indique une valeur de remise valide."); return; }
     if (remiseType === "POURCENTAGE" && Number(remiseValeur) > 100) { setError("Un pourcentage ne peut pas depasser 100."); return; }
@@ -433,6 +444,7 @@ export default function VentesSection() {
               <div className="flex items-center justify-between mt-3 text-sm"><span style={{ color: "#6B5D52" }}>Paye</span><span className="font-mono">{fmt(totalPaye)} F</span></div>
               <div className="flex items-center justify-between text-sm"><span style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{reste > 0 ? "Reste a payer" : "Monnaie a rendre"}</span><span className="font-mono" style={{ color: reste > 0 ? "#B04A3B" : "#3F6B4A" }}>{fmt(Math.abs(reste))} F</span></div>
               <div className="flex gap-2 mt-4">
+                <button onClick={annulerVenteEnCours} disabled={lignes.length === 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ border: "1px solid #B04A3B", color: "#B04A3B" }}><XCircle size={16} /> Annuler</button>
                 <button onClick={mettreEnAttente} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}><PauseCircle size={16} /> Mettre en attente</button>
                 <button onClick={validerVente} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider la vente</button>
               </div>
