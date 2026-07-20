@@ -74,7 +74,7 @@ export default function ClientsSection() {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["fiche", "Fiche clients"], ["anniversaires", "Anniversaires"], ["achats", "Achats par carte"]].map(([id, label]) => (
+        {[["fiche", "Fiche clients"], ["anniversaires", "Anniversaires"], ["achats", "Historique par carte fidélité"]].map(([id, label]) => (
           <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -215,6 +215,7 @@ function AchatsParCarteReport() {
 
   return (
     <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Recherchez un client par son numéro de carte de fidélité pour voir l'historique de ses achats (total cumulé, répartition par boutique, liste des ventes).</p>
       <div className="flex items-center gap-2 mb-6">
         <input value={carte} onChange={(e) => setCarte(e.target.value)} onKeyDown={(e) => e.key === "Enter" && rechercher()} placeholder="N° de carte de fidélité" style={{ ...inputStyle, marginTop: 0, maxWidth: "260px" }} />
         <button onClick={rechercher} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Search size={15} /> Rechercher</button>
