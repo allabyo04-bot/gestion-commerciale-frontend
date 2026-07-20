@@ -6,6 +6,7 @@ import { BOUTIQUES, fmt } from "../constants.js";
 import { ErrorBanner, selectStyle } from "../components/Shared.jsx";
 
 const COULEUR = { carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
+const BOUTIQUES_DEPENSE = [...BOUTIQUES, "Générale"];
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -112,7 +113,7 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
             <div>
               <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Boutique</label>
               <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
-                {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+                {BOUTIQUES_DEPENSE.map((b) => <option key={b}>{b}</option>)}
               </select>
             </div>
           )}
@@ -195,7 +196,7 @@ function ToutesLesDepenses({ categories, onError }) {
           <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Boutique</label>
           <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
             <option value="">Toutes</option>
-            {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+            {BOUTIQUES_DEPENSE.map((b) => <option key={b}>{b}</option>)}
           </select>
         </div>
         <div>
