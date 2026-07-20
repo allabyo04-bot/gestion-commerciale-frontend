@@ -27,7 +27,7 @@ export const MODES_PAIEMENT = [
   { id: "orange_money", label: "Orange Money", liquide: false },
   { id: "wave", label: "Wave", liquide: false },
   { id: "carte", label: "Carte bancaire", liquide: false },
-  { id: "bon_achat", label: "Bon d'achat", liquide: false },
+  { id: "bon_achat", label: "Carte cadeau", liquide: false },
 { id: "avoir", label: "Avoir", liquide: false },
 ];
 export const CIVILITES = ["Monsieur", "Madame", "Mademoiselle"];
