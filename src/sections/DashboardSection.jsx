@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { fmt } from "../constants.js";
+import { fmt, MOIS } from "../constants.js";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -30,6 +30,7 @@ export default function DashboardSection() {
   const [alertesStock, setAlertesStock] = useState([]);
   const [credits, setCredits] = useState(null);
   const [meilleurVendeur, setMeilleurVendeur] = useState(null);
+  const [anniversaires, setAnniversaires] = useState([]);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -61,7 +62,22 @@ export default function DashboardSection() {
         setMeilleurVendeur(vendeurRes.meilleur);
       }
 
-      if (peutVoirStock) {
+      if (estAdmin) {
+        const clients = await api.clients.list();
+        const aujourdhui = new Date();
+        const dansSeptJours = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(aujourdhui.getDate() + i);
+          dansSeptJours.push({ jour: d.getDate(), mois: MOIS[d.getMonth()] });
+        }
+        const bientot = clients.filter((c) =>
+          dansSeptJours.some((d) => d.jour === parseInt(c.jourAnniv, 10) && d.mois === c.moisAnniv)
+        );
+        setAnniversaires(bientot);
+      }
+
+    if (peutVoirStock) {
         const articles = await api.articles.list();
         const alertes = [];
         for (const a of articles) {
@@ -169,7 +185,22 @@ export default function DashboardSection() {
         )}
       </div>
 
-      {peutVoirVentes && meilleurVendeur && (
+      {estAdmin && anniversaires.length > 0 && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+          <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+            <Cake size={14} /> Anniversaires cette semaine
+          </p>
+          <div className="space-y-1.5">
+            {anniversaires.map((c) => (
+              <div key={c.id} className="flex items-center justify-between text-sm">
+                <span>{c.nomPrenoms}</span>
+                <span className="text-xs font-mono" style={{ color: COULEUR.texteDoux }}>{c.jourAnniv} {c.moisAnniv}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+     {peutVoirVentes && meilleurVendeur && (
         <div className="rounded-2xl p-5" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
           <p className="text-xs opacity-80 mb-1 flex items-center gap-1.5"><Award size={14} /> Meilleur vendeur de la semaine</p>
           <p className="font-display text-lg font-semibold">{meilleurVendeur.nom} — {meilleurVendeur.boutique}</p>
