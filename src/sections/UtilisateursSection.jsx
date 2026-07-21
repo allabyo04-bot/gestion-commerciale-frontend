@@ -35,8 +35,8 @@ export default function UtilisateursSection() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openNewUser = () => setModalUser({ isNew: true, nom: "", prenom: "", login: "", pin: "", roleId: roles?.[0]?.id || "", boutique: BOUTIQUES[0], actif: true });
-  const openEditUser = (u) => setModalUser({ ...u, pin: "", isNew: false });
+  const openNewUser = () => setModalUser({ isNew: true, nom: "", prenom: "", login: "", pin: "", roleId: roles?.[0]?.id || "", boutique: BOUTIQUES[0], actif: true, telephone: "", questionSecrete: "", reponseSecrete: "" });
+  const openEditUser = (u) => setModalUser({ ...u, pin: "", reponseSecrete: "", isNew: false });
 
   const submitUser = async (form) => {
     if (!form.nom.trim() || !form.prenom.trim() || !form.login.trim() || (form.isNew && !/^\d{4,6}$/.test(form.pin))) {
@@ -49,6 +49,7 @@ export default function UtilisateursSection() {
       } else {
         const payload = { ...form };
         if (!payload.pin) delete payload.pin;
+        if (!payload.reponseSecrete) delete payload.reponseSecrete;
         await api.users.update(form.id, payload);
       }
       setModalUser(null);
@@ -147,6 +148,9 @@ function UserModal({ user, roles, onCancel, onSubmit }) {
             <input value={form.pin} onChange={(e) => set("pin", e.target.value.replace(/\D/g, ""))} style={{ ...inputStyle, flex: 1 }} maxLength={6} inputMode="numeric" placeholder="••••" />
           </div>
         </Field>
+        <Field label="Téléphone (pour réinitialiser son PIN)"><input value={form.telephone || ""} onChange={(e) => set("telephone", e.target.value)} style={inputStyle} /></Field>
+        <Field label="Question secrète"><input value={form.questionSecrete || ""} onChange={(e) => set("questionSecrete", e.target.value)} style={inputStyle} placeholder="Ex : Nom de ma ville natale ?" /></Field>
+        <Field label={form.isNew ? "Réponse secrète" : "Nouvelle réponse (laisser vide pour ne pas changer)"}><input value={form.reponseSecrete || ""} onChange={(e) => set("reponseSecrete", e.target.value)} style={inputStyle} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Rôle"><select value={form.roleId} onChange={(e) => set("roleId", e.target.value)} style={inputStyle}>{roles.map((r) => <option key={r.id} value={r.id}>{r.nom}</option>)}</select></Field>
           <Field label="Boutique"><select value={form.boutique} onChange={(e) => set("boutique", e.target.value)} style={inputStyle}>{BOUTIQUES.map((b) => <option key={b} value={b}>{b}</option>)}</select></Field>
