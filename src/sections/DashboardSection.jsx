@@ -65,17 +65,11 @@ export default function DashboardSection() {
       if (estAdmin) {
         const clients = await api.clients.list();
         const aujourdhui = new Date();
-        const dansSeptJours = [];
-        for (let i = 0; i < 7; i++) {
-          const d = new Date();
-          d.setDate(aujourdhui.getDate() + i);
-          dansSeptJours.push({ jour: d.getDate(), mois: MOIS[d.getMonth()] });
-        }
-        const bientot = clients.filter((c) =>
-          dansSeptJours.some((d) => d.jour === parseInt(c.jourAnniv, 10) && d.mois === c.moisAnniv)
-        );
+        const jourAujourdhui = aujourdhui.getDate();
+        const moisAujourdhui = MOIS[aujourdhui.getMonth()];
+        const bientot = clients.filter((c) => parseInt(c.jourAnniv, 10) === jourAujourdhui && c.moisAnniv === moisAujourdhui);
         setAnniversaires(bientot);
-      }
+      }      
 
     if (peutVoirStock) {
         const articles = await api.articles.list();
@@ -188,7 +182,7 @@ export default function DashboardSection() {
       {estAdmin && anniversaires.length > 0 && (
         <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
           <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
-            <Cake size={14} /> Anniversaires cette semaine
+            <Cake size={14} /> Anniversaires aujourd'hui
           </p>
           <div className="space-y-1.5">
             {anniversaires.map((c) => (
