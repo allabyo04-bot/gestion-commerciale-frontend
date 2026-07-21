@@ -45,6 +45,8 @@ export const api = {
   auth: {
     login: (login, pin) => request("/api/auth/login", { method: "POST", body: { login, pin } }),
     me: () => request("/api/auth/me"),
+    questionSecrete: (login) => request(`/api/auth/question-secrete/${encodeURIComponent(login)}`),
+    reinitialiserPin: (data) => request("/api/auth/reinitialiser-pin", { method: "POST", body: data }),
   },
   users: {
     list: () => request("/api/users"),
