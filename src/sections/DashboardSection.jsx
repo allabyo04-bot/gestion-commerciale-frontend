@@ -68,7 +68,13 @@ export default function DashboardSection() {
         const jourAujourdhui = aujourdhui.getDate();
         const moisAujourdhui = MOIS[aujourdhui.getMonth()];
         const bientot = clients.filter((c) => parseInt(c.jourAnniv, 10) === jourAujourdhui && c.moisAnniv === moisAujourdhui);
-        setAnniversaires(bientot);
+        const anneeEnCours = aujourdhui.getFullYear();
+        const bientotAvecCumul = await Promise.all(bientot.map(async (c) => {
+          const ventes = await api.ventes.list({ clientId: c.id });
+          const cumulAnnee = ventes.filter((v) => new Date(v.date).getFullYear() === anneeEnCours).reduce((s, v) => s + v.total, 0);
+          return { ...c, cumulAnnee };
+        }));
+        setAnniversaires(bientotAvecCumul);
       }      
 
     if (peutVoirStock) {
@@ -187,11 +193,14 @@ export default function DashboardSection() {
           <div className="space-y-1.5">
             {anniversaires.map((c) => (
               <div key={c.id} className="flex items-center justify-between text-sm">
-                <span>{c.nomPrenoms}</span>
-                <span className="text-xs font-mono" style={{ color: COULEUR.texteDoux }}>{c.jourAnniv} {c.moisAnniv}</span>
+                <div>
+                  <span>{c.nomPrenoms}</span>
+                  <span className="text-xs ml-2" style={{ color: COULEUR.texteDoux }}>{c.telephone || "— pas de téléphone"}</span>
+                </div>
+                <span className="text-xs font-mono" style={{ color: COULEUR.texteDoux }}>Cumul {fmt(c.cumulAnnee)} F</span>
               </div>
             ))}
-          </div>
+    </div>
         </div>
       )}
      {peutVoirVentes && meilleurVendeur && (
