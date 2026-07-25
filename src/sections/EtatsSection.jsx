@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT } from "../constants.js";
@@ -43,6 +43,7 @@ export default function EtatsSection() {
       else if (sousOnglet === "mode") res = await api.etats.parModePaiement(params);
       else if (sousOnglet === "type") res = await api.etats.parType(params);
       else if (sousOnglet === "vendeur") res = await api.etats.parVendeur(params);
+      else if (sousOnglet === "audit") res = await api.etats.auditRemises({ dateDebut, dateFin });
       else res = await api.etats.recapBoutiques({ dateDebut, dateFin });
       setDonnees(res);
     } catch (e) {
@@ -148,6 +149,12 @@ export default function EtatsSection() {
       });
       lignes.push(["Cumul", donnees.cumul.nombreVentes, donnees.cumul.totalVentes, donnees.cumul.totalRetours, donnees.cumul.totalReglements]);
       nomFichier = `etat-recap-boutiques_${dateDebut}_${dateFin}`;
+    } else if (sousOnglet === "audit" && donnees?.lignes) {
+      lignes.push(["Vente", "Date", "Boutique", "Caissier", "Montant remise", "Demande N°", "Statut demande", "Traité par", "Suspecte"]);
+      donnees.lignes.forEach((l) => {
+        lignes.push([l.venteNumero, new Date(l.date).toLocaleString("fr-FR"), l.boutique, l.caissier || "", l.montantRemise, l.demandeNumero || "", l.demandeStatut || "", l.traitePar || "", l.suspecte ? "OUI" : "non"]);
+      });
+      nomFichier = `audit-remises_${dateDebut}_${dateFin}`;
     } else {
       return;
     }
@@ -183,6 +190,7 @@ export default function EtatsSection() {
     { id: "type", label: "Par type", icon: Store },
     { id: "vendeur", label: "Meilleur vendeur", icon: Award },
     ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
+    ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
   ];
 
   return (
@@ -211,6 +219,7 @@ export default function EtatsSection() {
         </div>
       </div>
 
+      {sousOnglet !== "audit" && (
       <div className="flex items-end gap-3 flex-wrap mb-6 p-4 rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
         <div className="relative">
           <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Période</label>
@@ -258,6 +267,22 @@ export default function EtatsSection() {
           </div>
         )}
       </div>
+      )}
+
+      {sousOnglet === "audit" && (
+        <div className="flex items-end gap-3 flex-wrap mb-6 p-4 rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Du</label>
+            <input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff" }} />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Au</label>
+            <input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff" }} />
+          </div>
+        </div>
+      )}
 
       {erreur && <p className="text-sm mb-4" style={{ color: COULEUR.accent }}>{erreur}</p>}
 
@@ -549,6 +574,67 @@ export default function EtatsSection() {
                 <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalCartesCadeauxVendues)}</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {!chargement && donnees?.lignes && sousOnglet === "audit" && (
+        <div>
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Ventes avec remise (période)</p>
+              <p className="font-display text-xl font-semibold">{donnees.total}</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: donnees.nbSuspectes > 0 ? "#FBEAE7" : COULEUR.carte, border: `1px solid ${donnees.nbSuspectes > 0 ? COULEUR.accent : COULEUR.bordure}` }}>
+              <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Anomalies détectées</p>
+              <p className="font-display text-xl font-semibold" style={{ color: donnees.nbSuspectes > 0 ? COULEUR.accent : "#3F6B4A" }}>{donnees.nbSuspectes}</p>
+            </div>
+          </div>
+
+          {donnees.nbSuspectes === 0 ? (
+            <p className="text-sm px-4 py-3 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>Aucune anomalie — toutes les remises appliquées correspondent à une demande approuvée par toi.</p>
+          ) : (
+            <p className="text-sm px-4 py-3 rounded-lg mb-4" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>⚠ {donnees.nbSuspectes} vente(s) avec remise ne correspondent à aucune demande approuvée valide — à vérifier ci-dessous.</p>
+          )}
+
+          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
+                  <th className="text-left px-4 py-2">Vente</th>
+                  <th className="text-left px-4 py-2">Date</th>
+                  <th className="text-left px-4 py-2">Boutique</th>
+                  <th className="text-left px-4 py-2">Caissier</th>
+                  <th className="text-right px-4 py-2">Remise</th>
+                  <th className="text-left px-4 py-2">Demande</th>
+                  <th className="text-left px-4 py-2">Traitée par</th>
+                  <th className="text-left px-4 py-2">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donnees.lignes.length === 0 && (
+                  <tr><td className="px-4 py-3 text-sm" colSpan={8} style={{ color: COULEUR.texteDoux }}>Aucune vente avec remise sur cette période.</td></tr>
+                )}
+                {donnees.lignes.map((l) => (
+                  <tr key={l.venteId} style={{ borderTop: `1px solid ${COULEUR.bordure}`, background: l.suspecte ? "#FBEAE7" : "transparent" }}>
+                    <td className="px-4 py-2 font-mono">{l.venteNumero}</td>
+                    <td className="px-4 py-2">{new Date(l.date).toLocaleString("fr-FR")}</td>
+                    <td className="px-4 py-2">{l.boutique}</td>
+                    <td className="px-4 py-2">{l.caissier || "—"}</td>
+                    <td className="text-right px-4 py-2">{formatFCFA(l.montantRemise)}</td>
+                    <td className="px-4 py-2 font-mono">{l.demandeNumero || "—"}</td>
+                    <td className="px-4 py-2">{l.traitePar || "—"}</td>
+                    <td className="px-4 py-2">
+                      {l.suspecte ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{l.problemes.join(", ")}</span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>OK</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

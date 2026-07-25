@@ -196,5 +196,9 @@ etats: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/par-vendeur${qs ? `?${qs}` : ""}`);
     },
+    auditRemises: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/audit-remises${qs ? `?${qs}` : ""}`);
+    },
   },
 };
