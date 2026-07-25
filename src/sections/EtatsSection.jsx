@@ -143,11 +143,11 @@ export default function EtatsSection() {
       });
       nomFichier = `etat-par-vendeur_${dateDebut}_${dateFin}`;
     } else if (sousOnglet === "recap" && donnees?.parBoutique) {
-      lignes.push(["Boutique", "Nombre de ventes", "Total des ventes", "Retours traités", "Total règlements"]);
+      lignes.push(["Boutique", "Nombre de ventes", "Total des ventes", "Retours traités", "Total règlements", "Créances historiques"]);
       donnees.parBoutique.forEach((b) => {
-        lignes.push([b.boutique, b.nombreVentes, b.totalVentes, b.totalRetours, b.totalReglements]);
+        lignes.push([b.boutique, b.nombreVentes, b.totalVentes, b.totalRetours, b.totalReglements, b.totalReglementsCreancesHistoriques]);
       });
-      lignes.push(["Cumul", donnees.cumul.nombreVentes, donnees.cumul.totalVentes, donnees.cumul.totalRetours, donnees.cumul.totalReglements]);
+      lignes.push(["Cumul", donnees.cumul.nombreVentes, donnees.cumul.totalVentes, donnees.cumul.totalRetours, donnees.cumul.totalReglements, donnees.cumul.totalReglementsCreancesHistoriques]);
       nomFichier = `etat-recap-boutiques_${dateDebut}_${dateFin}`;
     } else if (sousOnglet === "audit" && donnees?.lignes) {
       lignes.push(["Vente", "Date", "Boutique", "Caissier", "Montant remise", "Demande N°", "Statut demande", "Traité par", "Suspecte"]);
@@ -303,6 +303,7 @@ export default function EtatsSection() {
           <p className="text-sm mb-1">Total monnaie rendue : <strong>{formatFCFA(fermeture.totalMonnaieRendue)}</strong></p>
           <p className="text-sm mb-1">Règlements de crédit reçus aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsRecus)}</strong></p>
           <p className="text-sm mb-1">Cartes cadeaux vendues aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalCartesCadeauxVendues)}</strong></p>
+          <p className="text-sm mb-1">Règlements de créances historiques aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsCreancesHistoriques)}</strong></p>
           <p className="text-sm font-semibold mb-3" style={{ borderTop: `1px solid ${COULEUR.bordure}`, paddingTop: "8px" }}>Total encaissé (caisse) : <strong>{formatFCFA(fermeture.totalEncaisseGlobal)}</strong></p>
 
           <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Répartition par mode de paiement</p>
@@ -340,7 +341,7 @@ export default function EtatsSection() {
           {fermeture.cartesCadeauxVenduesDetail?.length > 0 && (
             <>
               <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des cartes cadeaux vendues</p>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm mb-4">
                 <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Numéro</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
                 <tbody>
                   {fermeture.cartesCadeauxVenduesDetail.map((c, i) => (
@@ -348,6 +349,24 @@ export default function EtatsSection() {
                       <td className="py-1">{c.numero}</td>
                       <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === c.mode)?.label || c.mode}</td>
                       <td className="text-right py-1">{formatFCFA(c.montant)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {fermeture.reglementsCreancesDetail?.length > 0 && (
+            <>
+              <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des règlements de créances historiques</p>
+              <table className="w-full text-sm">
+                <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Client</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
+                <tbody>
+                  {fermeture.reglementsCreancesDetail.map((r, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                      <td className="py-1">{r.clientNom}</td>
+                      <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}</td>
+                      <td className="text-right py-1">{formatFCFA(r.montant)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -534,7 +553,7 @@ export default function EtatsSection() {
           {donnees.parBoutique.map((b) => (
             <div key={b.boutique} className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="font-display text-lg font-semibold mb-3">{b.boutique}</p>
-              <div className="grid sm:grid-cols-4 gap-4">
+              <div className="grid sm:grid-cols-5 gap-4">
                 <div>
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total des ventes ({b.nombreVentes})</p>
                   <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalVentes)}</p>
@@ -551,12 +570,16 @@ export default function EtatsSection() {
                   <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Cartes cadeaux vendues</p>
                   <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalCartesCadeauxVendues)}</p>
                 </div>
+                <div>
+                  <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Créances historiques réglées</p>
+                  <p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{formatFCFA(b.totalReglementsCreancesHistoriques)}</p>
+                </div>
               </div>
             </div>
           ))}
           <div className="rounded-2xl p-5" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
             <p className="font-display text-lg font-semibold mb-3">Cumul des 2 boutiques</p>
-            <div className="grid sm:grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-5 gap-4">
               <div>
                 <p className="text-xs opacity-80">Total des ventes ({donnees.cumul.nombreVentes})</p>
                 <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalVentes)}</p>
@@ -572,6 +595,10 @@ export default function EtatsSection() {
               <div>
                 <p className="text-xs opacity-80">Cartes cadeaux vendues</p>
                 <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalCartesCadeauxVendues)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-80">Créances historiques réglées</p>
+                <p className="font-display text-xl font-semibold">{formatFCFA(donnees.cumul.totalReglementsCreancesHistoriques)}</p>
               </div>
             </div>
           </div>
