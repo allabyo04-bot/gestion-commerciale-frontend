@@ -242,7 +242,7 @@ export default function VentesSection() {
 
       <div className="flex gap-6 items-start">
         <div className="flex flex-col gap-2 no-print shrink-0" style={{ width: "200px" }}>
-          {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
+          {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["creances", "Créances historiques"], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
             ...(estAdmin ? [["remises-admin", `Demandes de remise${nbRemisesEnAttente > 0 ? ` (${nbRemisesEnAttente})` : ""}`]] : [])].map(([id, label]) => (
             <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-lg text-sm font-medium text-left" style={subTab === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
           ))}
@@ -508,6 +508,7 @@ export default function VentesSection() {
       {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} />}
       {subTab === "avoirs" && <AvoirsSection />}
       {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
+      {subTab === "creances" && <CreancesHistoriquesSection boutique={boutique} clients={clients} estAdmin={estAdmin} onDone={load} />}
       {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
         </div>
       </div>
@@ -885,6 +886,7 @@ function AvoirsSection() {
     </div>
   );
 }
+
 function CreditSection({ ventesCredit, onDone }) {
   const [venteSel, setVenteSel] = useState(null);
   const [mode, setMode] = useState("especes");
@@ -1012,6 +1014,216 @@ function RecuReglementModal({ recu, onClose }) {
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-2">
           <div className="flex justify-between text-sm"><span>Total de la vente</span><span>{fmt(recu.totalVente)} F</span></div>
           <div className="flex justify-between text-sm font-semibold" style={{ color: "#3F6B4A" }}><span>Montant réglé aujourd'hui</span><span>{fmt(recu.paiement.montant)} F</span></div>
+          <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Mode de paiement</span><span>{modeLabel}</span></div>
+        </div>
+
+        <div className="flex justify-between font-semibold mt-3 text-sm" style={{ color: recu.resteApres > 0 ? "#B04A3B" : "#3F6B4A" }}>
+          <span>{recu.resteApres > 0 ? "RESTE À PAYER" : "SOLDÉ"}</span>
+          <span>{fmt(Math.max(0, recu.resteApres))} F</span>
+        </div>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="mt-3 pt-3">
+          <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>{MESSAGE_FIN_TICKET}</p>
+        </div>
+
+        <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+      </div>
+    </div>
+  );
+}
+
+function CreancesHistoriquesSection({ boutique, clients, estAdmin, onDone }) {
+  const [creances, setCreances] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [error, setError] = useState("");
+
+  const [formOuvert, setFormOuvert] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [montantTotal, setMontantTotal] = useState("");
+  const [montantDejaPaye, setMontantDejaPaye] = useState("");
+  const [note, setNote] = useState("");
+
+  const [creanceSel, setCreanceSel] = useState(null);
+  const [mode, setMode] = useState("especes");
+  const [montant, setMontant] = useState("");
+  const [recu, setRecu] = useState(null);
+
+  const load = useCallback(async () => {
+    setChargement(true);
+    try { setCreances(await api.creancesHistoriques.list({ boutique })); } catch (e) { setError(e.message); } finally { setChargement(false); }
+  }, [boutique]);
+  useEffect(() => { load(); }, [load]);
+
+  const nonSoldees = creances.filter((c) => c.resteAPayer > 0);
+  const soldees = creances.filter((c) => c.resteAPayer <= 0);
+
+  const creer = async () => {
+    if (!clientId) { setError("Choisis un client."); return; }
+    if (!montantTotal) { setError("Le montant total est obligatoire."); return; }
+    try {
+      await api.creancesHistoriques.create({
+        clientId, boutique, montantTotal: Number(montantTotal),
+        montantDejaPaye: Number(montantDejaPaye) || 0, note,
+      });
+      setClientId(""); setClientSearch(""); setMontantTotal(""); setMontantDejaPaye(""); setNote(""); setFormOuvert(false);
+      setError(""); load();
+    } catch (e) { setError(e.message); }
+  };
+
+  const ouvrirReglement = (c) => {
+    setCreanceSel(c);
+    setMontant(c.resteAPayer);
+    setMode("especes");
+    setError("");
+  };
+
+  const enregistrerReglement = async () => {
+    if (!montant || Number(montant) <= 0) { setError("Le montant doit etre positif."); return; }
+    try {
+      const resultat = await api.creancesHistoriques.reglement(creanceSel.id, { montant: Number(montant), mode, boutique });
+      setRecu({ ...resultat, boutique });
+      setCreanceSel(null);
+      onDone?.();
+      load();
+    } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <div>
+      {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+
+      {estAdmin && (
+        <div className="mb-6">
+          {!formOuvert ? (
+            <button onClick={() => setFormOuvert(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Ajouter une ancienne créance</button>
+          ) : (
+            <div className="rounded-xl p-5 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+              <p className="font-display font-semibold mb-3">Nouvelle créance historique</p>
+              <Field label="Client">
+                {clientId ? (
+                  <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
+                    <span className="text-sm">{clients.find((c) => c.id === clientId)?.nomPrenoms}</span>
+                    <button onClick={() => { setClientId(""); setClientSearch(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
+                  </div>
+                ) : (
+                  <div className="relative mt-1">
+                    <input value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px" }} placeholder="Rechercher…" />
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+                    {clientSearch.trim() && (
+                      <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden max-h-40 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4" }}>
+                        {clients.filter((c) => c.nomPrenoms.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 6).map((c) => (
+                          <button key={c.id} onClick={() => { setClientId(c.id); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>{c.nomPrenoms}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Montant total de la dette (F CFA)"><input value={montantTotal} onChange={(e) => setMontantTotal(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
+                <Field label="Deja regle avant import (F CFA)"><input value={montantDejaPaye} onChange={(e) => setMontantDejaPaye(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
+              </div>
+              <Field label="Note (optionnel)"><input value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle} placeholder="Ex : reprise Abigescom" /></Field>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setFormOuvert(false)} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Annuler</button>
+                <button onClick={creer} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {chargement && <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>}
+
+      {!chargement && (
+        <>
+          <p className="font-display font-semibold mb-3">Non soldees ({nonSoldees.length})</p>
+          <div className="space-y-2 mb-6">
+            {nonSoldees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune créance en attente.</p>}
+            {nonSoldees.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                <div>
+                  <p className="font-medium text-sm">{c.client?.nomPrenoms || "Client inconnu"}</p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{c.boutique}{c.note ? ` · ${c.note}` : ""}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-xs" style={{ color: "#6B5D52" }}>Total {fmt(c.montantTotal)} F · Regle {fmt(c.totalRegle)} F</p>
+                    <p className="text-sm font-semibold" style={{ color: "#B04A3B" }}>Reste {fmt(c.resteAPayer)} F</p>
+                  </div>
+                  <button onClick={() => ouvrirReglement(c)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer un reglement</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="font-display font-semibold mb-3">Soldees ({soldees.length})</p>
+          <div className="space-y-2">
+            {soldees.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                <div>
+                  <p className="font-medium text-sm">{c.client?.nomPrenoms || "Client inconnu"}</p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{c.boutique}</p>
+                </div>
+                <p className="text-sm font-semibold" style={{ color: "#3F6B4A" }}>Soldee · {fmt(c.montantTotal)} F</p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {creanceSel && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+          <div className="rounded-xl p-6 max-w-sm w-full" style={{ background: "#FFFDF9" }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-semibold">Reglement — {creanceSel.client?.nomPrenoms}</p>
+              <button onClick={() => setCreanceSel(null)}><X size={18} color="#6B5D52" /></button>
+            </div>
+            {error && <p className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+            <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Reste a payer : {fmt(creanceSel.resteAPayer)} F</p>
+            <Field label="Mode de paiement">
+              <select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>
+                {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Montant (F CFA)">
+              <input type="number" min="0" max={creanceSel.resteAPayer} value={montant} onChange={(e) => setMontant(e.target.value)} style={inputStyle} />
+            </Field>
+            <button onClick={enregistrerReglement} className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider le reglement</button>
+          </div>
+        </div>
+      )}
+
+      {recu && <CreanceRecuModal recu={recu} onClose={() => setRecu(null)} />}
+    </div>
+  );
+}
+
+function CreanceRecuModal({ recu, onClose }) {
+  const infos = INFOS_BOUTIQUE[recu.boutique] || {};
+  const modeLabel = MODES_PAIEMENT.find((m) => m.id === recu.reglement.mode)?.label || recu.reglement.mode;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+      <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
+        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Reçu de règlement</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
+
+        <div className="text-center mb-3">
+          <p className="font-display font-bold text-sm leading-tight">{infos.nom}</p>
+          <p className="font-display font-bold text-sm leading-tight">{infos.ligne2}</p>
+          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{infos.adresse}</p>
+          <p className="text-xs" style={{ color: "#6B5D52" }}>{infos.telephone}</p>
+        </div>
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="my-2" />
+
+        <p className="text-center font-display text-lg font-semibold">RÈGLEMENT DE CRÉANCE</p>
+        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>{new Date().toLocaleString("fr-FR")} · {recu.boutique}</p>
+
+        <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {recu.clientNom}</div>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-2">
+          <div className="flex justify-between text-sm"><span>Montant total de la dette</span><span>{fmt(recu.montantTotal)} F</span></div>
+          <div className="flex justify-between text-sm font-semibold" style={{ color: "#3F6B4A" }}><span>Montant réglé aujourd'hui</span><span>{fmt(recu.reglement.montant)} F</span></div>
           <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Mode de paiement</span><span>{modeLabel}</span></div>
         </div>
 

@@ -162,6 +162,15 @@ depenses: {
     },
   },
 
+creancesHistoriques: {
+    list: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/creances-historiques${qs ? `?${qs}` : ""}`);
+    },
+    create: (data) => request("/api/creances-historiques", { method: "POST", body: data }),
+    reglement: (id, data) => request(`/api/creances-historiques/${id}/reglement`, { method: "POST", body: data }),
+  },
+
 etats: {
     parDate: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
