@@ -171,22 +171,26 @@ export default function DashboardSection() {
             </p>
             <p className="font-display text-2xl font-semibold mb-1">{fmt(credits.total)} F</p>
             <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>{credits.nombreClients} client(s) concerné(s)</p>
-            {credits.top.length > 0 && (
-              <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+          {credits.top.length > 0 && (
+              <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
                 {credits.top.map((v) => (
-                  <div key={v.id} className="flex items-center justify-between text-sm">
-                    <span>{v.client?.nomPrenoms || "Client"}</span>
-                    <span className="font-mono">{fmt(v.resteAPayer)} F</span>
+                  <div key={v.id} className="text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>{v.client?.nomPrenoms || "Client"}</span>
+                      <span className="font-mono font-semibold" style={{ color: COULEUR.accent }}>{fmt(v.resteAPayer)} F</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs" style={{ color: COULEUR.texteDoux }}>
+                      <span>{new Date(v.date).toLocaleDateString("fr-FR")} · Payé {fmt(v.totalPaye)} F</span>
+                    </div>
                   </div>
-                ))}
+             ))}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {estAdmin && anniversaires.length > 0 && (
-        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+      {estAdmin && anniversaires.length > 0 && (        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
           <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
             <Cake size={14} /> Anniversaires aujourd'hui
           </p>
