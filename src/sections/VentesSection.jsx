@@ -539,7 +539,7 @@ export default function VentesSection() {
   );
 }
 
-function ReceiptModal({ vente, onClose }) {
+export function ReceiptModal({ vente, onClose }) {
   const infos = INFOS_BOUTIQUE[vente.boutique] || {};
 const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   return (

@@ -3,6 +3,7 @@ import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printe
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT } from "../constants.js";
+import { ReceiptModal } from "./VentesSection.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -30,6 +31,7 @@ export default function EtatsSection() {
   const [fermeture, setFermeture] = useState(null);
   const [chargementFermeture, setChargementFermeture] = useState(false);
   const [periodeOuverte, setPeriodeOuverte] = useState(false);
+  const [receiptVente, setReceiptVente] = useState(null);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -403,7 +405,9 @@ export default function EtatsSection() {
                   <th className="text-left px-4 py-2">Boutique</th>
                   <th className="text-left px-4 py-2">Vendeur</th>
                   <th className="text-left px-4 py-2">Type</th>
+                  <th className="text-left px-4 py-2">Mode de paiement</th>
                   <th className="text-right px-4 py-2">Total</th>
+                  <th className="text-right px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -414,14 +418,19 @@ export default function EtatsSection() {
                     <td className="px-4 py-2">{v.boutique}</td>
                     <td className="px-4 py-2">{v.vendeur?.nom}</td>
                     <td className="px-4 py-2">{v.modeVente}</td>
+                    <td className="px-4 py-2">{v.paiements.map((p) => MODES_PAIEMENT.find((m) => m.id === p.mode)?.label || p.mode).join(", ")}</td>
                     <td className="text-right px-4 py-2">{formatFCFA(v.total)}</td>
+                    <td className="text-right px-4 py-2">
+                      <button onClick={() => setReceiptVente(v)} className="text-xs px-2 py-1 rounded-lg" style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.accent }}>Réimprimer</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
-                  <td className="px-4 py-2" colSpan={5}>Total net ({donnees.nombre} vente{donnees.nombre > 1 ? "s" : ""})</td>
+                  <td className="px-4 py-2" colSpan={6}>Total net ({donnees.nombre} vente{donnees.nombre > 1 ? "s" : ""})</td>
                   <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -665,6 +674,7 @@ export default function EtatsSection() {
           </div>
         </div>
       )}
+      {receiptVente && <ReceiptModal vente={receiptVente} onClose={() => setReceiptVente(null)} />}
     </div>
   );
 }
