@@ -221,7 +221,7 @@ export default function EtatsSection() {
         </div>
       </div>
 
-      {sousOnglet !== "audit" && (
+      {sousOnglet !== "audit" && estAdmin && (
       <div className="flex items-end gap-3 flex-wrap mb-6 p-4 rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
         <div className="relative">
           <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Période</label>
@@ -257,18 +257,22 @@ export default function EtatsSection() {
           <input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)}
             className="px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff" }} />
         </div>
-        {estAdmin && (
-          <div>
-            <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Boutique</label>
-            <select value={boutique} onChange={(e) => setBoutique(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff" }}>
-              <option value="">Toutes les boutiques</option>
-              <option value="Angré">Angré</option>
-              <option value="Koumassi">Koumassi</option>
-            </select>
-          </div>
-        )}
+        <div>
+          <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Boutique</label>
+          <select value={boutique} onChange={(e) => setBoutique(e.target.value)}
+            className="px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${COULEUR.bordure}`, background: "#fff" }}>
+            <option value="">Toutes les boutiques</option>
+            <option value="Angré">Angré</option>
+            <option value="Koumassi">Koumassi</option>
+          </select>
+        </div>
       </div>
+      )}
+
+      {sousOnglet !== "audit" && !estAdmin && (
+        <div className="mb-6 p-4 rounded-2xl text-sm" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}`, color: COULEUR.texteDoux }}>
+          Tu consultes les ventes d'aujourd'hui ({new Date().toLocaleDateString("fr-FR")}). Seule Djenie peut consulter les jours précédents.
+        </div>
       )}
 
       {sousOnglet === "audit" && (
