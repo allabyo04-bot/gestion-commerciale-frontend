@@ -34,6 +34,7 @@ export default function ClientsSection() {
 
   const submitClient = async (form) => {
     if (!form.nomPrenoms.trim()) { setError("Le nom et prénoms du client sont obligatoires."); return; }
+    if (!form.telephone?.trim()) { setError("Le numéro de téléphone du client est obligatoire."); return; }
     try {
       if (form.isNew) {
         const cree = await api.clients.create(form);
@@ -296,7 +297,7 @@ function ClientModal({ client, onCancel, onSubmit }) {
           )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Téléphone"><input value={form.telephone} onChange={(e) => set("telephone", e.target.value)} style={inputStyle} /></Field>
+          <Field label="Téléphone *"><input value={form.telephone} onChange={(e) => set("telephone", e.target.value)} style={inputStyle} /></Field>
           <Field label="Whatsapp"><input value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} style={inputStyle} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
