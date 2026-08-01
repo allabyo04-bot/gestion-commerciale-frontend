@@ -386,6 +386,10 @@ export default function EtatsSection() {
 
       {!chargement && donnees?.ventes && sousOnglet === "date" && (
         <>
+          <div className="rounded-2xl p-5 mb-4" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
+            <p className="text-xs opacity-80 mb-1">Total net ({donnees.nombre} vente{donnees.nombre > 1 ? "s" : ""})</p>
+            <p className="font-display text-2xl font-semibold">{formatFCFA(donnees.total)}</p>
+          </div>
           <div className="grid sm:grid-cols-3 gap-4 mb-4">
             <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Cartes cadeaux vendues</p>
@@ -444,6 +448,10 @@ export default function EtatsSection() {
 
       {!chargement && donnees?.recap && sousOnglet === "mode" && (
         <>
+          <div className="rounded-2xl p-5 mb-4" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
+            <p className="text-xs opacity-80 mb-1">Total général</p>
+            <p className="font-display text-2xl font-semibold">{formatFCFA(donnees.total)}</p>
+          </div>
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
               <p className="text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Liquidités (Espèces)</p>
@@ -488,7 +496,12 @@ export default function EtatsSection() {
       )}
 
       {!chargement && donnees?.recap && sousOnglet === "type" && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+        <>
+          <div className="rounded-2xl p-5 mb-4" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
+            <p className="text-xs opacity-80 mb-1">Total général</p>
+            <p className="font-display text-2xl font-semibold">{formatFCFA(donnees.total)}</p>
+          </div>
+          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
@@ -513,7 +526,8 @@ export default function EtatsSection() {
               </tr>
             </tfoot>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       {!chargement && donnees?.classement && sousOnglet === "vendeur" && (
