@@ -1,4 +1,4 @@
-export const FAMILLES = ["Chaussure", "Sac"];
+export const FAMILLES = ["Chaussure", "Sac", "Article d'entretien"];
 export const BOUTIQUES = ["Angré", "Koumassi"];
 
 export const INFOS_BOUTIQUE = {
