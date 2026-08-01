@@ -507,7 +507,7 @@ export default function VentesSection() {
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
       {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} />}
       {subTab === "avoirs" && <AvoirsSection />}
-      {subTab === "credit" && <CreditSection ventesCredit={ventesCredit} onDone={load} />}
+      {subTab === "credit" && <CreditSection estAdmin={estAdmin} onDone={load} />}
       {subTab === "creances" && <CreancesHistoriquesSection boutique={boutique} clients={clients} estAdmin={estAdmin} onDone={load} />}
       {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
         </div>
@@ -887,7 +887,10 @@ function AvoirsSection() {
   );
 }
 
-function CreditSection({ ventesCredit, onDone }) {
+function CreditSection({ estAdmin, onDone }) {
+  const [ventesCredit, setVentesCredit] = useState([]);
+  const [boutiqueFiltre, setBoutiqueFiltre] = useState("");
+  const [chargement, setChargement] = useState(true);
   const [venteSel, setVenteSel] = useState(null);
   const [mode, setMode] = useState("especes");
   const [montant, setMontant] = useState("");
@@ -896,9 +899,16 @@ function CreditSection({ ventesCredit, onDone }) {
   const [succes, setSucces] = useState("");
   const [recuReglement, setRecuReglement] = useState(null);
 
+  const chargerCredits = useCallback(async () => {
+    setChargement(true);
+    try {
+      setVentesCredit(await api.ventes.creditListe(boutiqueFiltre ? { boutique: boutiqueFiltre } : {}));
+    } catch (e) { setError(e.message); } finally { setChargement(false); }
+  }, [boutiqueFiltre]);
+  useEffect(() => { chargerCredits(); }, [chargerCredits]);
+
   const nonSoldees = ventesCredit.filter((v) => v.resteAPayer > 0);
   const soldees = ventesCredit.filter((v) => v.resteAPayer <= 0);
-
   const ouvrirReglement = (v) => {
     setVenteSel(v);
     setMontant(v.resteAPayer);
@@ -916,6 +926,7 @@ function CreditSection({ ventesCredit, onDone }) {
       });
       setRecuReglement(resultat);
       setVenteSel(null);
+      chargerCredits();
       onDone();
     } catch (e) { setError(e.message); }
   };
@@ -923,9 +934,20 @@ function CreditSection({ ventesCredit, onDone }) {
   return (
     <div>
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
+      {estAdmin && (
+        <div className="flex gap-2 mb-5">
+          {[["", "Toutes les boutiques"], ["Angré", "Angré"], ["Koumassi", "Koumassi"]].map(([val, label]) => (
+            <button key={val || "toutes"} onClick={() => setBoutiqueFiltre(val)} className="px-3 py-1.5 rounded-full text-xs font-medium"
+              style={boutiqueFiltre === val ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {chargement && <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>}
+      {!chargement && <p className="font-display font-semibold mb-3">Non soldees ({nonSoldees.length})</p>}
 
-      <p className="font-display font-semibold mb-3">Non soldees ({nonSoldees.length})</p>
-      <div className="space-y-2 mb-6">
+        <div className="space-y-2 mb-6">
         {nonSoldees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune vente a credit en attente de reglement.</p>}
         {nonSoldees.map((v) => (
           <div key={v.id} className="flex items-center justify-between rounded-xl p-4 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
