@@ -114,7 +114,7 @@ export default function VentesSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total]);
 
-  const montantRemiseApplique = demandeRemise?.statut === "APPROUVEE" ? demandeRemise.montantRemise : 0;
+  const montantRemiseApplique = demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.montantRemise : 0;
   const totalNet = total - montantRemiseApplique;
   const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
   const reste = totalNet - totalPaye;
@@ -182,7 +182,7 @@ export default function VentesSection() {
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
-        demandeRemiseId: demandeRemise?.statut === "APPROUVEE" ? demandeRemise.id : undefined,
+        demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: (p.mode === "bon_achat" || p.mode === "avoir") ? p.carteNumero : undefined })),
       });
@@ -394,7 +394,7 @@ export default function VentesSection() {
                 )}
                 {demandeRemise?.statut === "EN_ATTENTE" && (
                   <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
-                    <Clock size={13} /> En attente de validation par Djenie ({demandeRemise.numero})…
+                    <Clock size={13} /> Remise en attente de validation par Djenie ({demandeRemise.numero}) — tu peux deja encaisser au tarif reduit, elle validera apres coup
                   </div>
                 )}
                 {demandeRemise?.statut === "APPROUVEE" && (

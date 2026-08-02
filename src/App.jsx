@@ -9,12 +9,24 @@ import RolesSection from "./sections/RolesSection.jsx";
 import EtatsSection from "./sections/EtatsSection.jsx";
 import DashboardSection from "./sections/DashboardSection.jsx";
 import DepensesSection from "./sections/DepensesSection.jsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
+import { api } from "./api.js";
 
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
   const [tab, setTab] = useState("accueil");
+  const [nbRemisesEnAttente, setNbRemisesEnAttente] = useState(0);
+  const estAdmin = !!user?.role?.systeme;
+  useEffect(() => {
+    if (!estAdmin) return;
+    const rafraichir = async () => {
+      try { setNbRemisesEnAttente((await api.remises.list("EN_ATTENTE")).length); } catch { /* ignore */ }
+    };
+    rafraichir();
+    const interval = setInterval(rafraichir, 5000);
+    return () => clearInterval(interval);
+  }, [estAdmin]);
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
   const NAV = [
@@ -42,9 +54,16 @@ function Shell() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex gap-2 flex-wrap">
               {NAV.map(({ id, label, icon: Icon }) => (
-                <button key={id} onClick={() => setTab(id)} className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+                <button key={id} onClick={() => setTab(id)} className="relative flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
                   style={activeTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
                   <Icon size={14} /> {label}
+                  {id === "ventes" && estAdmin && nbRemisesEnAttente > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full text-[10px] font-bold animate-pulse"
+                      style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
+                      title={`${nbRemisesEnAttente} remise(s) en attente de validation`}>
+                      {nbRemisesEnAttente}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

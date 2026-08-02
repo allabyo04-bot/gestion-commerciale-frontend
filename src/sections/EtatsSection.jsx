@@ -312,6 +312,27 @@ export default function EtatsSection() {
           <p className="text-sm mb-1">Règlements de créances historiques aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsCreancesHistoriques)}</strong></p>
           <p className="text-sm font-semibold mb-3" style={{ borderTop: `1px solid ${COULEUR.bordure}`, paddingTop: "8px" }}>Total encaissé (caisse) : <strong>{formatFCFA(fermeture.totalEncaisseGlobal)}</strong></p>
 
+          {fermeture.remisesEnAttente?.length > 0 && (
+            <div className="mb-4 p-3 rounded-xl animate-pulse" style={{ background: "#FBEAE7", border: "1px solid #B04A3B" }}>
+              <p className="text-sm font-semibold mb-1" style={{ color: "#8C3B2E" }}>
+                ⚠ Remises en attente de validation : {formatFCFA(fermeture.totalRemisesEnAttente)} — à traiter pour régulariser le CA
+              </p>
+              <table className="w-full text-xs mt-2">
+                <thead><tr style={{ color: "#8C3B2E" }}><th className="text-left py-1">Demande</th><th className="text-left py-1">Vente</th><th className="text-left py-1">Demandée par</th><th className="text-right py-1">Montant</th></tr></thead>
+                <tbody>
+                  {fermeture.remisesEnAttente.map((r) => (
+                    <tr key={r.numero} style={{ borderTop: "1px solid #E8C3BB" }}>
+                      <td className="py-1">{r.numero}</td>
+                      <td className="py-1">{r.venteNumero || "—"}</td>
+                      <td className="py-1">{r.demandePar || "—"}</td>
+                      <td className="text-right py-1">{formatFCFA(r.montantRemise)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Répartition par mode de paiement</p>
           <table className="w-full text-sm mb-4">
             <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
