@@ -136,6 +136,10 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     reapprovisionner: (id, quantite) => request(`/api/denominations-cartes-cadeaux/${id}/reapprovisionner`, { method: "POST", body: { quantite } }),
     resume: () => request("/api/denominations-cartes-cadeaux/resume"),
   },
+  receptions: {
+    lister: (boutique) => request(`/api/receptions${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
+    creer: (data) => request("/api/receptions", { method: "POST", body: data }),
+  },
   soldes: {
     listerArticles: ({ marqueId, famille } = {}) => {
       const qs = new URLSearchParams({ ...(marqueId ? { marqueId } : {}), ...(famille ? { famille } : {}) }).toString();

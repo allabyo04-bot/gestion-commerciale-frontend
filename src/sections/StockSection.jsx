@@ -13,6 +13,7 @@ function stockQty(article, boutique, pointure) {
 function totalStock(article) {
   return (article.stocks || []).reduce((s, i) => s + i.quantite, 0);
 }
+function uidLocal() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
 export default function StockSection() {
   const [tab, setTab] = useState("articles");
@@ -104,7 +105,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"], ["reception", "Réception"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -280,6 +281,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
       {tab === "soldes" && <SoldesSection brands={brands} />}
+      {tab === "reception" && <ReceptionSection articles={articles} onApplique={load} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
@@ -1328,6 +1330,225 @@ function SoldesSection({ brands }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// RÉCEPTION — arrivage fournisseur, façon Archange Bébé : fournisseur, référence du bon de
+// livraison, recherche d'article, prix d'achat, notes. Pas de date de péremption (spécifique
+// aux cosmétiques d'Archange Bébé, non pertinent pour des chaussures/sacs).
+// ------------------------------------------------------------
+function ReceptionSection({ articles, onApplique }) {
+  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [fournisseur, setFournisseur] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [rechercheArticle, setRechercheArticle] = useState("");
+  const [articleChoisi, setArticleChoisi] = useState(null);
+  const [pointureChoisie, setPointureChoisie] = useState("");
+  const [quantiteChoisie, setQuantiteChoisie] = useState("");
+  const [prixAchatChoisi, setPrixAchatChoisi] = useState("");
+
+  const [lignes, setLignes] = useState([]);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [resultat, setResultat] = useState(null);
+
+  const [receptions, setReceptions] = useState([]);
+  const [chargementHistorique, setChargementHistorique] = useState(false);
+
+  const chargerHistorique = useCallback(async () => {
+    setChargementHistorique(true);
+    try { setReceptions(await api.receptions.lister(boutique)); } catch (e) { setErreur(e.message); } finally { setChargementHistorique(false); }
+  }, [boutique]);
+  useEffect(() => { chargerHistorique(); }, [chargerHistorique]);
+
+  const resultatsRecherche = useMemo(() => {
+    const q = rechercheArticle.trim().toLowerCase();
+    if (!q) return [];
+    return (articles || []).filter((a) => a.designation.toLowerCase().includes(q) || a.reference.toLowerCase().includes(q)).slice(0, 8);
+  }, [articles, rechercheArticle]);
+
+  const choisirArticle = (a) => {
+    setArticleChoisi(a);
+    setRechercheArticle("");
+    setPointureChoisie("");
+    setQuantiteChoisie("");
+    setPrixAchatChoisi(a.prixAchat != null ? String(a.prixAchat) : "");
+  };
+
+  const ajouterLigne = () => {
+    if (!articleChoisi) { setErreur("Choisis un article."); return; }
+    if (articleChoisi.famille === "Chaussure" && !pointureChoisie) { setErreur("Choisis une pointure."); return; }
+    const quantite = parseInt(quantiteChoisie, 10);
+    if (!quantite || quantite <= 0) { setErreur("Indique une quantité valide."); return; }
+    setLignes([...lignes, {
+      id: uidLocal(), articleId: articleChoisi.id, designation: articleChoisi.designation,
+      pointure: articleChoisi.famille === "Chaussure" ? pointureChoisie : "",
+      quantite, prixAchat: prixAchatChoisi ? Number(prixAchatChoisi) : null,
+    }]);
+    setArticleChoisi(null); setPointureChoisie(""); setQuantiteChoisie(""); setPrixAchatChoisi("");
+    setErreur("");
+  };
+  const retirerLigne = (id) => setLignes(lignes.filter((l) => l.id !== id));
+
+  const enregistrer = async () => {
+    if (lignes.length === 0) { setErreur("Ajoute au moins une ligne à la réception."); return; }
+    setEnvoiEnCours(true); setErreur(""); setResultat(null);
+    try {
+      const rec = await api.receptions.creer({
+        fournisseur: fournisseur || undefined, reference: reference || undefined, boutique, notes: notes || undefined,
+        lignes: lignes.map(({ articleId, pointure, quantite, prixAchat }) => ({ articleId, pointure, quantite, prixAchat })),
+      });
+      setResultat(rec);
+      setLignes([]); setFournisseur(""); setReference(""); setNotes("");
+      chargerHistorique();
+      onApplique();
+    } catch (e) { setErreur(e.message); } finally { setEnvoiEnCours(false); }
+  };
+
+  return (
+    <div>
+      <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-4">Nouvelle réception</p>
+
+        <div className="grid sm:grid-cols-3 gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+            <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+              {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Fournisseur (optionnel)</label>
+            <input value={fournisseur} onChange={(e) => setFournisseur(e.target.value)} style={selectStyle} placeholder="Ex : Hispanitas Import" />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Référence bon de livraison (optionnel)</label>
+            <input value={reference} onChange={(e) => setReference(e.target.value)} style={selectStyle} placeholder="Ex : BL-2026-045" />
+          </div>
+        </div>
+
+        <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+          <p className="text-sm font-medium mb-3">Ajouter un article</p>
+          <div className="relative mb-3">
+            <input value={rechercheArticle} onChange={(e) => { setRechercheArticle(e.target.value); setArticleChoisi(null); }} placeholder="Rechercher par désignation ou référence…" style={{ ...selectStyle, paddingLeft: "32px" }} />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+            {resultatsRecherche.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
+                {resultatsRecherche.map((a) => (
+                  <button key={a.id} type="button" onClick={() => choisirArticle(a)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
+                    {a.designation} <span style={{ color: "#6B5D52" }}>({a.reference})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {articleChoisi && (
+            <div className="grid sm:grid-cols-4 gap-3 items-end">
+              <div className="sm:col-span-1">
+                <p className="text-xs mb-1" style={{ color: "#6B5D52" }}>Article</p>
+                <p className="text-sm font-medium">{articleChoisi.designation}</p>
+              </div>
+              {articleChoisi.famille === "Chaussure" && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
+                  <select value={pointureChoisie} onChange={(e) => setPointureChoisie(e.target.value)} style={selectStyle}>
+                    <option value="">—</option>
+                    {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Quantité</label>
+                <input type="number" min="1" value={quantiteChoisie} onChange={(e) => setQuantiteChoisie(e.target.value)} style={selectStyle} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Prix d'achat (optionnel)</label>
+                <input type="number" min="0" value={prixAchatChoisi} onChange={(e) => setPrixAchatChoisi(e.target.value)} style={selectStyle} />
+              </div>
+              <button onClick={ajouterLigne} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter à la réception</button>
+            </div>
+          )}
+        </div>
+
+        {erreur && <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#B04A3B", background: "#FBEAE7" }}>⚠ {erreur}</p>}
+        {resultat && (
+          <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#3F6B4A", background: "#E9F0EA" }}>
+            Réception enregistrée : {resultat.lignes.length} ligne(s), stock mis à jour.
+          </p>
+        )}
+
+        {lignes.length > 0 && (
+          <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                  <th className="text-left px-4 py-2">Article</th>
+                  <th className="text-left px-4 py-2">Pointure</th>
+                  <th className="text-right px-4 py-2">Quantité</th>
+                  <th className="text-right px-4 py-2">Prix d'achat</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.map((l) => (
+                  <tr key={l.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="px-4 py-2">{l.designation}</td>
+                    <td className="px-4 py-2">{l.pointure ? `T${l.pointure}` : "—"}</td>
+                    <td className="text-right px-4 py-2">{l.quantite}</td>
+                    <td className="text-right px-4 py-2">{l.prixAchat != null ? `${fmt(l.prixAchat)} F` : "—"}</td>
+                    <td className="text-right px-4 py-2"><button onClick={() => retirerLigne(l.id)} style={{ color: "#B04A3B" }}><X size={14} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Notes (optionnel)</label>
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} style={selectStyle} placeholder="Ex : Colis reçu incomplet, 2 paires manquantes signalées au fournisseur" />
+        </div>
+
+        <button onClick={enregistrer} disabled={envoiEnCours || lignes.length === 0} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: envoiEnCours || lignes.length === 0 ? 0.6 : 1 }}>
+          {envoiEnCours ? "Enregistrement..." : `Enregistrer la réception (${lignes.length} ligne(s))`}
+        </button>
+      </div>
+
+      <div className="rounded-2xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-4">Historique des réceptions — {boutique}</p>
+        {chargementHistorique ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>
+        ) : receptions.length === 0 ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune réception enregistrée pour l'instant.</p>
+        ) : (
+          <div className="space-y-3">
+            {receptions.map((r) => (
+              <div key={r.id} className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <p className="text-sm font-medium">
+                    {r.fournisseur || "Fournisseur non précisé"} {r.reference ? `· ${r.reference}` : ""}
+                  </p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(r.dateReception).toLocaleDateString("fr-FR")} · {r.effectuePar?.prenom} {r.effectuePar?.nom}</p>
+                </div>
+                <div className="text-xs space-y-1" style={{ color: "#6B5D52" }}>
+                  {r.lignes.map((l) => (
+                    <div key={l.id} className="flex justify-between">
+                      <span>{l.article?.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span>
+                      <span>{l.prixAchat != null ? `${fmt(l.prixAchat)} F / unité` : ""}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.notes && <p className="text-xs mt-2 italic" style={{ color: "#6B5D52" }}>{r.notes}</p>}
+              </div>
+            ))}
           </div>
         )}
       </div>
