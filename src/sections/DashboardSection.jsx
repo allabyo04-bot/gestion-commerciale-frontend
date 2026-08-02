@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fmt, MOIS } from "../constants.js";
@@ -31,6 +31,8 @@ export default function DashboardSection() {
   const [credits, setCredits] = useState(null);
   const [meilleurVendeur, setMeilleurVendeur] = useState(null);
   const [anniversaires, setAnniversaires] = useState([]);
+  const [remisesEnAttente, setRemisesEnAttente] = useState(null);
+  const [resumeCartesCadeaux, setResumeCartesCadeaux] = useState([]);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -75,9 +77,22 @@ export default function DashboardSection() {
           return { ...c, cumulAnnee };
         }));
         setAnniversaires(bientotAvecCumul);
+
+        const [remisesRes, resumeRes] = await Promise.all([
+          api.remises.list("EN_ATTENTE"),
+          api.denominationsCartesCadeaux.resume(),
+        ]);
+        setRemisesEnAttente({
+          nombre: remisesRes.length,
+          total: remisesRes.reduce((s, r) => s + r.montantRemise, 0),
+          top: remisesRes.slice(0, 5),
+        });
+        setResumeCartesCadeaux(resumeRes);
       }      
 
-    if (peutVoirStock) {
+    // Alerte stock faible : utile pour un gestionnaire de stock au quotidien, pas pour Djenie
+    // qui fonctionne par collections (un stock faible sur un modèle n'est pas anormal chez elle).
+    if (peutVoirStock && !estAdmin) {
         const articles = await api.articles.list();
         const alertes = [];
         for (const a of articles) {
@@ -142,7 +157,7 @@ export default function DashboardSection() {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4 mb-6">
-        {peutVoirStock && (
+        {peutVoirStock && !estAdmin && (
           <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
             <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: "#B04A3B" }}>
               <AlertTriangle size={14} /> Alertes stock faible (≤ {SEUIL_STOCK_FAIBLE})
@@ -186,6 +201,51 @@ export default function DashboardSection() {
              ))}
               </div>
             )}
+          </div>
+        )}
+
+        {estAdmin && remisesEnAttente && (
+          <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: remisesEnAttente.nombre > 0 ? "1px solid #B04A3B" : `1px solid ${COULEUR.bordure}` }}>
+            <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: remisesEnAttente.nombre > 0 ? "#B04A3B" : COULEUR.accent }}>
+              <Percent size={14} /> Remises en attente {remisesEnAttente.nombre > 0 && <span className="animate-pulse">●</span>}
+            </p>
+            {remisesEnAttente.nombre === 0 ? (
+              <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Rien à traiter pour l'instant.</p>
+            ) : (
+              <>
+                <p className="font-display text-2xl font-semibold mb-1">{remisesEnAttente.nombre} demande(s)</p>
+                <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>{fmt(remisesEnAttente.total)} F à régulariser au total</p>
+                <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                  {remisesEnAttente.top.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between text-sm">
+                      <span>{r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}</span>
+                      <span className="font-mono" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {estAdmin && resumeCartesCadeaux.length > 0 && (
+          <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+              <Gift size={14} /> Cartes cadeaux
+            </p>
+            <div className="space-y-2">
+              {resumeCartesCadeaux.map((r) => (
+                <div key={r.id} className="flex items-center justify-between text-sm">
+                  <span>{fmt(r.montant)} F {!r.actif && <span className="text-xs" style={{ color: COULEUR.texteDoux }}>(inactif)</span>}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: COULEUR.texteDoux }}>{r.vendu} vendue(s)</span>
+                    <span className="font-mono px-2 py-0.5 rounded-full text-xs" style={{ background: r.reste <= 5 ? "#FBEAE7" : "#F1E9DC", color: r.reste <= 5 ? "#B04A3B" : "#6B5D52" }}>
+                      {r.reste} reste{r.reste <= 5 ? " ⚠" : ""}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

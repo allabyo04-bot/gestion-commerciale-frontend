@@ -133,6 +133,8 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     lister: (tous) => request(`/api/denominations-cartes-cadeaux${tous ? "?tous=1" : ""}`),
     creer: (montant) => request("/api/denominations-cartes-cadeaux", { method: "POST", body: { montant } }),
     activer: (id, actif) => request(`/api/denominations-cartes-cadeaux/${id}`, { method: "PUT", body: { actif } }),
+    reapprovisionner: (id, quantite) => request(`/api/denominations-cartes-cadeaux/${id}/reapprovisionner`, { method: "POST", body: { quantite } }),
+    resume: () => request("/api/denominations-cartes-cadeaux/resume"),
   },
   soldes: {
     listerArticles: ({ marqueId, famille } = {}) => {

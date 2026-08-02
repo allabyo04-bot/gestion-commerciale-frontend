@@ -866,6 +866,7 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
 
   const [denominations, setDenominations] = useState([]);
   const [nouvelleDenomination, setNouvelleDenomination] = useState("");
+  const [reapproValeurs, setReapproValeurs] = useState({});
 
   const load = useCallback(async () => { try { setCartes(await api.bonsValeur.list("CADEAU")); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { load(); }, [load]);
@@ -882,6 +883,15 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   };
   const toggleDenomination = async (d) => {
     try { await api.denominationsCartesCadeaux.activer(d.id, !d.actif); chargerDenominations(); } catch (e) { setError(e.message); }
+  };
+  const reapprovisionner = async (d) => {
+    const quantite = Number(reapproValeurs[d.id]);
+    if (!quantite || quantite <= 0) { setError("Indique une quantité valide à ajouter."); return; }
+    try {
+      await api.denominationsCartesCadeaux.reapprovisionner(d.id, quantite);
+      setReapproValeurs((prev) => ({ ...prev, [d.id]: "" }));
+      chargerDenominations();
+    } catch (e) { setError(e.message); }
   };
 
   const creer = async () => {
@@ -900,16 +910,23 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
         <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
           <p className="font-display font-semibold mb-1">Montants des cartes cadeaux</p>
           <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Les montants imprimés sur tes cartes physiques — utilisés dans le panier de vente pour vendre une carte comme un article.</p>
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="space-y-2 mb-3">
             {denominations.map((d) => (
-              <button key={d.id} onClick={() => toggleDenomination(d)} className="text-xs px-3 py-1.5 rounded-full font-medium" style={d.actif ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "#F1E9DC", color: "#6B5D52", textDecoration: "line-through" }} title={d.actif ? "Cliquer pour désactiver" : "Cliquer pour réactiver"}>
-                {fmt(d.montant)} F
-              </button>
+              <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2" style={{ background: "#F1E9DC" }}>
+                <button onClick={() => toggleDenomination(d)} className="text-xs px-2 py-1 rounded-full font-medium" style={d.actif ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "#DDD3C4", color: "#6B5D52", textDecoration: "line-through" }} title={d.actif ? "Cliquer pour désactiver" : "Cliquer pour réactiver"}>
+                  {fmt(d.montant)} F
+                </button>
+                <span className="text-xs" style={{ color: d.stockRestant <= 5 ? "#B04A3B" : "#6B5D52" }}>{d.stockRestant} en stock{d.stockRestant <= 5 ? " ⚠" : ""}</span>
+                <div className="flex items-center gap-1">
+                  <input value={reapproValeurs[d.id] || ""} onChange={(e) => setReapproValeurs((prev) => ({ ...prev, [d.id]: e.target.value.replace(/\D/g, "") }))} placeholder="+ qté" style={{ ...inputStyle, marginTop: 0, width: "70px", padding: "4px 8px", fontSize: "12px" }} />
+                  <button onClick={() => reapprovisionner(d)} className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>Ajouter</button>
+                </div>
+              </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <input value={nouvelleDenomination} onChange={(e) => setNouvelleDenomination(e.target.value.replace(/\D/g, ""))} placeholder="Ex : 200000" style={{ ...inputStyle, marginTop: 0 }} />
-            <button onClick={ajouterDenomination} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#2B2320", color: "#FBF3EC" }}>Ajouter</button>
+            <input value={nouvelleDenomination} onChange={(e) => setNouvelleDenomination(e.target.value.replace(/\D/g, ""))} placeholder="Nouveau montant, ex : 200000" style={{ ...inputStyle, marginTop: 0 }} />
+            <button onClick={ajouterDenomination} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#2B2320", color: "#FBF3EC" }}>Créer</button>
           </div>
         </div>
       )}
