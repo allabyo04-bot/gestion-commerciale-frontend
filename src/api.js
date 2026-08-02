@@ -94,6 +94,41 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     },
     importConfirmer: (data) => request("/api/articles/import/confirmer", { method: "POST", body: data }),
   },
+  inventaire: {
+    // Télécharge la feuille de comptage Excel et déclenche le téléchargement dans le navigateur.
+    export: async ({ boutique, marqueId, famille }) => {
+      const token = localStorage.getItem("gc_token");
+      const qs = new URLSearchParams({ boutique, ...(marqueId ? { marqueId } : {}), ...(famille ? { famille } : {}) }).toString();
+      const res = await fetch(`${API_URL}/api/inventaire/export?${qs}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        let data; try { data = await res.json(); } catch { data = null; }
+        const err = new Error(data?.error || `Erreur ${res.status}`); err.status = res.status; throw err;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const nomFichier = match ? match[1] : "inventaire.xlsx";
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nomFichier; document.body.appendChild(a); a.click();
+      a.remove(); window.URL.revokeObjectURL(url);
+    },
+    apercu: async (formData) => {
+      const token = localStorage.getItem("gc_token");
+      const res = await fetch(`${API_URL}/api/inventaire/apercu`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      let data;
+      try { data = await res.json(); } catch { data = null; }
+      if (!res.ok) { const err = new Error(data?.error || `Erreur ${res.status}`); err.status = res.status; throw err; }
+      return data;
+    },
+    confirmer: (data) => request("/api/inventaire/confirmer", { method: "POST", body: data }),
+  },
   clients: {
     list: () => request("/api/clients"),
     create: (data) => request("/api/clients", { method: "POST", body: data }),

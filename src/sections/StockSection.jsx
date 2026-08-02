@@ -104,7 +104,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -278,6 +278,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {!loading && tab === "virements" && <VirementsSection articles={articles || []} onDone={load} />}
       {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
+      {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
@@ -901,6 +902,188 @@ function ImportSection({ brands, onImported }) {
             <button onClick={() => { setApercu(null); setFichier(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
             <button onClick={confirmer} disabled={chargement} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: chargement ? 0.6 : 1 }}>
               {chargement ? "Import en cours..." : "Confirmer l'import"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ------------------------------------------------------------
+// INVENTAIRE (export/import Excel) — comme les anciennes habitudes clients (Abigescom) :
+// on télécharge une feuille Excel avec le stock système, on la remplit à la main pendant
+// le comptage physique, puis on la réimporte pour appliquer les écarts.
+// ------------------------------------------------------------
+function InventaireSection({ brands, onApplique }) {
+  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [marqueId, setMarqueId] = useState("");
+  const [famille, setFamille] = useState("");
+  const [telechargement, setTelechargement] = useState(false);
+
+  const [fichier, setFichier] = useState(null);
+  const [apercu, setApercu] = useState(null);
+  const [notes, setNotes] = useState("");
+  const [chargement, setChargement] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [resultat, setResultat] = useState(null);
+
+  useEffect(() => {
+    if (resultat || erreur) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [resultat, erreur]);
+
+  const telecharger = async () => {
+    setTelechargement(true); setErreur("");
+    try {
+      await api.inventaire.export({ boutique, marqueId: marqueId || undefined, famille: famille || undefined });
+    } catch (e) { setErreur(e.message); } finally { setTelechargement(false); }
+  };
+
+  const analyser = async () => {
+    if (!fichier) { setErreur("Choisis le fichier Excel rempli à réimporter."); return; }
+    setChargement(true); setErreur(""); setResultat(null);
+    try {
+      const fd = new FormData();
+      fd.append("fichier", fichier);
+      fd.append("boutique", boutique);
+      const res = await api.inventaire.apercu(fd);
+      setApercu(res);
+    } catch (e) { setErreur(e.message); } finally { setChargement(false); }
+  };
+
+  const confirmer = async () => {
+    setChargement(true); setErreur("");
+    try {
+      const lignesAAppliquer = apercu.lignes
+        .filter((l) => l.statut === "OK" && l.ecart !== 0)
+        .map((l) => ({ articleId: l.articleId, pointure: l.pointure, quantiteComptee: l.quantiteComptee }));
+      const res = await api.inventaire.confirmer({ boutique, notes: notes || undefined, lignes: lignesAAppliquer });
+      setResultat(res);
+      setApercu(null);
+      setFichier(null);
+      setNotes("");
+      onApplique();
+    } catch (e) { setErreur(e.message); } finally { setChargement(false); }
+  };
+
+  const badgeStatut = (statut) => {
+    const styles = {
+      OK: { background: "#E9F0EA", color: "#3F6B4A", label: "OK" },
+      INTROUVABLE: { background: "#FBEAE7", color: "#B04A3B", label: "Référence introuvable" },
+      ERREUR: { background: "#FBEAE7", color: "#B04A3B", label: "Erreur" },
+      IGNOREE: { background: "#F1E9DC", color: "#6B5D52", label: "Ignorée (vide)" },
+    };
+    const s = styles[statut] || styles.ERREUR;
+    return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: s.background, color: s.color }}>{s.label}</span>;
+  };
+
+  return (
+    <div>
+      <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-1">1. Télécharger la feuille de comptage</p>
+        <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>
+          Génère un fichier Excel avec chaque article (et pointure) de la sélection, son stock système, et une colonne "Stock Compté" à remplir pendant l'inventaire physique. Ne modifie rien en base.
+        </p>
+        <div className="grid sm:grid-cols-3 gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+            <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+              {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Marque (optionnel)</label>
+            <select value={marqueId} onChange={(e) => setMarqueId(e.target.value)} style={selectStyle}>
+              <option value="">Toutes les marques</option>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Famille (optionnel)</label>
+            <select value={famille} onChange={(e) => setFamille(e.target.value)} style={selectStyle}>
+              <option value="">Toutes les familles</option>
+              {FAMILLES.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+        <button onClick={telecharger} disabled={telechargement} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: telechargement ? 0.6 : 1 }}>
+          {telechargement ? "Génération..." : "⬇ Télécharger la feuille Excel"}
+        </button>
+      </div>
+
+      <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-1">2. Réimporter le fichier rempli</p>
+        <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>
+          Ne touche pas aux colonnes Référence et Pointure — seule la colonne "Stock Compté" doit être remplie. Les lignes laissées vides sont ignorées (le stock système reste inchangé).
+        </p>
+        <div className="flex items-center gap-3">
+          <input type="file" accept=".xls,.xlsx" onChange={(e) => setFichier(e.target.files?.[0] || null)} className="text-sm" />
+          <button onClick={analyser} disabled={chargement || !fichier} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: chargement || !fichier ? 0.6 : 1 }}>
+            {chargement ? "Analyse..." : "Analyser le fichier"}
+          </button>
+        </div>
+      </div>
+
+      {erreur && <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#B04A3B", background: "#FBEAE7" }}>⚠ {erreur}</p>}
+
+      {resultat && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: "#E9F0EA", border: "1px solid #C9DECD" }}>
+          <p className="font-medium text-sm" style={{ color: "#3F6B4A" }}>
+            Inventaire appliqué : {resultat.corrections} correction(s) enregistrée(s), {resultat.inchanges} article(s) déjà juste(s).
+            {resultat.erreurs?.length > 0 && ` ${resultat.erreurs.length} erreur(s).`}
+          </p>
+        </div>
+      )}
+
+      {apercu && (
+        <div>
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <p className="text-sm" style={{ color: "#6B5D52" }}>
+              {apercu.nombreLignes} ligne(s) lue(s) — {apercu.nombreOk} reconnue(s), {apercu.nombreEcarts} écart(s) à corriger
+              {apercu.nombreIntrouvables > 0 && <span style={{ color: "#B04A3B" }}> · {apercu.nombreIntrouvables} référence(s) introuvable(s)</span>}
+              {apercu.nombreErreurs > 0 && <span style={{ color: "#B04A3B" }}> · {apercu.nombreErreurs} ligne(s) en erreur</span>}
+            </p>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                  <th className="text-left px-4 py-2">Référence</th>
+                  <th className="text-left px-4 py-2">Désignation</th>
+                  <th className="text-left px-4 py-2">Pointure</th>
+                  <th className="text-right px-4 py-2">Stock système</th>
+                  <th className="text-right px-4 py-2">Stock compté</th>
+                  <th className="text-right px-4 py-2">Écart</th>
+                  <th className="text-left px-4 py-2">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {apercu.lignes.map((l, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="px-4 py-2">{l.reference || "—"}</td>
+                    <td className="px-4 py-2">{l.designation || "—"}</td>
+                    <td className="px-4 py-2">{l.pointure || "—"}</td>
+                    <td className="text-right px-4 py-2">{l.statut === "OK" ? l.stockActuel : "—"}</td>
+                    <td className="text-right px-4 py-2">{l.statut === "OK" ? l.quantiteComptee : "—"}</td>
+                    <td className="text-right px-4 py-2" style={{ color: l.ecart > 0 ? "#3F6B4A" : l.ecart < 0 ? "#B04A3B" : "#6B5D52", fontWeight: 600 }}>
+                      {l.statut === "OK" ? (l.ecart > 0 ? `+${l.ecart}` : l.ecart) : "—"}
+                    </td>
+                    <td className="px-4 py-2">{badgeStatut(l.statut)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Motif / notes (optionnel)</label>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} style={selectStyle} placeholder="Ex : Inventaire mensuel du 2 août" />
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button onClick={() => { setApercu(null); setFichier(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
+            <button onClick={confirmer} disabled={chargement || apercu.nombreEcarts === 0} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: chargement || apercu.nombreEcarts === 0 ? 0.6 : 1 }}>
+              {chargement ? "Application..." : `Confirmer l'inventaire (${apercu.nombreEcarts} écart(s))`}
             </button>
           </div>
         </div>
