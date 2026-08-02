@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 
-const FAMILLE_COLORS = { Chaussure: { bg: "#8C3B2E", fg: "#FBF3EC" }, Sac: { bg: "#A8823D", fg: "#2B2320" } };
+const FAMILLE_COLORS = { Chaussure: { bg: "#8C3B2E", fg: "#FBF3EC" }, Sac: { bg: "#A8823D", fg: "#2B2320" }, "Article d'entretien": { bg: "#5C7A5E", fg: "#FBF3EC" } };
 
 function stockQty(article, boutique, pointure) {
   const item = article.stocks?.find((s) => s.boutique === boutique && s.pointure === (pointure || null));

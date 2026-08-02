@@ -40,6 +40,11 @@ export default function VentesSection() {
   const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
   const [paiements, setPaiements] = useState([]);
+  const [cartesCadeauxPanier, setCartesCadeauxPanier] = useState([]);
+  const [denominationsCartes, setDenominationsCartes] = useState([]);
+  const [carteFormOuvert, setCarteFormOuvert] = useState(false);
+  const [carteDenomination, setCarteDenomination] = useState("");
+  const [carteNumeroForm, setCarteNumeroForm] = useState("");
 
   const [selArticle, setSelArticle] = useState("");
   const [articleSearch, setArticleSearch] = useState("");
@@ -61,6 +66,10 @@ export default function VentesSection() {
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, [boutique]);
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    api.denominationsCartesCadeaux.lister().then(setDenominationsCartes).catch(() => {});
+  }, []);
 
   useEffect(() => { setVendeurId(""); }, [boutique]);
 
@@ -115,7 +124,8 @@ export default function VentesSection() {
   }, [total]);
 
   const montantRemiseApplique = demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.montantRemise : 0;
-  const totalNet = total - montantRemiseApplique;
+  const totalCartesCadeauxPanier = cartesCadeauxPanier.reduce((s, c) => s + c.montant, 0);
+  const totalNet = total - montantRemiseApplique + totalCartesCadeauxPanier;
   const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
   const reste = totalNet - totalPaye;
 
@@ -141,16 +151,28 @@ export default function VentesSection() {
   const updatePaiement = (id, patch) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const removePaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
+  const ajouterCarteCadeauPanier = () => {
+    const montant = Number(carteDenomination);
+    const numero = carteNumeroForm.trim();
+    if (!montant) { setError("Choisis un montant de carte cadeau."); return; }
+    if (!numero) { setError("Indique le numéro imprimé sur la carte."); return; }
+    if (cartesCadeauxPanier.some((c) => c.numero === numero)) { setError("Ce numéro de carte est déjà dans le panier."); return; }
+    setCartesCadeauxPanier([...cartesCadeauxPanier, { id: uid(), montant, numero }]);
+    setCarteDenomination(""); setCarteNumeroForm(""); setCarteFormOuvert(false); setError("");
+  };
+  const retirerCarteCadeauPanier = (id) => setCartesCadeauxPanier(cartesCadeauxPanier.filter((c) => c.id !== id));
+
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
+    setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteDenomination(""); setCarteNumeroForm("");
   };
 
   // Le client se desiste avant paiement : on vide le panier en cours sans rien
   // enregistrer (ni en attente, ni en base). Simple confirmation pour eviter
   // un clic accidentel qui ferait perdre une vente en cours de saisie.
   const annulerVenteEnCours = () => {
-    if (lignes.length === 0) return;
+    if (lignes.length === 0 && cartesCadeauxPanier.length === 0) return;
     const confirme = window.confirm("Annuler cette vente ? Le panier sera vide et rien ne sera enregistre.");
     if (!confirme) return;
     resetVente();
@@ -175,7 +197,7 @@ export default function VentesSection() {
   };
 
   const validerVente = async () => {
-    if (lignes.length === 0) { setError("Ajoute au moins un article a la vente."); return; }
+    if (lignes.length === 0 && cartesCadeauxPanier.length === 0) { setError("Ajoute au moins un article ou une carte cadeau a la vente."); return; }
     if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
     if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente a credit."); return; }
     if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }
@@ -184,6 +206,7 @@ export default function VentesSection() {
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
+        cartesCadeauxAEmettre: cartesCadeauxPanier.map(({ montant, numero }) => ({ montant, numero })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: (p.mode === "bon_achat" || p.mode === "avoir") ? p.carteNumero : undefined })),
       });
       setReceipt(vente);
@@ -201,7 +224,7 @@ export default function VentesSection() {
       await api.ventesAttente.create({
         boutique, vendeurId, clientId: clientId || null, modeVente,
         label: clientSel ? clientSel.nomPrenoms : undefined,
-        panier: lignes, paiements,
+        panier: lignes, paiements, cartesCadeaux: cartesCadeauxPanier,
       });
       resetVente();
       setSubTab("attente");
@@ -212,6 +235,7 @@ export default function VentesSection() {
   const reprendreAttente = async (ticket) => {
     setLignes(ticket.panier || []);
     setPaiements(ticket.paiements || []);
+    setCartesCadeauxPanier(ticket.cartesCadeaux || []);
     setClientId(ticket.clientId || "");
     setModeVente(ticket.modeVente || MODES_VENTE[0]);
     setVendeurId(ticket.vendeurId || "");
@@ -409,9 +433,36 @@ export default function VentesSection() {
                     <button onClick={() => setDemandeRemise(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
                   </div>
                 )}
-                {montantRemiseApplique > 0 && (
+                {(montantRemiseApplique > 0 || totalCartesCadeauxPanier > 0) && (
                   <div className="flex items-center justify-between mt-2 text-sm font-semibold">
                     <span style={{ color: "#6B5D52" }}>Net a payer</span><span style={{ color: "#3F6B4A" }}>{fmt(totalNet)} F</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 pt-3" style={{ borderTop: "1px solid #EFE7D9" }}>
+                {cartesCadeauxPanier.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between text-xs px-3 py-2 rounded-lg mb-2" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                    <span className="flex items-center gap-1.5"><Gift size={13} /> Carte cadeau {fmt(c.montant)} F — n° {c.numero}</span>
+                    <button onClick={() => retirerCarteCadeauPanier(c.id)} style={{ color: "#B04A3B" }}><X size={13} /></button>
+                  </div>
+                ))}
+                {!carteFormOuvert && (
+                  <button onClick={() => setCarteFormOuvert(true)} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#8C3B2E" }}>
+                    <Gift size={13} /> Ajouter une carte cadeau
+                  </button>
+                )}
+                {carteFormOuvert && (
+                  <div className="rounded-lg p-3" style={{ background: "#F1E9DC" }}>
+                    <select value={carteDenomination} onChange={(e) => setCarteDenomination(e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
+                      <option value="">— Montant de la carte —</option>
+                      {denominationsCartes.map((d) => <option key={d.id} value={d.montant}>{fmt(d.montant)} F</option>)}
+                    </select>
+                    <input value={carteNumeroForm} onChange={(e) => setCarteNumeroForm(e.target.value)} placeholder="Numéro imprimé sur la carte" style={{ ...inputStyle, marginTop: "8px" }} />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => { setCarteFormOuvert(false); setCarteDenomination(""); setCarteNumeroForm(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                      <button onClick={ajouterCarteCadeauPanier} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter au panier</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -505,7 +556,7 @@ export default function VentesSection() {
       )}
 
       {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
-      {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} />}
+      {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} estAdmin={estAdmin} />}
       {subTab === "avoirs" && <AvoirsSection />}
       {subTab === "credit" && <CreditSection estAdmin={estAdmin} onDone={load} />}
       {subTab === "creances" && <CreancesHistoriquesSection boutique={boutique} clients={clients} estAdmin={estAdmin} onDone={load} />}
@@ -563,6 +614,7 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
         {vente.client && <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {vente.client.nomPrenoms}</div>}
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1.5">
           {vente.lignes.map((l) => <div key={l.id} className="flex justify-between text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span>{fmt(l.sousTotal)} F</span></div>)}
+          {vente.cartesCadeauxEmises?.map((c) => <div key={c.id} className="flex justify-between text-xs"><span>Carte cadeau n° {c.numero}</span><span>{fmt(c.montant)} F</span></div>)}
         </div>
         {vente.montantRemise > 0 ? (
           <div className="mt-3 space-y-1">
@@ -804,7 +856,7 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
   );
 }
 
-function CartesCadeauxSection({ boutique }) {
+function CartesCadeauxSection({ boutique, estAdmin }) {
   const [cartes, setCartes] = useState([]);
   const [numero, setNumero] = useState("");
   const [montant, setMontant] = useState("");
@@ -812,8 +864,25 @@ function CartesCadeauxSection({ boutique }) {
   const [modePaiement, setModePaiement] = useState("especes");
   const [error, setError] = useState("");
 
+  const [denominations, setDenominations] = useState([]);
+  const [nouvelleDenomination, setNouvelleDenomination] = useState("");
+
   const load = useCallback(async () => { try { setCartes(await api.bonsValeur.list("CADEAU")); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { load(); }, [load]);
+
+  const chargerDenominations = useCallback(async () => {
+    if (!estAdmin) return;
+    try { setDenominations(await api.denominationsCartesCadeaux.lister(true)); } catch (e) { setError(e.message); }
+  }, [estAdmin]);
+  useEffect(() => { chargerDenominations(); }, [chargerDenominations]);
+
+  const ajouterDenomination = async () => {
+    if (!nouvelleDenomination || Number(nouvelleDenomination) <= 0) { setError("Indique un montant valide."); return; }
+    try { await api.denominationsCartesCadeaux.creer(Number(nouvelleDenomination)); setNouvelleDenomination(""); chargerDenominations(); } catch (e) { setError(e.message); }
+  };
+  const toggleDenomination = async (d) => {
+    try { await api.denominationsCartesCadeaux.activer(d.id, !d.actif); chargerDenominations(); } catch (e) { setError(e.message); }
+  };
 
   const creer = async () => {
     if (!montant) { setError("Le montant est obligatoire."); return; }
@@ -826,6 +895,25 @@ function CartesCadeauxSection({ boutique }) {
   return (
     <div>
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
+
+      {estAdmin && (
+        <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+          <p className="font-display font-semibold mb-1">Montants des cartes cadeaux</p>
+          <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Les montants imprimés sur tes cartes physiques — utilisés dans le panier de vente pour vendre une carte comme un article.</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {denominations.map((d) => (
+              <button key={d.id} onClick={() => toggleDenomination(d)} className="text-xs px-3 py-1.5 rounded-full font-medium" style={d.actif ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "#F1E9DC", color: "#6B5D52", textDecoration: "line-through" }} title={d.actif ? "Cliquer pour désactiver" : "Cliquer pour réactiver"}>
+                {fmt(d.montant)} F
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input value={nouvelleDenomination} onChange={(e) => setNouvelleDenomination(e.target.value.replace(/\D/g, ""))} placeholder="Ex : 200000" style={{ ...inputStyle, marginTop: 0 }} />
+            <button onClick={ajouterDenomination} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#2B2320", color: "#FBF3EC" }}>Ajouter</button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau</p>
         <Field label="Numero (laisser vide pour generer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>

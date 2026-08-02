@@ -129,6 +129,11 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     },
     confirmer: (data) => request("/api/inventaire/confirmer", { method: "POST", body: data }),
   },
+  denominationsCartesCadeaux: {
+    lister: (tous) => request(`/api/denominations-cartes-cadeaux${tous ? "?tous=1" : ""}`),
+    creer: (montant) => request("/api/denominations-cartes-cadeaux", { method: "POST", body: { montant } }),
+    activer: (id, actif) => request(`/api/denominations-cartes-cadeaux/${id}`, { method: "PUT", body: { actif } }),
+  },
   soldes: {
     listerArticles: ({ marqueId, famille } = {}) => {
       const qs = new URLSearchParams({ ...(marqueId ? { marqueId } : {}), ...(famille ? { famille } : {}) }).toString();
