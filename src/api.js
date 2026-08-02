@@ -129,6 +129,15 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     },
     confirmer: (data) => request("/api/inventaire/confirmer", { method: "POST", body: data }),
   },
+  soldes: {
+    listerArticles: ({ marqueId, famille } = {}) => {
+      const qs = new URLSearchParams({ ...(marqueId ? { marqueId } : {}), ...(famille ? { famille } : {}) }).toString();
+      return request(`/api/soldes/articles${qs ? `?${qs}` : ""}`);
+    },
+    lister: () => request("/api/soldes"),
+    creer: (data) => request("/api/soldes", { method: "POST", body: data }),
+    terminer: (id) => request(`/api/soldes/${id}/terminer`, { method: "POST" }),
+  },
   clients: {
     list: () => request("/api/clients"),
     create: (data) => request("/api/clients", { method: "POST", body: data }),

@@ -104,7 +104,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"]].map(([id, label]) => (
+        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
       </div>
@@ -279,6 +279,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
+      {tab === "soldes" && <SoldesSection brands={brands} />}
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
@@ -1088,6 +1089,248 @@ function InventaireSection({ brands, onApplique }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// SOLDES (remises groupées temporaires) — sélection multiple d'articles filtrés par
+// marque/famille, application d'un pourcentage ou d'un montant en une seule action.
+// Les prix d'origine sont restaurés automatiquement à la date de fin (côté serveur).
+// ------------------------------------------------------------
+function SoldesSection({ brands }) {
+  const [marqueId, setMarqueId] = useState("");
+  const [famille, setFamille] = useState("");
+  const [articles, setArticles] = useState([]);
+  const [selection, setSelection] = useState(new Set());
+  const [chargementArticles, setChargementArticles] = useState(false);
+
+  const [nom, setNom] = useState("");
+  const [type, setType] = useState("POURCENTAGE");
+  const [valeur, setValeur] = useState("");
+  const [dateFin, setDateFin] = useState("");
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [resultat, setResultat] = useState(null);
+
+  const [campagnes, setCampagnes] = useState([]);
+  const [chargementCampagnes, setChargementCampagnes] = useState(false);
+
+  const chargerArticles = useCallback(async () => {
+    setChargementArticles(true); setErreur("");
+    try {
+      const a = await api.soldes.listerArticles({ marqueId: marqueId || undefined, famille: famille || undefined });
+      setArticles(a);
+      setSelection(new Set());
+    } catch (e) { setErreur(e.message); } finally { setChargementArticles(false); }
+  }, [marqueId, famille]);
+
+  const chargerCampagnes = useCallback(async () => {
+    setChargementCampagnes(true);
+    try { setCampagnes(await api.soldes.lister()); } catch (e) { setErreur(e.message); } finally { setChargementCampagnes(false); }
+  }, []);
+
+  useEffect(() => { chargerArticles(); }, [chargerArticles]);
+  useEffect(() => { chargerCampagnes(); }, [chargerCampagnes]);
+
+  const toggleArticle = (id) => {
+    setSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const articlesSelectionnables = articles.filter((a) => !a.dejaEnSolde);
+  const toutSelectionner = () => setSelection(new Set(articlesSelectionnables.map((a) => a.id)));
+  const toutDeselectionner = () => setSelection(new Set());
+
+  const previsualiserPrix = (prixVente) => {
+    if (!valeur || Number(valeur) <= 0) return prixVente;
+    if (type === "POURCENTAGE") return Math.max(0, Math.round(prixVente - (prixVente * Number(valeur)) / 100));
+    return Math.max(0, prixVente - Number(valeur));
+  };
+
+  const appliquer = async () => {
+    if (selection.size === 0) { setErreur("Sélectionne au moins un article."); return; }
+    if (!valeur || Number(valeur) <= 0) { setErreur("Indique une valeur de remise valide."); return; }
+    if (type === "POURCENTAGE" && Number(valeur) > 100) { setErreur("Un pourcentage ne peut pas dépasser 100."); return; }
+    if (!dateFin) { setErreur("Choisis une date de fin."); return; }
+    setEnvoiEnCours(true); setErreur(""); setResultat(null);
+    try {
+      const campagne = await api.soldes.creer({
+        nom: nom || undefined, type, valeur: Number(valeur),
+        dateFin: new Date(`${dateFin}T23:59:59`).toISOString(),
+        articleIds: Array.from(selection),
+      });
+      setResultat(campagne);
+      setNom(""); setValeur(""); setDateFin("");
+      chargerArticles();
+      chargerCampagnes();
+    } catch (e) { setErreur(e.message); } finally { setEnvoiEnCours(false); }
+  };
+
+  const terminerMaintenant = async (campagne) => {
+    const confirme = window.confirm(`Terminer maintenant les soldes "${campagne.nom || campagne.numero}" ? Les prix d'origine seront restaurés immédiatement.`);
+    if (!confirme) return;
+    try {
+      await api.soldes.terminer(campagne.id);
+      chargerCampagnes();
+      chargerArticles();
+    } catch (e) { setErreur(e.message); }
+  };
+
+  return (
+    <div>
+      <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-1">Nouvelle campagne de soldes</p>
+        <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>
+          Filtre les articles concernés, sélectionne-les, choisis une remise et une date de fin — les prix reviendront automatiquement à la normale ce jour-là.
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Marque (filtre)</label>
+            <select value={marqueId} onChange={(e) => setMarqueId(e.target.value)} style={selectStyle}>
+              <option value="">Toutes les marques</option>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Famille (filtre)</label>
+            <select value={famille} onChange={(e) => setFamille(e.target.value)} style={selectStyle}>
+              <option value="">Toutes les familles</option>
+              {FAMILLES.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {erreur && <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#B04A3B", background: "#FBEAE7" }}>⚠ {erreur}</p>}
+        {resultat && (
+          <p className="text-sm mb-4 p-3 rounded-lg" style={{ color: "#3F6B4A", background: "#E9F0EA" }}>
+            Campagne "{resultat.nom || resultat.numero}" créée : {resultat.lignes.length} article(s) mis en soldes.
+          </p>
+        )}
+
+        {chargementArticles ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{selection.size} sélectionné(s) sur {articlesSelectionnables.length} éligible(s) ({articles.length - articlesSelectionnables.length} déjà en soldes exclu(s))</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={toutSelectionner} className="text-xs px-2 py-1 rounded" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Tout sélectionner</button>
+                <button type="button" onClick={toutDeselectionner} className="text-xs px-2 py-1 rounded" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Tout désélectionner</button>
+              </div>
+            </div>
+            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "320px", overflowY: "auto" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                    <th className="text-left px-3 py-2"></th>
+                    <th className="text-left px-3 py-2">Article</th>
+                    <th className="text-left px-3 py-2">Marque</th>
+                    <th className="text-right px-3 py-2">Prix actuel</th>
+                    <th className="text-right px-3 py-2">Prix soldé prévu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {articles.map((a) => (
+                    <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9", opacity: a.dejaEnSolde ? 0.5 : 1 }}>
+                      <td className="px-3 py-2">
+                        <input type="checkbox" disabled={a.dejaEnSolde} checked={selection.has(a.id)} onChange={() => toggleArticle(a.id)} />
+                      </td>
+                      <td className="px-3 py-2">
+                        {a.designation}
+                        {a.dejaEnSolde && <span className="text-xs ml-2" style={{ color: "#B04A3B" }}>(déjà en soldes — {a.campagneActive})</span>}
+                      </td>
+                      <td className="px-3 py-2">{a.marque}</td>
+                      <td className="text-right px-3 py-2">{fmt(a.prixVente)} F</td>
+                      <td className="text-right px-3 py-2" style={{ color: "#8C3B2E", fontWeight: 600 }}>
+                        {selection.has(a.id) ? `${fmt(previsualiserPrix(a.prixVente))} F` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {articles.length === 0 && (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-sm" style={{ color: "#6B5D52" }}>Aucun article pour ce filtre.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <div className="grid sm:grid-cols-4 gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom (optionnel)</label>
+            <input value={nom} onChange={(e) => setNom(e.target.value)} style={selectStyle} placeholder="Ex : Soldes Août" />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Type</label>
+            <select value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
+              <option value="POURCENTAGE">Pourcentage (%)</option>
+              <option value="MONTANT">Montant (F)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Valeur</label>
+            <input type="number" min="0" value={valeur} onChange={(e) => setValeur(e.target.value)} style={selectStyle} placeholder={type === "POURCENTAGE" ? "Ex : 20" : "Ex : 5000"} />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Date de fin</label>
+            <input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} style={selectStyle} />
+          </div>
+        </div>
+
+        <button onClick={appliquer} disabled={envoiEnCours || selection.size === 0} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: envoiEnCours || selection.size === 0 ? 0.6 : 1 }}>
+          {envoiEnCours ? "Application..." : `Appliquer les soldes (${selection.size} article(s))`}
+        </button>
+      </div>
+
+      <div className="rounded-2xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="font-display text-lg font-semibold mb-4">Campagnes de soldes</p>
+        {chargementCampagnes ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>
+        ) : campagnes.length === 0 ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune campagne pour l'instant.</p>
+        ) : (
+          <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #EAE1D2" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+                  <th className="text-left px-4 py-2">Campagne</th>
+                  <th className="text-left px-4 py-2">Remise</th>
+                  <th className="text-left px-4 py-2">Articles</th>
+                  <th className="text-left px-4 py-2">Fin</th>
+                  <th className="text-left px-4 py-2">Statut</th>
+                  <th className="text-right px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {campagnes.map((c) => (
+                  <tr key={c.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="px-4 py-2">{c.nom || c.numero}</td>
+                    <td className="px-4 py-2">{c.type === "POURCENTAGE" ? `- ${c.valeur}%` : `- ${fmt(c.valeur)} F`}</td>
+                    <td className="px-4 py-2">{c.nombreArticles}</td>
+                    <td className="px-4 py-2">{new Date(c.dateFin).toLocaleDateString("fr-FR")}</td>
+                    <td className="px-4 py-2">
+                      {c.statut === "ACTIVE"
+                        ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>Active</span>
+                        : <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#F1E9DC", color: "#6B5D52" }}>Terminée{c.terminaisonAnticipee ? " (anticipée)" : ""}</span>}
+                    </td>
+                    <td className="text-right px-4 py-2">
+                      {c.statut === "ACTIVE" && (
+                        <button onClick={() => terminerMaintenant(c)} className="text-xs px-2 py-1 rounded" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>
+                          Terminer maintenant
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
