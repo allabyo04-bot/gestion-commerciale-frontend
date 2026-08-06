@@ -451,7 +451,7 @@ export default function EtatsSection() {
                     <td className="px-4 py-2">{v.modeVente}</td>
                     <td className="px-4 py-2">{v.paiements.map((p) => MODES_PAIEMENT.find((m) => m.id === p.mode)?.label || p.mode).join(", ")}</td>
                     <td className="text-right px-4 py-2">{v.lignes.filter((l) => l.famille === "Chaussure").reduce((s, l) => s + l.quantite, 0)}</td>
-                    <td className="text-right px-4 py-2">{formatFCFA(v.total)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(v.total)}</td>
                     <td className="text-right px-4 py-2">
                       <button onClick={() => setReceiptVente(v)} className="text-xs px-2 py-1 rounded-lg" style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.accent }}>Réimprimer</button>
                     </td>
@@ -462,7 +462,7 @@ export default function EtatsSection() {
                 <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
                   <td className="px-4 py-2" colSpan={6}>Total net ({donnees.nombre} vente{donnees.nombre > 1 ? "s" : ""})</td>
                   <td className="text-right px-4 py-2">{donnees.ventes.reduce((s, v) => s + v.lignes.filter((l) => l.famille === "Chaussure").reduce((s2, l) => s2 + l.quantite, 0), 0)}</td>
-                  <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(donnees.total)}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -505,14 +505,14 @@ export default function EtatsSection() {
                   <tr key={r.mode} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
                     <td className="px-4 py-2">{MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}</td>
                     <td className="text-right px-4 py-2">{r.nombre}</td>
-                    <td className="text-right px-4 py-2">{formatFCFA(r.montant)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(r.montant)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
                   <td className="px-4 py-2" colSpan={2}>Total</td>
-                  <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(donnees.total)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -540,14 +540,14 @@ export default function EtatsSection() {
                 <tr key={r.modeVente} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
                   <td className="px-4 py-2">{r.modeVente}</td>
                   <td className="text-right px-4 py-2">{r.nombre}</td>
-                  <td className="text-right px-4 py-2">{formatFCFA(r.montant)}</td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(r.montant)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
                 <td className="px-4 py-2" colSpan={2}>Total</td>
-                <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
+                <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(donnees.total)}</td>
               </tr>
             </tfoot>
           </table>
@@ -590,8 +590,8 @@ export default function EtatsSection() {
                     <td className="px-4 py-2">{v.nom}</td>
                     <td className="px-4 py-2">{v.boutique}</td>
                     <td className="text-right px-4 py-2">{v.nombre}</td>
-                    <td className="text-right px-4 py-2">{formatFCFA(v.panierMoyen)}</td>
-                    <td className="text-right px-4 py-2">{formatFCFA(v.montant)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(v.panierMoyen)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(v.montant)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -700,7 +700,7 @@ export default function EtatsSection() {
                     <td className="px-4 py-2">{new Date(l.date).toLocaleString("fr-FR")}</td>
                     <td className="px-4 py-2">{l.boutique}</td>
                     <td className="px-4 py-2">{l.caissier || "—"}</td>
-                    <td className="text-right px-4 py-2">{formatFCFA(l.montantRemise)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(l.montantRemise)}</td>
                     <td className="px-4 py-2 font-mono">{l.demandeNumero || "—"}</td>
                     <td className="px-4 py-2">{l.traitePar || "—"}</td>
                     <td className="px-4 py-2">
