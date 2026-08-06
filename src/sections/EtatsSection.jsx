@@ -118,11 +118,12 @@ export default function EtatsSection() {
     let nomFichier = "export";
 
     if (sousOnglet === "date" && donnees?.ventes) {
-      lignes.push(["N°", "Date", "Boutique", "Vendeur", "Type", "Total"]);
+      lignes.push(["N°", "Date", "Boutique", "Vendeur", "Type", "Paires", "Total"]);
       donnees.ventes.forEach((v) => {
-        lignes.push([v.numero, new Date(v.date).toLocaleString("fr-FR"), v.boutique, v.vendeur?.nom || "", v.modeVente, v.total]);
+        const paires = v.lignes.filter((l) => l.famille === "Chaussure").reduce((s, l) => s + l.quantite, 0);
+        lignes.push([v.numero, new Date(v.date).toLocaleString("fr-FR"), v.boutique, v.vendeur?.nom || "", v.modeVente, paires, v.total]);
       });
-      lignes.push(["", "", "", "", "Total net", donnees.total]);
+      lignes.push(["", "", "", "", "", "Total net", donnees.total]);
       nomFichier = `etat-par-date_${dateDebut}_${dateFin}`;
     } else if (sousOnglet === "mode" && donnees?.recap) {
       lignes.push(["Mode de paiement", "Nombre", "Montant"]);
@@ -435,6 +436,7 @@ export default function EtatsSection() {
                   <th className="text-left px-4 py-2">Vendeur</th>
                   <th className="text-left px-4 py-2">Type</th>
                   <th className="text-left px-4 py-2">Mode de paiement</th>
+                  <th className="text-right px-4 py-2">Paires</th>
                   <th className="text-right px-4 py-2">Total</th>
                   <th className="text-right px-4 py-2"></th>
                 </tr>
@@ -448,6 +450,7 @@ export default function EtatsSection() {
                     <td className="px-4 py-2">{v.vendeur?.nom}</td>
                     <td className="px-4 py-2">{v.modeVente}</td>
                     <td className="px-4 py-2">{v.paiements.map((p) => MODES_PAIEMENT.find((m) => m.id === p.mode)?.label || p.mode).join(", ")}</td>
+                    <td className="text-right px-4 py-2">{v.lignes.filter((l) => l.famille === "Chaussure").reduce((s, l) => s + l.quantite, 0)}</td>
                     <td className="text-right px-4 py-2">{formatFCFA(v.total)}</td>
                     <td className="text-right px-4 py-2">
                       <button onClick={() => setReceiptVente(v)} className="text-xs px-2 py-1 rounded-lg" style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.accent }}>Réimprimer</button>
@@ -458,6 +461,7 @@ export default function EtatsSection() {
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${COULEUR.texte}`, fontWeight: 600 }}>
                   <td className="px-4 py-2" colSpan={6}>Total net ({donnees.nombre} vente{donnees.nombre > 1 ? "s" : ""})</td>
+                  <td className="text-right px-4 py-2">{donnees.ventes.reduce((s, v) => s + v.lignes.filter((l) => l.famille === "Chaussure").reduce((s2, l) => s2 + l.quantite, 0), 0)}</td>
                   <td className="text-right px-4 py-2">{formatFCFA(donnees.total)}</td>
                   <td></td>
                 </tr>
