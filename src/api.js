@@ -63,6 +63,11 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  apiPublique: {
+    listerCles: () => request("/api/api-publique/cles"),
+    creerCle: (nom, codeConfirmation) => request("/api/api-publique/cles", { method: "POST", body: { nom, codeConfirmation } }),
+    toggleCle: (id, actif) => request(`/api/api-publique/cles/${id}`, { method: "PUT", body: { actif } }),
+  },
   brands: {
     list: () => request("/api/brands"),
     create: (nom) => request("/api/brands", { method: "POST", body: { nom } }),
