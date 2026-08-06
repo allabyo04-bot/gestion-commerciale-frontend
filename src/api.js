@@ -52,13 +52,16 @@ export const api = {
     list: () => request("/api/users"),
     create: (data) => request("/api/users", { method: "POST", body: data }),
     update: (id, data) => request(`/api/users/${id}`, { method: "PUT", body: data }),
-    remove: (id) => request(`/api/users/${id}`, { method: "DELETE" }),
+    remove: (id, codeConfirmation) => request(`/api/users/${id}`, { method: "DELETE", body: { codeConfirmation } }),
   },
   roles: {
     list: () => request("/api/roles"),
     create: (data) => request("/api/roles", { method: "POST", body: data }),
     update: (id, data) => request(`/api/roles/${id}`, { method: "PUT", body: data }),
-    remove: (id) => request(`/api/roles/${id}`, { method: "DELETE" }),
+    remove: (id, codeConfirmation) => request(`/api/roles/${id}`, { method: "DELETE", body: { codeConfirmation } }),
+  },
+  securite: {
+    changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
   brands: {
     list: () => request("/api/brands"),

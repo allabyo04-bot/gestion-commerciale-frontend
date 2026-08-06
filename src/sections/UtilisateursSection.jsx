@@ -61,11 +61,15 @@ export default function UtilisateursSection() {
   };
 
   const toggleActive = async (u) => {
-    try { await api.users.update(u.id, { actif: !u.actif }); load(); } catch (e) { setError(e.message); }
+    const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
+    if (codeConfirmation === null) return;
+    try { await api.users.update(u.id, { actif: !u.actif, codeConfirmation }); load(); } catch (e) { setError(e.message); }
   };
 
   const removeUser = async (u) => {
-    try { await api.users.remove(u.id); setConfirmDelete(null); load(); } catch (e) { setError(e.message); }
+    const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
+    if (codeConfirmation === null) return;
+    try { await api.users.remove(u.id, codeConfirmation); setConfirmDelete(null); load(); } catch (e) { setError(e.message); }
   };
 
   return (
@@ -158,6 +162,9 @@ function UserModal({ user, roles, onCancel, onSubmit }) {
         <label className="flex items-center gap-2 mt-4 text-sm" style={{ color: "#6B5D52" }}>
           <input type="checkbox" checked={form.actif} onChange={(e) => set("actif", e.target.checked)} /> Compte actif
         </label>
+        <Field label="Code de confirmation (action sensible)">
+          <input type="password" value={form.codeConfirmation || ""} onChange={(e) => set("codeConfirmation", e.target.value)} style={inputStyle} placeholder="Connu uniquement de Djenie et Phil" />
+        </Field>
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
           <button onClick={() => onSubmit(form)} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Enregistrer</button>

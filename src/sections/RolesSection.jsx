@@ -25,8 +25,10 @@ export default function RolesSection() {
   useEffect(() => { load(); }, [load]);
 
   const togglePermission = async (role, key) => {
+    const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
+    if (codeConfirmation === null) return;
     try {
-      await api.roles.update(role.id, { permissions: { ...role.permissions, [key]: !role.permissions[key] } });
+      await api.roles.update(role.id, { permissions: { ...role.permissions, [key]: !role.permissions[key] }, codeConfirmation });
       load();
     } catch (e) { setError(e.message); }
   };
@@ -34,20 +36,39 @@ export default function RolesSection() {
   const addRole = async () => {
     const nom = newRoleName.trim();
     if (!nom) return;
+    const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
+    if (codeConfirmation === null) return;
     try {
-      await api.roles.create({ nom, permissions: { ventes: false, stock: false, clients: false, rapports: false, utilisateurs: false, configuration: false } });
+      await api.roles.create({ nom, permissions: { ventes: false, stock: false, clients: false, rapports: false, utilisateurs: false, configuration: false }, codeConfirmation });
       setNewRoleName("");
       load();
     } catch (e) { setError(e.message); }
   };
 
   const deleteRole = async (role) => {
-    try { await api.roles.remove(role.id); load(); } catch (e) { setError(e.message); }
+    const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
+    if (codeConfirmation === null) return;
+    try { await api.roles.remove(role.id, codeConfirmation); load(); } catch (e) { setError(e.message); }
+  };
+
+  const changerCode = async () => {
+    const codeActuel = window.prompt("Code de confirmation actuel :");
+    if (codeActuel === null) return;
+    const nouveauCode = window.prompt("Nouveau code (6 caractères minimum) :");
+    if (nouveauCode === null) return;
+    try {
+      await api.securite.changerCode(codeActuel, nouveauCode);
+      window.alert("Code de confirmation changé avec succès.");
+    } catch (e) { setError(e.message); }
   };
 
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Le code de confirmation est exigé en plus du PIN pour créer/modifier/supprimer un employé ou un rôle — connu uniquement de Djenie et Phil.</p>
+        <button onClick={changerCode} className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Changer le code</button>
+      </div>
       <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid #EAE1D2" }}>
         <table className="w-full text-sm" style={{ background: "#FFFFFF" }}>
           <thead>
