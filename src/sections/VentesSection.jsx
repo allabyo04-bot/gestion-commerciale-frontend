@@ -613,27 +613,27 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
         <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Mode : {vente.modeVente}</div>
         {vente.client && <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {vente.client.nomPrenoms}</div>}
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1.5">
-          {vente.lignes.map((l) => <div key={l.id} className="flex justify-between text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span>{fmt(l.sousTotal)} F</span></div>)}
-          {vente.cartesCadeauxEmises?.map((c) => <div key={c.id} className="flex justify-between text-xs"><span>Carte cadeau n° {c.numero}</span><span>{fmt(c.montant)} F</span></div>)}
+          {vente.lignes.map((l) => <div key={l.id} className="flex justify-between gap-2 text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span className="whitespace-nowrap">{fmt(l.sousTotal)} F</span></div>)}
+          {vente.cartesCadeauxEmises?.map((c) => <div key={c.id} className="flex justify-between gap-2 text-xs"><span>Carte cadeau n° {c.numero}</span><span className="whitespace-nowrap">{fmt(c.montant)} F</span></div>)}
         </div>
         {vente.montantRemise > 0 ? (
           <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Sous-total</span><span>{fmt(vente.total + vente.montantRemise)} F</span></div>
-            <div className="flex justify-between text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Remise accordee</span><span>- {fmt(vente.montantRemise)} F</span></div>
-            <div className="flex justify-between font-semibold text-sm"><span>NET A PAYER</span><span>{fmt(vente.total)} F</span></div>
+            <div className="flex justify-between gap-2 text-xs" style={{ color: "#6B5D52" }}><span>Sous-total</span><span className="whitespace-nowrap">{fmt(vente.total + vente.montantRemise)} F</span></div>
+            <div className="flex justify-between gap-2 text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Remise accordee</span><span className="whitespace-nowrap">- {fmt(vente.montantRemise)} F</span></div>
+            <div className="flex justify-between gap-2 font-semibold text-sm"><span>NET A PAYER</span><span className="whitespace-nowrap">{fmt(vente.total)} F</span></div>
           </div>
         ) : (
-          <div className="flex justify-between font-semibold mt-3 text-sm"><span>TOTAL</span><span>{fmt(vente.total)} F</span></div>
+          <div className="flex justify-between gap-2 font-semibold mt-3 text-sm"><span>TOTAL</span><span className="whitespace-nowrap">{fmt(vente.total)} F</span></div>
         )}
 {vente.typeVente === "Credit" && (
           <div className="mt-1 space-y-1">
-            <div className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>Paye</span><span>{fmt(totalPayeRecu)} F</span></div>
-            <div className="flex justify-between text-xs font-semibold" style={{ color: "#B04A3B" }}><span>Reste a payer</span><span>{fmt(vente.total - totalPayeRecu)} F</span></div>
+            <div className="flex justify-between gap-2 text-xs" style={{ color: "#6B5D52" }}><span>Paye</span><span className="whitespace-nowrap">{fmt(totalPayeRecu)} F</span></div>
+            <div className="flex justify-between gap-2 text-xs font-semibold" style={{ color: "#B04A3B" }}><span>Reste a payer</span><span className="whitespace-nowrap">{fmt(vente.total - totalPayeRecu)} F</span></div>
           </div>
         )}
         <div className="mt-2 space-y-1">
-          {vente.paiements.map((p) => <div key={p.id} className="flex justify-between text-xs" style={{ color: "#6B5D52" }}><span>{MODES_PAIEMENT.find((m) => m.id === p.mode)?.label}</span><span>{fmt(p.montant)} F</span></div>)}
-          {vente.monnaieRendue > 0 && <div className="flex justify-between text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Monnaie rendue</span><span>{fmt(vente.monnaieRendue)} F</span></div>}
+          {vente.paiements.map((p) => <div key={p.id} className="flex justify-between gap-2 text-xs" style={{ color: "#6B5D52" }}><span>{MODES_PAIEMENT.find((m) => m.id === p.mode)?.label}</span><span className="whitespace-nowrap">{fmt(p.montant)} F</span></div>)}
+          {vente.monnaieRendue > 0 && <div className="flex justify-between gap-2 text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Monnaie rendue</span><span className="whitespace-nowrap">{fmt(vente.monnaieRendue)} F</span></div>}
         </div>
 
         <div style={{ borderTop: "1px dashed #DDD3C4" }} className="mt-3 pt-3">
