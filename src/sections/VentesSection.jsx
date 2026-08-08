@@ -441,6 +441,9 @@ export default function VentesSection() {
               </div>
 
               <div className="mt-3 pt-3" style={{ borderTop: "1px solid #EFE7D9" }}>
+                {cartesCadeauxPanier.length > 0 && (
+                  <p className="text-xs mb-2 font-medium" style={{ color: "#8C3B2E" }}>Carte(s) cadeau vendue(s) dans cette vente :</p>
+                )}
                 {cartesCadeauxPanier.map((c) => (
                   <div key={c.id} className="flex items-center justify-between text-xs px-3 py-2 rounded-lg mb-2" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
                     <span className="flex items-center gap-1.5"><Gift size={13} /> Carte cadeau {fmt(c.montant)} F — n° {c.numero}</span>
@@ -449,7 +452,7 @@ export default function VentesSection() {
                 ))}
                 {!carteFormOuvert && (
                   <button onClick={() => setCarteFormOuvert(true)} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#8C3B2E" }}>
-                    <Gift size={13} /> Ajouter une carte cadeau
+                    <Gift size={13} /> Vendre une carte cadeau (nouvelle)
                   </button>
                 )}
                 {carteFormOuvert && (
@@ -470,6 +473,9 @@ export default function VentesSection() {
 
             <div className="rounded-xl p-5 mt-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <p className="font-display font-semibold mb-3 flex items-center gap-2"><Wallet size={16} /> Paiement (mixte possible)</p>
+              <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>
+                Une cliente a plusieurs cartes cadeaux ? Clique sur "Carte cadeau" une fois par carte — chacune aura son propre numéro à renseigner.
+              </p>
               <div className="flex gap-2 mb-3 flex-wrap">
                 {MODES_PAIEMENT.map(({ id, label }) => (
                   <button key={id} onClick={() => addPaiement(id)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
