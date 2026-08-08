@@ -33,7 +33,7 @@ export default function VentesSection() {
   const [loading, setLoading] = useState(true);
   const [receipt, setReceipt] = useState(null);
 
-  const [boutique, setBoutique] = useState(user?.boutique || BOUTIQUES[0]);
+  const [boutique, setBoutique] = useState(estAdmin ? "" : (user?.boutique || BOUTIQUES[0]));
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
@@ -54,6 +54,7 @@ export default function VentesSection() {
   const brandName = (id) => brands.find((b) => b.id === id)?.nom || "—";
 
   const load = useCallback(async () => {
+    if (!boutique) { setLoading(false); return; }
     setLoading(true);
     try {
       const [a, b, c, v, at, vc, vd] = await Promise.all([
@@ -264,6 +265,17 @@ export default function VentesSection() {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
 
+      {estAdmin && !boutique ? (
+        <div className="rounded-xl p-6 text-center" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+          <p className="font-display text-lg font-semibold mb-1">Choisis une boutique</p>
+          <p className="text-sm mb-4">Angré ou Koumassi — pour commencer une vente ou consulter l'activité.</p>
+          <div className="flex items-center justify-center gap-3">
+            {BOUTIQUES.map((b) => (
+              <button key={b} onClick={() => setBoutique(b)} className="px-5 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{b}</button>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="flex gap-6 items-start">
         <div className="flex flex-col gap-2 no-print shrink-0" style={{ width: "200px" }}>
           {[["nouvelle", "Nouvelle vente"], ["attente", `En attente (${attentes.length})`], ["credit", `Ventes a credit (${ventesCredit.length})`], ["creances", "Créances historiques"], ["historique", "Historique"], ["retours", "Retours / Echanges"], ["cartes", "Cartes cadeaux"], ["avoirs", "Avoirs"],
@@ -279,7 +291,10 @@ export default function VentesSection() {
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Boutique">
                   {user?.role?.systeme ? (
-                    <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={inputStyle}>{BOUTIQUES.map((b) => <option key={b}>{b}</option>)}</select>
+                    <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={inputStyle}>
+                      <option value="">— Choisir une boutique —</option>
+                      {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+                    </select>
                   ) : (
                     <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>{boutique}</div>
                   )}
@@ -569,6 +584,7 @@ export default function VentesSection() {
       {subTab === "remises-admin" && estAdmin && <RemisesAdminSection onTraite={() => setNbRemisesEnAttente((n) => Math.max(0, n - 1))} />}
         </div>
       </div>
+      )}
 
       {receipt && <ReceiptModal vente={receipt} onClose={() => setReceipt(null)} />}
 

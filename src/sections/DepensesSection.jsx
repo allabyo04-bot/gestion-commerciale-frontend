@@ -75,12 +75,13 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
   const [montant, setMontant] = useState("");
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState("");
-  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [boutique, setBoutique] = useState(estAdmin ? "" : BOUTIQUES[0]);
   const [envoi, setEnvoi] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const soumettre = async () => {
     if (!categorieId || !montant || Number(montant) <= 0) { onError("Catégorie et montant (positif) sont obligatoires."); return; }
+    if (estAdmin && !boutique) { onError("Choisis la boutique concernée par cette dépense."); return; }
     setEnvoi(true);
     try {
       const data = { categorieId, montant: Number(montant), description, reference };
@@ -113,6 +114,7 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
             <div>
               <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Boutique</label>
               <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+                <option value="">— Choisir —</option>
                 {BOUTIQUES_DEPENSE.map((b) => <option key={b}>{b}</option>)}
               </select>
             </div>

@@ -763,9 +763,7 @@ function ImportSection({ brands, onImported }) {
   const [marqueId, setMarqueId] = useState(brands?.[0]?.id || "");
   const [famille, setFamille] = useState("Chaussure");
   const [modeQuantite, setModeQuantite] = useState("pointure");
-  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
-  const [fichier, setFichier] = useState(null);
-  const [apercu, setApercu] = useState(null);
+  const [boutique, setBoutique] = useState("");
   const [lignesEdit, setLignesEdit] = useState([]);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
@@ -783,6 +781,7 @@ function ImportSection({ brands, onImported }) {
 
   const analyser = async () => {
     if (!fichier || !marqueId) { setErreur("Choisis une marque et un fichier."); return; }
+    if (!boutique) { setErreur("Choisis la boutique concernée par cet arrivage."); return; }
     setChargement(true); setErreur(""); setResultat(null);
     try {
       const fd = new FormData();
@@ -843,6 +842,7 @@ function ImportSection({ brands, onImported }) {
           <div>
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
             <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+              <option value="">— Choisir —</option>
               {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
             </select>
           </div>
@@ -1373,7 +1373,7 @@ function SoldesSection({ brands }) {
 // aux cosmétiques d'Archange Bébé, non pertinent pour des chaussures/sacs).
 // ------------------------------------------------------------
 function ReceptionSection({ articles, onApplique }) {
-  const [boutique, setBoutique] = useState(BOUTIQUES[0]);
+  const [boutique, setBoutique] = useState("");
   const [fournisseur, setFournisseur] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -1429,6 +1429,7 @@ function ReceptionSection({ articles, onApplique }) {
 
   const enregistrer = async () => {
     if (lignes.length === 0) { setErreur("Ajoute au moins une ligne à la réception."); return; }
+    if (!boutique) { setErreur("Choisis la boutique concernée par cette réception."); return; }
     setEnvoiEnCours(true); setErreur(""); setResultat(null);
     try {
       const rec = await api.receptions.creer({
@@ -1451,6 +1452,7 @@ function ReceptionSection({ articles, onApplique }) {
           <div>
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
             <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
+              <option value="">— Choisir —</option>
               {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
             </select>
           </div>
