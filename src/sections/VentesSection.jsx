@@ -630,14 +630,13 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
     const lignesArticles = vente.lignes.map((l) => `- ${l.designation}${l.pointure ? ` T${l.pointure}` : ""} x${l.quantite} : ${fmt(l.sousTotal)} F`);
     const lignesCartes = (vente.cartesCadeauxEmises || []).map((c) => `- Carte cadeau n° ${c.numero} : ${fmt(c.montant)} F`);
     const message = [
-      `Merci pour votre visite chez ${infos.nom || "La Pointure Espagnole"} !`,
+      "Merci pour votre achat de ce jour chez La Pointure Españole 👠❤️",
+      "Nous espérons que votre nouvelle paire vous plaît. Au plaisir de vous revoir très bientôt, belle Cendrillon ! ✨",
       "",
       `Reçu ${vente.numero} — ${new Date(vente.date).toLocaleDateString("fr-FR")}`,
       ...lignesArticles, ...lignesCartes,
       "",
       `Total : ${fmt(vente.total)} F`,
-      "",
-      "À très bientôt !",
     ].join("\n");
     window.open(`https://wa.me/${numeroWA}?text=${encodeURIComponent(message)}`, "_blank");
   };
