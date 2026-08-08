@@ -47,7 +47,7 @@ function Shell() {
          <div className="flex items-center gap-4">
             <img src={logo} alt="La Pointure Espagnole" style={{ height: "56px", width: "auto" }} />
             <div>
-              <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale</p>
+              <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale & CRM</p>
               <p className="text-xs italic mt-0.5" style={{ color: "#B8A88F", fontFamily: "'Georgia', serif" }}>by Phil et Osée</p>
             </div>
           </div>

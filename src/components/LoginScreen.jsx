@@ -76,7 +76,7 @@ export default function LoginScreen() {
           <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "#F1E9DC" }}>
             <ShieldCheck size={22} color="#8C3B2E" />
           </div>
-          <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale</p>
+          <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale & CRM</p>
           <h1 className="font-display text-2xl font-semibold mt-1">
             {mode === "login" ? "Connexion" : "PIN oublié"}
           </h1>
