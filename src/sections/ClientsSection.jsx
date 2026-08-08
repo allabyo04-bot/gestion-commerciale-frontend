@@ -77,11 +77,22 @@ export default function ClientsSection() {
   });
 
   const exporterClientsExcel = () => {
+    // Astuce Excel : ="0778138742" force Excel à garder ce texte tel quel (avec le zéro de
+    // tête), même en ouvrant le fichier directement, contrairement à une simple colonne
+    // "texte" qu'Excel réinterprète parfois comme un nombre et vide le zéro initial.
+    const protegerNumero = (n) => (n ? `="${String(n).trim()}"` : "");
+
     const lignes = [["Nom et prénoms", "Téléphone", "WhatsApp", "Ville", "Commune", "Pays", "Pointure", "Anniversaire", "Carte fidélité"]];
     filtered.forEach((c) => {
-      lignes.push([c.nomPrenoms, c.telephone || "", c.whatsapp || "", c.ville || "", c.commune || "", c.pays || "", c.pointure || "", c.jourAnniv && c.moisAnniv ? `${c.jourAnniv} ${c.moisAnniv}` : "", c.carteFidelite || ""]);
+      lignes.push([c.nomPrenoms, protegerNumero(c.telephone), protegerNumero(c.whatsapp), c.ville || "", c.commune || "", c.pays || "", c.pointure || "", c.jourAnniv && c.moisAnniv ? `${c.jourAnniv} ${c.moisAnniv}` : "", c.carteFidelite || ""]);
     });
-    const csv = lignes.map((ligne) => ligne.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const csv = lignes.map((ligne) => ligne.map((cell) => {
+      const texte = String(cell);
+      // Une cellule déjà au format ="..." ne doit pas être re-entourée de guillemets,
+      // sinon Excel ne la lit plus comme une formule protégeant le zéro de tête.
+      if (/^="[^"]*"$/.test(texte)) return texte;
+      return `"${texte.replace(/"/g, '""')}"`;
+    }).join(";")).join("\r\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
