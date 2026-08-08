@@ -55,7 +55,7 @@ export default function DashboardSection() {
           const res = await api.etats.parDate({ dateDebut: jour, dateFin: jour });
           setCaJour({ parBoutique: [{ boutique: user.boutique, totalVentes: res.total, nombreVentes: res.nombre }], cumul: { totalVentes: res.total, nombreVentes: res.nombre } });
           const resMois = await api.etats.parDate({ dateDebut: debutMoisISO(), dateFin: jour });
-          setCaMois({ cumul: { nombreVentes: resMois.nombre } });
+          setCaMois({ cumul: { nombreVentes: resMois.nombre, totalVentes: resMois.total } });
         }
 
         const paramsBoutique = estAdmin ? {} : { boutique: user.boutique };
@@ -161,6 +161,7 @@ export default function DashboardSection() {
               <ShoppingBag size={14} /> Ventes du mois
             </p>
             <p className="font-display text-3xl font-semibold">{caMois?.cumul.nombreVentes ?? "…"}</p>
+            {caMois && <p className="text-sm mt-1" style={{ color: COULEUR.texteDoux }}>{fmt(caMois.cumul.totalVentes)} F cumulés</p>}
           </div>
         </div>
       )}
