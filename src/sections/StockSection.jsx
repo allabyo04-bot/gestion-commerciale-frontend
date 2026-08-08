@@ -762,6 +762,7 @@ function VirementsSection({ articles, onDone }) {
 function ImportSection({ brands, onImported }) {
   const [marqueId, setMarqueId] = useState(brands?.[0]?.id || "");
   const [famille, setFamille] = useState("Chaussure");
+  const [modeQuantite, setModeQuantite] = useState("pointure");
   const [boutique, setBoutique] = useState(BOUTIQUES[0]);
   const [fichier, setFichier] = useState(null);
   const [apercu, setApercu] = useState(null);
@@ -769,6 +770,12 @@ function ImportSection({ brands, onImported }) {
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
   const [resultat, setResultat] = useState(null);
+
+  // Suggestion de mode par defaut selon la famille choisie — reste modifiable manuellement,
+  // pour les familles a venir (bijoux, etc.) qui n'ont pas forcement besoin de pointures.
+  useEffect(() => {
+    setModeQuantite(famille === "Chaussure" ? "pointure" : "simple");
+  }, [famille]);
 
   useEffect(() => {
     if (resultat || erreur) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -782,6 +789,7 @@ function ImportSection({ brands, onImported }) {
       fd.append("fichier", fichier);
       fd.append("marqueId", marqueId);
       fd.append("famille", famille);
+      fd.append("modeQuantite", modeQuantite);
       fd.append("boutique", boutique);
       const res = await api.articles.importApercu(fd);
       setApercu(res);
@@ -793,7 +801,7 @@ function ImportSection({ brands, onImported }) {
     setChargement(true); setErreur("");
     try {
       const res = await api.articles.importConfirmer({
-        marqueId, famille, boutique,
+        marqueId, famille, modeQuantite, boutique,
         lignes: lignesEdit.map((l) => ({ designation: l.designation, articleId: l.articleId, prixVente: l.prixVente, quantites: l.quantites })),
       });
       setResultat(res);
@@ -811,7 +819,7 @@ function ImportSection({ brands, onImported }) {
     <div>
       <div className="rounded-2xl p-5 mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="font-display text-lg font-semibold mb-4">Importer un arrivage (mise en stock)</p>
-        <div className="grid sm:grid-cols-3 gap-3 mb-4">
+        <div className="grid sm:grid-cols-4 gap-3 mb-4">
           <div>
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Marque</label>
             <select value={marqueId} onChange={(e) => setMarqueId(e.target.value)} style={selectStyle}>
@@ -823,6 +831,13 @@ function ImportSection({ brands, onImported }) {
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Famille</label>
             <select value={famille} onChange={(e) => setFamille(e.target.value)} style={selectStyle}>
               {FAMILLES.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Colonnes du fichier</label>
+            <select value={modeQuantite} onChange={(e) => setModeQuantite(e.target.value)} style={selectStyle}>
+              <option value="pointure">Par pointure (T35 à T42)</option>
+              <option value="simple">Quantité simple (un seul total)</option>
             </select>
           </div>
           <div>
@@ -839,7 +854,8 @@ function ImportSection({ brands, onImported }) {
           </button>
         </div>
         <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
-          {famille === "Chaussure" ? "Colonnes attendues : REFERENCES, T35 à T42, PRIX DE VENTE." : "Colonnes attendues : REFERENCES, QUANTITE, PRIX DE VENTE."}
+          {modeQuantite === "pointure" ? "Colonnes attendues : REFERENCES, T35 à T42, PRIX DE VENTE." : "Colonnes attendues : REFERENCES, QUANTITE, PRIX DE VENTE."}
+          {" "}Le choix "Colonnes du fichier" est indépendant de la famille — utile si un nouveau type de produit (bijoux, etc.) n'a pas besoin de pointures.
         </p>
       </div>
 
