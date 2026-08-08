@@ -685,6 +685,15 @@ function RemisesAdminSection({ onTraite }) {
               <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>
                 Panier {fmt(d.totalVente)} F · Remise demandee : {d.type === "POURCENTAGE" ? `${d.valeur}%` : `${fmt(d.valeur)} F`} → <strong style={{ color: "#8C3B2E" }}>-{fmt(d.montantRemise)} F</strong>
               </p>
+              {d.vente ? (
+                <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
+                  Vente {d.vente.numero} du {new Date(d.vente.date).toLocaleDateString("fr-FR")} — après approbation, vérifier le CA de <strong>ce jour-là</strong> dans États → Par date (pas "aujourd'hui" si la vente date d'un autre jour)
+                </p>
+              ) : (
+                <p className="text-xs mt-1" style={{ color: "#6B5D52", fontStyle: "italic" }}>
+                  Ancienne demande sans vente rattachée — approuver ou refuser n'aura aucun impact sur le CA
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={() => traiter(d, "REFUSEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Refuser</button>

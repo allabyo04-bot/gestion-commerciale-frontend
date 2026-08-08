@@ -218,7 +218,7 @@ export default function DashboardSection() {
                 <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
                   {remisesEnAttente.top.map((r) => (
                     <div key={r.id} className="flex items-center justify-between text-sm">
-                      <span>{r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}</span>
+                      <span>{r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}{r.vente ? ` · vente du ${new Date(r.vente.date).toLocaleDateString("fr-FR")}` : ""}</span>
                       <span className="font-mono" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
                     </div>
                   ))}
