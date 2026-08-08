@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Receipt, Tag, Wallet } from "lucide-react";
+import { Plus, Receipt, Tag, Wallet, Pencil, Trash2 } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, fmt } from "../constants.js";
@@ -252,12 +252,25 @@ function ToutesLesDepenses({ categories, onError }) {
 
 function GestionCategories({ categories, onChanged, onError }) {
   const [nouveau, setNouveau] = useState("");
+  const [editionId, setEditionId] = useState(null);
+  const [nomEdite, setNomEdite] = useState("");
+
   const ajouter = async () => {
     if (!nouveau.trim()) return;
     try { await api.depenses.categories.create(nouveau.trim()); setNouveau(""); onChanged(); } catch (e) { onError(e.message); }
   };
   const toggler = async (cat) => {
     try { await api.depenses.categories.update(cat.id, { actif: !cat.actif }); onChanged(); } catch (e) { onError(e.message); }
+  };
+  const commencerEdition = (cat) => { setEditionId(cat.id); setNomEdite(cat.nom); };
+  const annulerEdition = () => { setEditionId(null); setNomEdite(""); };
+  const enregistrerEdition = async (cat) => {
+    if (!nomEdite.trim()) return;
+    try { await api.depenses.categories.update(cat.id, { nom: nomEdite.trim() }); setEditionId(null); onChanged(); } catch (e) { onError(e.message); }
+  };
+  const supprimer = async (cat) => {
+    if (!window.confirm(`Supprimer la catégorie "${cat.nom}" ? Cette action est irréversible.`)) return;
+    try { await api.depenses.categories.remove(cat.id); onChanged(); } catch (e) { onError(e.message); }
   };
 
   return (
@@ -268,11 +281,25 @@ function GestionCategories({ categories, onChanged, onError }) {
       </div>
       <div className="grid sm:grid-cols-3 gap-3">
         {categories.map((c) => (
-          <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: COULEUR.carte, border: "1px solid #EAE1D2" }}>
-            <p className="font-medium text-sm">{c.nom}</p>
-            <button onClick={() => toggler(c)} className="text-xs px-2 py-1 rounded-full" style={c.actif ? { background: "#E9F0EA", color: "#3F6B4A" } : { background: "#FBEAE7", color: "#B04A3B" }}>
-              {c.actif ? "Active" : "Désactivée"}
-            </button>
+          <div key={c.id} className="rounded-lg px-4 py-3" style={{ background: COULEUR.carte, border: "1px solid #EAE1D2" }}>
+            {editionId === c.id ? (
+              <div className="flex items-center gap-2">
+                <input value={nomEdite} onChange={(e) => setNomEdite(e.target.value)} autoFocus className="flex-1 px-2 py-1 rounded text-sm outline-none" style={{ border: "1px solid #DDD3C4" }} onKeyDown={(e) => e.key === "Enter" && enregistrerEdition(c)} />
+                <button onClick={() => enregistrerEdition(c)} className="text-xs px-2 py-1 rounded" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>OK</button>
+                <button onClick={annulerEdition} className="text-xs px-2 py-1 rounded" style={{ color: "#6B5D52" }}>Annuler</button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-sm">{c.nom}</p>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => toggler(c)} className="text-xs px-2 py-1 rounded-full" style={c.actif ? { background: "#E9F0EA", color: "#3F6B4A" } : { background: "#FBEAE7", color: "#B04A3B" }}>
+                    {c.actif ? "Active" : "Désactivée"}
+                  </button>
+                  <button onClick={() => commencerEdition(c)} title="Renommer" style={{ color: "#6B5D52" }}><Pencil size={14} /></button>
+                  <button onClick={() => supprimer(c)} title="Supprimer" style={{ color: "#B04A3B" }}><Trash2 size={14} /></button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

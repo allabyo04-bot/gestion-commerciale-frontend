@@ -210,6 +210,7 @@ depenses: {
       },
       create: (nom) => request("/api/depenses/categories", { method: "POST", body: { nom } }),
       update: (id, data) => request(`/api/depenses/categories/${id}`, { method: "PUT", body: data }),
+      remove: (id) => request(`/api/depenses/categories/${id}`, { method: "DELETE" }),
     },
     list: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
