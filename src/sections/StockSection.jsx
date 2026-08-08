@@ -1103,6 +1103,7 @@ function InventaireSection({ brands, onApplique }) {
 function SoldesSection({ brands }) {
   const [marqueId, setMarqueId] = useState("");
   const [famille, setFamille] = useState("");
+  const [recherche, setRecherche] = useState("");
   const [articles, setArticles] = useState([]);
   const [selection, setSelection] = useState(new Set());
   const [chargementArticles, setChargementArticles] = useState(false);
@@ -1143,6 +1144,12 @@ function SoldesSection({ brands }) {
     });
   };
   const articlesSelectionnables = articles.filter((a) => !a.dejaEnSolde);
+  const articlesAffiches = recherche.trim()
+    ? articles.filter((a) => {
+        const q = recherche.trim().toLowerCase();
+        return a.designation.toLowerCase().includes(q) || a.reference.toLowerCase().includes(q);
+      })
+    : articles;
   const toutSelectionner = () => setSelection(new Set(articlesSelectionnables.map((a) => a.id)));
   const toutDeselectionner = () => setSelection(new Set());
 
@@ -1189,7 +1196,7 @@ function SoldesSection({ brands }) {
           Filtre les articles concernés, sélectionne-les, choisis une remise et une date de fin — les prix reviendront automatiquement à la normale ce jour-là.
         </p>
 
-        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+        <div className="grid sm:grid-cols-3 gap-3 mb-4">
           <div>
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Marque (filtre)</label>
             <select value={marqueId} onChange={(e) => setMarqueId(e.target.value)} style={selectStyle}>
@@ -1203,6 +1210,13 @@ function SoldesSection({ brands }) {
               <option value="">Toutes les familles</option>
               {FAMILLES.map((f) => <option key={f}>{f}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Rechercher un article</label>
+            <div className="relative">
+              <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Référence ou désignation…" style={{ ...selectStyle, paddingLeft: "30px" }} />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+            </div>
           </div>
         </div>
 
@@ -1236,13 +1250,13 @@ function SoldesSection({ brands }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {articles.map((a) => (
+                  {articlesAffiches.map((a) => (
                     <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9", opacity: a.dejaEnSolde ? 0.5 : 1 }}>
                       <td className="px-3 py-2">
                         <input type="checkbox" disabled={a.dejaEnSolde} checked={selection.has(a.id)} onChange={() => toggleArticle(a.id)} />
                       </td>
                       <td className="px-3 py-2">
-                        {a.designation}
+                        {a.designation} <span style={{ color: "#6B5D52" }}>({a.reference})</span>
                         {a.dejaEnSolde && <span className="text-xs ml-2" style={{ color: "#B04A3B" }}>(déjà en soldes — {a.campagneActive})</span>}
                       </td>
                       <td className="px-3 py-2">{a.marque}</td>
@@ -1252,8 +1266,8 @@ function SoldesSection({ brands }) {
                       </td>
                     </tr>
                   ))}
-                  {articles.length === 0 && (
-                    <tr><td colSpan={5} className="px-3 py-4 text-center text-sm" style={{ color: "#6B5D52" }}>Aucun article pour ce filtre.</td></tr>
+                  {articlesAffiches.length === 0 && (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-sm" style={{ color: "#6B5D52" }}>{recherche.trim() ? "Aucun article ne correspond à cette recherche." : "Aucun article pour ce filtre."}</td></tr>
                   )}
                 </tbody>
               </table>
