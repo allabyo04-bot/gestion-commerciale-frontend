@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt } from "lucide-react";
+import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt, Download } from "lucide-react";
 import { api } from "../api.js";
 import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, QUARTIERS_PAR_COMMUNE, BOUTIQUES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
@@ -76,6 +76,21 @@ export default function ClientsSection() {
     return true;
   });
 
+  const exporterClientsExcel = () => {
+    const lignes = [["Nom et prénoms", "Téléphone", "WhatsApp", "Ville", "Commune", "Pays", "Pointure", "Anniversaire", "Carte fidélité"]];
+    filtered.forEach((c) => {
+      lignes.push([c.nomPrenoms, c.telephone || "", c.whatsapp || "", c.ville || "", c.commune || "", c.pays || "", c.pointure || "", c.jourAnniv && c.moisAnniv ? `${c.jourAnniv} ${c.moisAnniv}` : "", c.carteFidelite || ""]);
+    });
+    const csv = lignes.map((ligne) => ligne.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `clients${nbFiltresActifs > 0 || search ? "-filtres" : ""}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
@@ -99,9 +114,14 @@ export default function ClientsSection() {
                 <SlidersHorizontal size={14} /> Filtres avancés{nbFiltresActifs > 0 ? ` (${nbFiltresActifs})` : ""}
               </button>
             </div>
-            <button onClick={openNewClient} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
-              <Plus size={16} /> Nouveau client
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={exporterClientsExcel} disabled={filtered.length === 0} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52", opacity: filtered.length === 0 ? 0.5 : 1 }}>
+                <Download size={16} /> Exporter ({filtered.length})
+              </button>
+              <button onClick={openNewClient} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
+                <Plus size={16} /> Nouveau client
+              </button>
+            </div>
           </div>
 
           {filtresOuverts && (
