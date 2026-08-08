@@ -7,6 +7,10 @@ import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
+// Interrupteur temporaire : le bouton "WhatsApp" sur le reçu est désactivé le temps que Djenie
+// forme les caissières à son utilisation — repasser à true dès qu'elle donne le feu vert.
+const WHATSAPP_RECU_ACTIF = false;
+
 export default function VentesSection() {
   const { user } = useAuth();
   const estAdmin = !!user?.role?.systeme;
@@ -690,7 +694,7 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
 
         <div className="no-print flex gap-2 mt-5">
           <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
-          {numeroWA && (
+          {WHATSAPP_RECU_ACTIF && numeroWA && (
             <button onClick={envoyerSurWhatsApp} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#25D366", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
               <MessageCircle size={15} /> WhatsApp
             </button>
