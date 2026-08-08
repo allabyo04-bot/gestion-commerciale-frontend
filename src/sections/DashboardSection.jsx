@@ -17,6 +17,10 @@ function debutSemaineISO() {
   d.setDate(d.getDate() - decalage);
   return d.toISOString().slice(0, 10);
 }
+function debutMoisISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
 
 export default function DashboardSection() {
   const { user, permissions } = useAuth();
@@ -27,6 +31,7 @@ export default function DashboardSection() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [caJour, setCaJour] = useState(null);
+  const [caMois, setCaMois] = useState(null);
   const [alertesStock, setAlertesStock] = useState([]);
   const [credits, setCredits] = useState(null);
   const [meilleurVendeur, setMeilleurVendeur] = useState(null);
@@ -44,9 +49,13 @@ export default function DashboardSection() {
         if (estAdmin) {
           const recap = await api.etats.recapBoutiques({ dateDebut: jour, dateFin: jour });
           setCaJour({ parBoutique: recap.parBoutique, cumul: recap.cumul });
+          const recapMois = await api.etats.recapBoutiques({ dateDebut: debutMoisISO(), dateFin: jour });
+          setCaMois({ cumul: recapMois.cumul });
         } else {
           const res = await api.etats.parDate({ dateDebut: jour, dateFin: jour });
           setCaJour({ parBoutique: [{ boutique: user.boutique, totalVentes: res.total, nombreVentes: res.nombre }], cumul: { totalVentes: res.total, nombreVentes: res.nombre } });
+          const resMois = await api.etats.parDate({ dateDebut: debutMoisISO(), dateFin: jour });
+          setCaMois({ cumul: { nombreVentes: resMois.nombre } });
         }
 
         const paramsBoutique = estAdmin ? {} : { boutique: user.boutique };
@@ -149,9 +158,9 @@ export default function DashboardSection() {
 
           <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
             <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
-              <ShoppingBag size={14} /> Ventes du jour
+              <ShoppingBag size={14} /> Ventes du mois
             </p>
-            <p className="font-display text-3xl font-semibold">{caJour.cumul.nombreVentes}</p>
+            <p className="font-display text-3xl font-semibold">{caMois?.cumul.nombreVentes ?? "…"}</p>
           </div>
         </div>
       )}
