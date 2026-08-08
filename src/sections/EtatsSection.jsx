@@ -200,17 +200,19 @@ export default function EtatsSection() {
 
   return (
     <div>
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-6 items-start">
+        <div className="flex flex-col gap-2 no-print shrink-0" style={{ width: "200px" }}>
           {SOUS_ONGLETS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setSousOnglet(id)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-left"
               style={sousOnglet === id ? { background: COULEUR.texte, color: "#FBF3EC" } : { background: "transparent", color: COULEUR.texteDoux, border: `1px solid ${COULEUR.bordure}` }}>
               <Icon size={14} /> {label}
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-end gap-2 flex-wrap mb-6">
           <button onClick={exportCSV} disabled={chargement || !donnees}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
             style={{ border: `1px solid ${COULEUR.bordure}`, color: COULEUR.texteDoux, opacity: (chargement || !donnees) ? 0.5 : 1 }}>
@@ -221,7 +223,6 @@ export default function EtatsSection() {
             style={{ background: COULEUR.accent, color: "#FBF3EC" }}>
             <Lock size={14} /> {chargementFermeture ? "Calcul..." : "Fermeture de caisse"}
           </button>
-        </div>
       </div>
 
       {sousOnglet !== "audit" && estAdmin && (
@@ -765,6 +766,8 @@ export default function EtatsSection() {
         </div>
       )}
       {receiptVente && <ReceiptModal vente={receiptVente} onClose={() => setReceiptVente(null)} />}
+        </div>
+      </div>
     </div>
   );
 }
