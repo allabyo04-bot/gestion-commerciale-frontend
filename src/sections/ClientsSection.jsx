@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal } from "lucide-react";
+import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt } from "lucide-react";
 import { api } from "../api.js";
 import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, QUARTIERS_PAR_COMMUNE, BOUTIQUES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
@@ -11,6 +11,7 @@ export default function ClientsSection() {
   const [error, setError] = useState("");
   const [modalClient, setModalClient] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [historiqueClient, setHistoriqueClient] = useState(null);
   const [search, setSearch] = useState("");
   const [filtresOuverts, setFiltresOuverts] = useState(false);
   const [filtrePointure, setFiltrePointure] = useState("");
@@ -31,6 +32,10 @@ export default function ClientsSection() {
     pointure: "", pays: "Côte d'Ivoire", carteFidelite: "", dateDelivrance: new Date().toISOString().slice(0, 10), observation: "",
   });
   const openEditClient = (c) => setModalClient({ ...c, isNew: false, dateDelivrance: c.dateDelivrance ? c.dateDelivrance.slice(0, 10) : "" });
+
+  const voirHistorique = async (c) => {
+    try { setHistoriqueClient(await api.clients.historiqueAchats(c.id)); } catch (e) { setError(e.message); }
+  };
 
   const submitClient = async (form) => {
     if (!form.nomPrenoms.trim()) { setError("Le nom et prénoms du client sont obligatoires."); return; }
@@ -154,6 +159,7 @@ export default function ClientsSection() {
                 </div>
                 {c.carteFidelite && <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-full font-mono" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>Carte {c.carteFidelite}</span>}
                 <div className="flex items-center justify-end gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
+                  <button onClick={() => voirHistorique(c)} title="Voir les achats" style={{ color: "#3F6B4A" }}><Receipt size={16} /></button>
                   <button onClick={() => openEditClient(c)} style={{ color: "#8C3B2E" }}><Pencil size={16} /></button>
                   <button onClick={() => setConfirmDelete(c)} style={{ color: "#B04A3B" }}><Trash2 size={16} /></button>
                 </div>
@@ -169,6 +175,7 @@ export default function ClientsSection() {
 
       {modalClient && <ClientModal client={modalClient} onCancel={() => setModalClient(null)} onSubmit={submitClient} />}
       {confirmDelete && <ConfirmModal title="Supprimer ce client ?" message={`${confirmDelete.nomPrenoms} sera retiré de la fiche clients.`} onCancel={() => setConfirmDelete(null)} onConfirm={() => removeClient(confirmDelete)} />}
+      {historiqueClient && <HistoriqueAchatsModal client={historiqueClient} onClose={() => setHistoriqueClient(null)} />}
     </div>
   );
 }
@@ -196,6 +203,54 @@ function AnniversairesReport({ clients }) {
   );
 }
 
+function HistoriqueAchatsView({ client }) {
+  const achats = client?.ventes || [];
+  const totalCumule = achats.reduce((s, v) => s + v.total, 0);
+  const parBoutique = BOUTIQUES.map((b) => ({ boutique: b, total: achats.filter((v) => v.boutique === b).reduce((s, v) => s + v.total, 0), nb: achats.filter((v) => v.boutique === b).length }));
+
+  return (
+    <div>
+      <div className="rounded-xl p-5 mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div><p className="font-display text-lg font-semibold">{client.nomPrenoms}</p><p className="text-xs font-mono" style={{ color: "#6B5D52" }}>{client.carteFidelite ? `Carte ${client.carteFidelite} · ` : ""}{client.code}</p></div>
+          <div className="text-right"><p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>Total cumulé</p><p className="font-display text-xl font-semibold">{fmt(totalCumule)} F</p></div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
+          {parBoutique.map((pb) => (
+            <div key={pb.boutique} className="flex items-center justify-between text-sm">
+              <span style={{ color: "#6B5D52" }}>{pb.boutique} ({pb.nb} achat{pb.nb > 1 ? "s" : ""})</span>
+              <span className="font-mono">{fmt(pb.total)} F</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {achats.map((v) => (
+          <div key={v.id} className="flex items-center justify-between rounded-lg px-4 py-3 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · {v.modeVente}</p></div>
+            <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
+          </div>
+        ))}
+        {achats.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun achat enregistré pour ce client.</p>}
+      </div>
+    </div>
+  );
+}
+
+function HistoriqueAchatsModal({ client, onClose }) {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+      <div className="rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9" }}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-display text-lg font-semibold">Historique des achats</p>
+          <button onClick={onClose} style={{ color: "#6B5D52" }}><X size={18} /></button>
+        </div>
+        <HistoriqueAchatsView client={client} />
+      </div>
+    </div>
+  );
+}
+
 function AchatsParCarteReport() {
   const [carte, setCarte] = useState("");
   const [client, setClient] = useState(null);
@@ -210,10 +265,6 @@ function AchatsParCarteReport() {
     } catch (e) { setClient(null); setError(e.message); }
   };
 
-  const achats = client?.ventes || [];
-  const totalCumule = achats.reduce((s, v) => s + v.total, 0);
-  const parBoutique = BOUTIQUES.map((b) => ({ boutique: b, total: achats.filter((v) => v.boutique === b).reduce((s, v) => s + v.total, 0), nb: achats.filter((v) => v.boutique === b).length }));
-
   return (
     <div>
       <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Recherchez un client par son numéro de carte de fidélité pour voir l'historique de ses achats (total cumulé, répartition par boutique, liste des ventes).</p>
@@ -222,32 +273,7 @@ function AchatsParCarteReport() {
         <button onClick={rechercher} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Search size={15} /> Rechercher</button>
       </div>
       {cherche && error && <p className="text-sm" style={{ color: "#B04A3B" }}>{error}</p>}
-      {client && (
-        <div>
-          <div className="rounded-xl p-5 mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div><p className="font-display text-lg font-semibold">{client.nomPrenoms}</p><p className="text-xs font-mono" style={{ color: "#6B5D52" }}>Carte {client.carteFidelite} · {client.code}</p></div>
-              <div className="text-right"><p className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>Total cumulé</p><p className="font-display text-xl font-semibold">{fmt(totalCumule)} F</p></div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
-              {parBoutique.map((pb) => (
-                <div key={pb.boutique} className="flex items-center justify-between text-sm">
-                  <span style={{ color: "#6B5D52" }}>{pb.boutique} ({pb.nb} achat{pb.nb > 1 ? "s" : ""})</span>
-                  <span className="font-mono">{fmt(pb.total)} F</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            {achats.map((v) => (
-              <div key={v.id} className="flex items-center justify-between rounded-lg px-4 py-3 flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-                <div><p className="font-mono text-sm font-medium">{v.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · {v.modeVente}</p></div>
-                <p className="font-display font-semibold" style={{ color: "#8C3B2E" }}>{fmt(v.total)} F</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {client && <HistoriqueAchatsView client={client} />}
     </div>
   );
 }

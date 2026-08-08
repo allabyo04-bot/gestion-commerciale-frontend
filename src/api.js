@@ -163,6 +163,7 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     update: (id, data) => request(`/api/clients/${id}`, { method: "PUT", body: data }),
     remove: (id) => request(`/api/clients/${id}`, { method: "DELETE" }),
     rechercheParCarte: (carte) => request(`/api/clients/recherche?carte=${encodeURIComponent(carte)}`),
+    historiqueAchats: (id) => request(`/api/clients/${id}/historique-achats`),
   },
   ventes: {
     list: (params = {}) => {
