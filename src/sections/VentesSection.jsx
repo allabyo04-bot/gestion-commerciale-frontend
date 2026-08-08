@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, fmt } from "../constants.js";
@@ -615,6 +615,33 @@ export default function VentesSection() {
 export function ReceiptModal({ vente, onClose }) {
   const infos = INFOS_BOUTIQUE[vente.boutique] || {};
 const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
+
+  const numeroWhatsApp = (numero) => {
+    if (!numero) return null;
+    const chiffres = String(numero).replace(/\D/g, "");
+    if (chiffres.length === 10 && chiffres.startsWith("0")) return "225" + chiffres.slice(1);
+    if (chiffres.length >= 11 && chiffres.startsWith("225")) return chiffres;
+    return null; // format non reconnu, on ne propose pas l'envoi plutot que d'envoyer au mauvais numero
+  };
+  const numeroClient = vente.client && (vente.client.whatsapp || vente.client.telephone);
+  const numeroWA = numeroWhatsApp(numeroClient);
+
+  const envoyerSurWhatsApp = () => {
+    const lignesArticles = vente.lignes.map((l) => `- ${l.designation}${l.pointure ? ` T${l.pointure}` : ""} x${l.quantite} : ${fmt(l.sousTotal)} F`);
+    const lignesCartes = (vente.cartesCadeauxEmises || []).map((c) => `- Carte cadeau n° ${c.numero} : ${fmt(c.montant)} F`);
+    const message = [
+      `Merci pour votre visite chez ${infos.nom || "La Pointure Espagnole"} !`,
+      "",
+      `Reçu ${vente.numero} — ${new Date(vente.date).toLocaleDateString("fr-FR")}`,
+      ...lignesArticles, ...lignesCartes,
+      "",
+      `Total : ${fmt(vente.total)} F`,
+      "",
+      "À très bientôt !",
+    ].join("\n");
+    window.open(`https://wa.me/${numeroWA}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
       <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
@@ -662,7 +689,14 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
           <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>{MESSAGE_FIN_TICKET}</p>
         </div>
 
-        <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+        <div className="no-print flex gap-2 mt-5">
+          <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+          {numeroWA && (
+            <button onClick={envoyerSurWhatsApp} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#25D366", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
+              <MessageCircle size={15} /> WhatsApp
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
