@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert, Heart } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT } from "../constants.js";
@@ -45,6 +45,7 @@ export default function EtatsSection() {
       else if (sousOnglet === "mode") res = await api.etats.parModePaiement(params);
       else if (sousOnglet === "type") res = await api.etats.parType(params);
       else if (sousOnglet === "vendeur") res = await api.etats.parVendeur(params);
+      else if (sousOnglet === "clients") res = await api.etats.parClient(params);
       else if (sousOnglet === "audit") res = await api.etats.auditRemises({ dateDebut, dateFin });
       else res = await api.etats.recapBoutiques({ dateDebut, dateFin });
       setDonnees(res);
@@ -192,6 +193,7 @@ export default function EtatsSection() {
     { id: "mode", label: "Par mode de paiement", icon: CreditCard },
     { id: "type", label: "Par type", icon: Store },
     { id: "vendeur", label: "Meilleur vendeur", icon: Award },
+    { id: "clients", label: "Meilleures clientes", icon: Heart },
     ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
     ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
   ];
@@ -592,6 +594,51 @@ export default function EtatsSection() {
                     <td className="text-right px-4 py-2">{v.nombre}</td>
                     <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(v.panierMoyen)}</td>
                     <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(v.montant)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!chargement && donnees?.classement && sousOnglet === "clients" && (
+        <div className="space-y-4">
+          {donnees.meilleure && (
+            <div className="rounded-2xl p-5" style={{ background: COULEUR.texte, color: "#FBF3EC" }}>
+              <p className="text-xs opacity-80 mb-1 flex items-center gap-1.5"><Heart size={14} /> Meilleure cliente de la période</p>
+              <p className="font-display text-xl font-semibold">{donnees.meilleure.nomPrenoms}</p>
+              <div className="grid grid-cols-3 gap-4 mt-3">
+                <div><p className="text-xs opacity-80">Montant dépensé</p><p className="font-display text-lg font-semibold">{formatFCFA(donnees.meilleure.montant)}</p></div>
+                <div><p className="text-xs opacity-80">Nombre d'achats</p><p className="font-display text-lg font-semibold">{donnees.meilleure.nombre}</p></div>
+                <div><p className="text-xs opacity-80">Panier moyen</p><p className="font-display text-lg font-semibold">{formatFCFA(donnees.meilleure.panierMoyen)}</p></div>
+              </div>
+            </div>
+          )}
+          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
+                  <th className="text-left px-4 py-2">Rang</th>
+                  <th className="text-left px-4 py-2">Cliente</th>
+                  <th className="text-left px-4 py-2">Téléphone</th>
+                  <th className="text-right px-4 py-2">Nombre d'achats</th>
+                  <th className="text-right px-4 py-2">Panier moyen</th>
+                  <th className="text-right px-4 py-2">Montant dépensé</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donnees.classement.length === 0 && (
+                  <tr><td className="px-4 py-3 text-sm" colSpan={6} style={{ color: COULEUR.texteDoux }}>Aucun achat rattaché à une cliente sur cette période.</td></tr>
+                )}
+                {donnees.classement.map((c, i) => (
+                  <tr key={c.clientId} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                    <td className="px-4 py-2">{i + 1}</td>
+                    <td className="px-4 py-2">{c.nomPrenoms}{c.carteFidelite ? ` · Carte ${c.carteFidelite}` : ""}</td>
+                    <td className="px-4 py-2">{c.telephone}</td>
+                    <td className="text-right px-4 py-2">{c.nombre}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(c.panierMoyen)}</td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(c.montant)}</td>
                   </tr>
                 ))}
               </tbody>
