@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import UtilisateursSection from "./sections/UtilisateursSection.jsx";
@@ -9,6 +9,7 @@ import RolesSection from "./sections/RolesSection.jsx";
 import EtatsSection from "./sections/EtatsSection.jsx";
 import DashboardSection from "./sections/DashboardSection.jsx";
 import DepensesSection from "./sections/DepensesSection.jsx";
+import LivraisonSection from "./sections/LivraisonSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
@@ -29,9 +30,14 @@ function Shell() {
   }, [estAdmin]);
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
+  // Interrupteur temporaire : le module Livraison est construit et prêt, mais caché tant que
+  // Djenie n'a pas donné le feu vert (le temps de bien expliquer aux caissières) — repasser à
+  // true dès qu'elle donne l'accord.
+  const LIVRAISON_ACTIF = false;
   const NAV = [
     { id: "accueil", label: "Accueil", icon: LayoutDashboard },
     { id: "ventes", label: "Ventes", icon: ShoppingCart, perm: "ventes" },
+    ...(LIVRAISON_ACTIF ? [{ id: "livraison", label: "Livraison", icon: Truck, perm: "ventes" }] : []),
     { id: "etats", label: "États", icon: BarChart3, perm: "ventes" },
     { id: "depenses", label: "Dépenses", icon: Wallet, perm: "ventes" },
     { id: "clients", label: "Clients", icon: Heart, perm: "clients" },
@@ -77,6 +83,7 @@ function Shell() {
       <div className="max-w-6xl mx-auto px-6 sm:px-10 py-8">
         {activeTab === "accueil" && <DashboardSection />}
         {activeTab === "ventes" && <VentesSection />}
+        {activeTab === "livraison" && <LivraisonSection />}
         {activeTab === "etats" && <EtatsSection />}
         {activeTab === "depenses" && <DepensesSection />}
         {activeTab === "clients" && <ClientsSection />}

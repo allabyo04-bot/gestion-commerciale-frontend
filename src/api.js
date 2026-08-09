@@ -148,6 +148,16 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     lister: (boutique) => request(`/api/receptions${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
     creer: (data) => request("/api/receptions", { method: "POST", body: data }),
   },
+  bonsLivraison: {
+    lister: ({ statut, boutique } = {}) => {
+      const qs = new URLSearchParams({ ...(statut ? { statut } : {}), ...(boutique ? { boutique } : {}) }).toString();
+      return request(`/api/bons-livraison${qs ? `?${qs}` : ""}`);
+    },
+    get: (id) => request(`/api/bons-livraison/${id}`),
+    creer: (data) => request("/api/bons-livraison", { method: "POST", body: data }),
+    cloturer: (id, data) => request(`/api/bons-livraison/${id}/cloturer`, { method: "POST", body: data }),
+    annuler: (id) => request(`/api/bons-livraison/${id}/annuler`, { method: "POST" }),
+  },
   soldes: {
     listerArticles: ({ marqueId, famille } = {}) => {
       const qs = new URLSearchParams({ ...(marqueId ? { marqueId } : {}), ...(famille ? { famille } : {}) }).toString();
