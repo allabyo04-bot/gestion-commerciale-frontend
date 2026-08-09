@@ -9,7 +9,7 @@ function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 
 // Interrupteur temporaire : le bouton "WhatsApp" sur le reçu est désactivé le temps que Djenie
 // forme les caissières à son utilisation — repasser à true dès qu'elle donne le feu vert.
-const WHATSAPP_RECU_ACTIF = false;
+const WHATSAPP_RECU_ACTIF = true;
 
 export default function VentesSection() {
   const { user } = useAuth();
