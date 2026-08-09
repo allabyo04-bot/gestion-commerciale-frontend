@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert, Heart } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert, Heart, Truck } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { MODES_PAIEMENT } from "../constants.js";
+import { MODES_PAIEMENT, LIVRAISON_ACTIF } from "../constants.js";
 import { ReceiptModal } from "./VentesSection.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
@@ -47,6 +47,7 @@ export default function EtatsSection() {
       else if (sousOnglet === "vendeur") res = await api.etats.parVendeur(params);
       else if (sousOnglet === "clients") res = await api.etats.parClient(params);
       else if (sousOnglet === "audit") res = await api.etats.auditRemises({ dateDebut, dateFin });
+      else if (sousOnglet === "livraisons") res = await api.etats.livraisons(params);
       else res = await api.etats.recapBoutiques({ dateDebut, dateFin });
       setDonnees(res);
     } catch (e) {
@@ -196,6 +197,7 @@ export default function EtatsSection() {
     { id: "clients", label: "Meilleures clientes", icon: Heart },
     ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
     ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
+    ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
   ];
 
   return (
@@ -640,6 +642,87 @@ export default function EtatsSection() {
                     <td className="text-right px-4 py-2">{c.nombre}</td>
                     <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(c.panierMoyen)}</td>
                     <td className="text-right px-4 py-2 whitespace-nowrap">{formatFCFA(c.montant)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!chargement && donnees?.paires && sousOnglet === "livraisons" && (
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-4 gap-3">
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Bons sur la période</p>
+              <p className="font-display text-2xl font-semibold">{donnees.nombreBons}</p>
+              <p className="text-xs mt-1" style={{ color: COULEUR.texteDoux }}>{donnees.nombreEnCours} en cours · {donnees.nombreClotures} clôturés{donnees.nombreAnnules > 0 ? ` · ${donnees.nombreAnnules} annulés` : ""}</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs" style={{ color: COULEUR.texteDoux }}>Paires parties</p>
+              <p className="font-display text-2xl font-semibold">{donnees.paires.parties}</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "#E9F0EA" }}>
+              <p className="text-xs" style={{ color: "#3F6B4A" }}>Vendues / Rendues</p>
+              <p className="font-display text-2xl font-semibold" style={{ color: "#3F6B4A" }}>{donnees.paires.vendues} / {donnees.paires.retournees}</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: donnees.paires.perdues > 0 ? "#FBEAE7" : COULEUR.carte, border: donnees.paires.perdues > 0 ? "1px solid #B04A3B" : `1px solid ${COULEUR.bordure}` }}>
+              <p className="text-xs" style={{ color: donnees.paires.perdues > 0 ? "#B04A3B" : COULEUR.texteDoux }}>Perdues / cassées</p>
+              <p className="font-display text-2xl font-semibold" style={{ color: donnees.paires.perdues > 0 ? "#B04A3B" : COULEUR.texte }}>{donnees.paires.perdues}</p>
+              {donnees.valeurPertes > 0 && <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>{formatFCFA(donnees.valeurPertes)}</p>}
+            </div>
+          </div>
+
+          {donnees.parBoutique.length > 1 && (
+            <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+              <table className="w-full text-sm">
+                <thead><tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}><th className="text-left px-4 py-2">Boutique</th><th className="text-right px-4 py-2">Bons</th><th className="text-right px-4 py-2">Parties</th><th className="text-right px-4 py-2">Vendues</th><th className="text-right px-4 py-2">Rendues</th><th className="text-right px-4 py-2">Perdues</th></tr></thead>
+                <tbody>
+                  {donnees.parBoutique.map((pb) => (
+                    <tr key={pb.boutique} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                      <td className="px-4 py-2">{pb.boutique}</td>
+                      <td className="text-right px-4 py-2">{pb.nombreBons}</td>
+                      <td className="text-right px-4 py-2">{pb.parties}</td>
+                      <td className="text-right px-4 py-2">{pb.vendues}</td>
+                      <td className="text-right px-4 py-2">{pb.retournees}</td>
+                      <td className="text-right px-4 py-2" style={{ color: pb.perdues > 0 ? "#B04A3B" : COULEUR.texte }}>{pb.perdues}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
+                  <th className="text-left px-4 py-2">Bon</th>
+                  <th className="text-left px-4 py-2">Client</th>
+                  <th className="text-left px-4 py-2">Boutique</th>
+                  <th className="text-left px-4 py-2">Statut</th>
+                  <th className="text-left px-4 py-2">Créé le</th>
+                  <th className="text-left px-4 py-2">Vente générée</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donnees.bons.length === 0 && (
+                  <tr><td className="px-4 py-3 text-sm" colSpan={6} style={{ color: COULEUR.texteDoux }}>Aucun bon de livraison sur cette période.</td></tr>
+                )}
+                {donnees.bons.map((b) => (
+                  <tr key={b.numero} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                    <td className="px-4 py-2">{b.numero}</td>
+                    <td className="px-4 py-2">{b.clientNom}</td>
+                    <td className="px-4 py-2">{b.boutique}</td>
+                    <td className="px-4 py-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={
+                        b.statut === "EN_COURS" ? { background: "#F1E9DC", color: "#6B5D52" }
+                        : b.statut === "ANNULE" ? { background: "#FBEAE7", color: "#B04A3B" }
+                        : { background: "#E9F0EA", color: "#3F6B4A" }
+                      }>{b.statut === "EN_COURS" ? "En cours" : b.statut === "ANNULE" ? "Annulé" : "Clôturé"}</span>
+                    </td>
+                    <td className="px-4 py-2">{new Date(b.dateCreation).toLocaleDateString("fr-FR")}</td>
+                    <td className="px-4 py-2">{b.venteGeneree ? `${b.venteGeneree.numero} (${formatFCFA(b.venteGeneree.total)})` : "—"}</td>
                   </tr>
                 ))}
               </tbody>

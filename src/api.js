@@ -283,5 +283,9 @@ etats: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/livraison-jour${qs ? `?${qs}` : ""}`);
     },
+    livraisons: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/livraisons${qs ? `?${qs}` : ""}`);
+    },
   },
 };
