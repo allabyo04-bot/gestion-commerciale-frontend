@@ -56,3 +56,9 @@ export const QUARTIERS_PAR_COMMUNE = {
 export function fmt(n) {
   return Number(n || 0).toLocaleString("fr-FR");
 }
+
+// Interrupteur temporaire : le module Livraison (bons de livraison, sortie provisoire de stock)
+// est construit et prêt, mais caché tant que Djenie n'a pas donné le feu vert (le temps de bien
+// expliquer aux caissières) — repasser à true dès qu'elle donne l'accord. Contrôle à la fois
+// l'onglet dans la navigation (App.jsx) et l'encart correspondant sur le tableau de bord.
+export const LIVRAISON_ACTIF = false;

@@ -13,6 +13,7 @@ import LivraisonSection from "./sections/LivraisonSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
+import { LIVRAISON_ACTIF } from "./constants.js";
 
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
@@ -30,10 +31,8 @@ function Shell() {
   }, [estAdmin]);
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
-  // Interrupteur temporaire : le module Livraison est construit et prêt, mais caché tant que
-  // Djenie n'a pas donné le feu vert (le temps de bien expliquer aux caissières) — repasser à
-  // true dès qu'elle donne l'accord.
-  const LIVRAISON_ACTIF = false;
+  // Interrupteur temporaire (voir constants.js) : le module Livraison est construit et prêt,
+  // mais caché tant que Djenie n'a pas donné le feu vert.
   const NAV = [
     { id: "accueil", label: "Accueil", icon: LayoutDashboard },
     { id: "ventes", label: "Ventes", icon: ShoppingCart, perm: "ventes" },

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { fmt, MOIS } from "../constants.js";
+import { fmt, MOIS, LIVRAISON_ACTIF } from "../constants.js";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -38,6 +38,7 @@ export default function DashboardSection() {
   const [anniversaires, setAnniversaires] = useState([]);
   const [remisesEnAttente, setRemisesEnAttente] = useState(null);
   const [resumeCartesCadeaux, setResumeCartesCadeaux] = useState([]);
+  const [livraisonJour, setLivraisonJour] = useState(null);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -97,6 +98,10 @@ export default function DashboardSection() {
           top: remisesRes.slice(0, 5),
         });
         setResumeCartesCadeaux(resumeRes);
+
+        if (LIVRAISON_ACTIF) {
+          api.etats.livraisonJour().then(setLivraisonJour).catch(() => {});
+        }
       }      
 
     // Alerte stock faible : utile pour un gestionnaire de stock au quotidien, pas pour Djenie
@@ -255,6 +260,18 @@ export default function DashboardSection() {
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {LIVRAISON_ACTIF && estAdmin && livraisonJour && (
+          <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+              <Truck size={14} /> Livraisons du jour
+            </p>
+            <div className="flex items-center justify-between">
+              <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Paires parties</p><p className="font-display text-2xl font-semibold">{livraisonJour.parties}</p></div>
+              <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Paires rendues</p><p className="font-display text-2xl font-semibold" style={{ color: "#3F6B4A" }}>{livraisonJour.retournees}</p></div>
             </div>
           </div>
         )}

@@ -279,5 +279,9 @@ etats: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/audit-remises${qs ? `?${qs}` : ""}`);
     },
+    livraisonJour: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/livraison-jour${qs ? `?${qs}` : ""}`);
+    },
   },
 };
