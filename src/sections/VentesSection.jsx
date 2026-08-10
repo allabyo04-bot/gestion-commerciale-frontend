@@ -644,9 +644,7 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
       "",
       `Total : ${fmt(vente.total)} F`,
     ].join("\n");
-    // wa.me a un bug connu qui casse certains emojis (surtout ceux à plusieurs composants comme
-    // ❤️) lors de sa redirection interne — le double encodage est le contournement habituel.
-    window.open(`https://wa.me/${numeroWA}?text=${encodeURIComponent(encodeURIComponent(message))}`, "_blank");
+    window.open(`https://wa.me/${numeroWA}?text=${encodeURIComponent(message)}`, "_blank");
   };
 
   return (
