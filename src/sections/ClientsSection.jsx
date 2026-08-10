@@ -301,27 +301,56 @@ function HistoriqueAchatsModal({ client, onClose }) {
 }
 
 function AchatsParCarteReport() {
-  const [carte, setCarte] = useState("");
+  const [recherche, setRecherche] = useState("");
+  const [resultats, setResultats] = useState([]);
   const [client, setClient] = useState(null);
   const [error, setError] = useState("");
   const [cherche, setCherche] = useState(false);
 
   const rechercher = async () => {
+    if (!recherche.trim()) return;
     setCherche(true);
     setError("");
+    setClient(null);
     try {
-      setClient(await api.clients.rechercheParCarte(carte.trim()));
-    } catch (e) { setClient(null); setError(e.message); }
+      const trouves = await api.clients.rechercheMulti(recherche.trim());
+      if (trouves.length === 0) { setResultats([]); setError("Aucun client ne correspond à cette recherche."); return; }
+      if (trouves.length === 1) {
+        setResultats([]);
+        setClient(await api.clients.historiqueAchats(trouves[0].id));
+        return;
+      }
+      setResultats(trouves);
+    } catch (e) { setError(e.message); }
+  };
+
+  const choisir = async (c) => {
+    setError("");
+    try {
+      setClient(await api.clients.historiqueAchats(c.id));
+      setResultats([]);
+    } catch (e) { setError(e.message); }
   };
 
   return (
     <div>
-      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Recherchez un client par son numéro de carte de fidélité pour voir l'historique de ses achats (total cumulé, répartition par boutique, liste des ventes).</p>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Recherchez un client par son nom, son numéro de téléphone ou sa carte de fidélité pour voir l'historique de ses achats (total cumulé, répartition par boutique, liste des ventes).</p>
       <div className="flex items-center gap-2 mb-6">
-        <input value={carte} onChange={(e) => setCarte(e.target.value)} onKeyDown={(e) => e.key === "Enter" && rechercher()} placeholder="N° de carte de fidélité" style={{ ...inputStyle, marginTop: 0, maxWidth: "260px" }} />
+        <input value={recherche} onChange={(e) => setRecherche(e.target.value)} onKeyDown={(e) => e.key === "Enter" && rechercher()} placeholder="Nom, téléphone ou n° de carte de fidélité" style={{ ...inputStyle, marginTop: 0, maxWidth: "320px" }} />
         <button onClick={rechercher} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Search size={15} /> Rechercher</button>
       </div>
-      {cherche && error && <p className="text-sm" style={{ color: "#B04A3B" }}>{error}</p>}
+      {cherche && error && <p className="text-sm mb-4" style={{ color: "#B04A3B" }}>{error}</p>}
+      {resultats.length > 0 && (
+        <div className="rounded-2xl overflow-hidden mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+          <p className="text-xs px-4 py-2" style={{ color: "#6B5D52", background: "#F1E9DC" }}>{resultats.length} client(s) trouvé(s) — choisis-en un :</p>
+          {resultats.map((c) => (
+            <button key={c.id} onClick={() => choisir(c)} className="w-full text-left px-4 py-3 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
+              <span className="font-medium">{c.nomPrenoms}</span>
+              <span style={{ color: "#6B5D52" }}> · {c.telephone || "—"}{c.carteFidelite ? ` · Carte ${c.carteFidelite}` : ""}{c.ville ? ` · ${c.ville}` : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {client && <HistoriqueAchatsView client={client} />}
     </div>
   );
