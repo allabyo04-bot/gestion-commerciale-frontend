@@ -37,6 +37,23 @@ export const COMMUNES = ["Abobo", "Adjamé", "Anyama", "Attécoubé", "Bingervil
 export const CLIENT_POINTURES = ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"];
 export const PAYS_LIST = ["Côte d'Ivoire", "France", "Mali", "Burkina Faso", "Sénégal", "Bénin", "Togo", "Ghana", "Nigeria", "Autre"];
 
+// Indicatif téléphonique par pays, et si le zéro de tête d'un numéro local doit être conservé
+// en format international (confirmé pour la Côte d'Ivoire uniquement — vérifié via un vrai reçu
+// local : "+225 07 15 49 81 87"). Pour les autres pays, on applique la convention la plus
+// courante (zéro retiré) par défaut, à vérifier au cas par cas si besoin.
+export const PAYS_INDICATIF = {
+  "Côte d'Ivoire": { code: "225", garderZero: true },
+  "France": { code: "33", garderZero: false },
+  "Mali": { code: "223", garderZero: false },
+  "Burkina Faso": { code: "226", garderZero: false },
+  "Sénégal": { code: "221", garderZero: false },
+  "Bénin": { code: "229", garderZero: false },
+  "Togo": { code: "228", garderZero: false },
+  "Ghana": { code: "233", garderZero: false },
+  "Nigeria": { code: "234", garderZero: false },
+  // "Autre" volontairement absent : indicatif inconnu, on ne devine pas.
+};
+
 export const QUARTIERS_PAR_COMMUNE = {
   "Abobo": ["Abobo Gare", "Anonkoua-Kouté", "Avocatier", "Baoulé", "Belleville", "Derrière-Rail", "Dokui", "Kennedy", "N'Dotré", "Sagbé", "Sogefiha"],
   "Adjamé": ["220 Logements", "Bracodi", "Liberté", "Marché Gouro", "Mirador", "Williamsville"],
