@@ -38,16 +38,24 @@ export default function ClientsSection() {
   };
 
   const chiffresSeuls = (s) => (s || "").replace(/\D/g, "");
+  // La règle "10 chiffres" est spécifique à la Côte d'Ivoire (confirmée). D'autres pays ont
+  // encore des numéros locaux à 8 chiffres (ou d'autres longueurs) — on reste large pour eux
+  // plutôt que de bloquer à tort une cliente dont le numéro est en réalité correct.
+  const nombreDeChiffresValide = (numero, pays) => {
+    const n = chiffresSeuls(numero).length;
+    if (pays === "Côte d'Ivoire") return n === 10;
+    return n >= 8 && n <= 11;
+  };
 
   const submitClient = async (form) => {
     if (!form.nomPrenoms.trim()) { setError("Le nom et prénoms du client sont obligatoires."); return; }
     if (!form.telephone?.trim()) { setError("Le numéro de téléphone du client est obligatoire."); return; }
-    if (chiffresSeuls(form.telephone).length !== 10) {
-      setError(`Le numéro de téléphone doit contenir 10 chiffres (actuellement ${chiffresSeuls(form.telephone).length}). Vérifie qu'aucun chiffre ne manque.`);
+    if (!nombreDeChiffresValide(form.telephone, form.pays)) {
+      setError(`Le numéro de téléphone semble incorrect pour ${form.pays} (${chiffresSeuls(form.telephone).length} chiffres actuellement). Vérifie la saisie.`);
       return;
     }
-    if (form.whatsapp?.trim() && chiffresSeuls(form.whatsapp).length !== 10) {
-      setError(`Le numéro WhatsApp doit contenir 10 chiffres (actuellement ${chiffresSeuls(form.whatsapp).length}). Vérifie qu'aucun chiffre ne manque.`);
+    if (form.whatsapp?.trim() && !nombreDeChiffresValide(form.whatsapp, form.pays)) {
+      setError(`Le numéro WhatsApp semble incorrect pour ${form.pays} (${chiffresSeuls(form.whatsapp).length} chiffres actuellement). Vérifie la saisie.`);
       return;
     }
     try {
