@@ -37,9 +37,19 @@ export default function ClientsSection() {
     try { setHistoriqueClient(await api.clients.historiqueAchats(c.id)); } catch (e) { setError(e.message); }
   };
 
+  const chiffresSeuls = (s) => (s || "").replace(/\D/g, "");
+
   const submitClient = async (form) => {
     if (!form.nomPrenoms.trim()) { setError("Le nom et prénoms du client sont obligatoires."); return; }
     if (!form.telephone?.trim()) { setError("Le numéro de téléphone du client est obligatoire."); return; }
+    if (chiffresSeuls(form.telephone).length !== 10) {
+      setError(`Le numéro de téléphone doit contenir 10 chiffres (actuellement ${chiffresSeuls(form.telephone).length}). Vérifie qu'aucun chiffre ne manque.`);
+      return;
+    }
+    if (form.whatsapp?.trim() && chiffresSeuls(form.whatsapp).length !== 10) {
+      setError(`Le numéro WhatsApp doit contenir 10 chiffres (actuellement ${chiffresSeuls(form.whatsapp).length}). Vérifie qu'aucun chiffre ne manque.`);
+      return;
+    }
     try {
       if (form.isNew) {
         const cree = await api.clients.create(form);
