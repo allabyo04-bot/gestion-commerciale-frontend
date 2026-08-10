@@ -549,6 +549,11 @@ export default function VentesSection() {
 
      {subTab === "historique" && (
         <div>
+          {!estAdmin && (
+            <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+              Tu consultes les ventes d'aujourd'hui ({new Date().toLocaleDateString("fr-FR")}). Seule Djenie peut consulter et annuler les jours précédents.
+            </p>
+          )}
           <div className="relative mb-4 max-w-md">
             <input value={historiqueSearch} onChange={(e) => setHistoriqueSearch(e.target.value)} placeholder="Rechercher par n° de reçu ou nom du client…" style={{ ...inputStyle, marginTop: 0, paddingLeft: "32px" }} />
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
