@@ -623,8 +623,10 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   const numeroWhatsApp = (numero) => {
     if (!numero) return null;
     const chiffres = String(numero).replace(/\D/g, "");
-    if (chiffres.length === 10 && chiffres.startsWith("0")) return "225" + chiffres.slice(1);
-    if (chiffres.length >= 11 && chiffres.startsWith("225")) return chiffres;
+    // La Côte d'Ivoire garde le zéro de tête même en format international (+225 07 15 49 81 87,
+    // pas +225 7 15 49 81 87) — le zéro fait partie du numéro depuis la réforme à 10 chiffres.
+    if (chiffres.length === 10 && chiffres.startsWith("0")) return "225" + chiffres;
+    if (chiffres.length === 12 && chiffres.startsWith("2250")) return chiffres;
     return null; // format non reconnu, on ne propose pas l'envoi plutot que d'envoyer au mauvais numero
   };
   const numeroClient = vente.client && (vente.client.whatsapp || vente.client.telephone);
