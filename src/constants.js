@@ -18,7 +18,7 @@ export const INFOS_BOUTIQUE = {
 
 export const MESSAGE_FIN_TICKET = "Aucun remboursement n'est effectué après achat. Les articles ne sont ni échangés, ni retournés au-delà de dix (10) jours. Passé ce délai, aucune réclamation ne sera acceptée.\n\nMerci pour votre visite";
 
-export const POINTURES = ["36", "37", "38", "39", "40", "41", "42"];
+export const POINTURES = ["35", "36", "36.5", "37", "37.5", "38", "38.5", "39", "39.5", "40", "40.5", "41", "41.5", "42", "42.5", "43", "43.5", "44", "44.5", "45", "45.5", "46", "46.5", "47", "47.5", "48"];
 export const MODES_VENTE = ["Boutique", "Livraison", "Expédition"];
 export const MODES_PAIEMENT = [
   { id: "especes", label: "Espèces", liquide: true },
@@ -34,7 +34,7 @@ export const CIVILITES = ["Monsieur", "Madame", "Mademoiselle"];
 export const JOURS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
 export const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 export const COMMUNES = ["Abobo", "Adjamé", "Anyama", "Attécoubé", "Bingerville", "Cocody", "Koumassi", "Marcory", "Plateau", "Port-Bouët", "Songon", "Treichville", "Yopougon"];
-export const CLIENT_POINTURES = ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"];
+export const CLIENT_POINTURES = POINTURES;
 export const PAYS_LIST = ["Côte d'Ivoire", "France", "Mali", "Burkina Faso", "Sénégal", "Bénin", "Togo", "Ghana", "Nigeria", "Autre"];
 
 // Indicatif téléphonique par pays, et si le zéro de tête d'un numéro local doit être conservé
