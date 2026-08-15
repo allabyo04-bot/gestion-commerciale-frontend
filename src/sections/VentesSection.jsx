@@ -47,7 +47,6 @@ export default function VentesSection() {
   const [cartesCadeauxPanier, setCartesCadeauxPanier] = useState([]);
   const [denominationsCartes, setDenominationsCartes] = useState([]);
   const [carteFormOuvert, setCarteFormOuvert] = useState(false);
-  const [carteDenomination, setCarteDenomination] = useState("");
   const [carteNumeroForm, setCarteNumeroForm] = useState("");
 
   const [selArticle, setSelArticle] = useState("");
@@ -156,21 +155,24 @@ export default function VentesSection() {
   const updatePaiement = (id, patch) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const removePaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
-  const ajouterCarteCadeauPanier = () => {
-    const montant = Number(carteDenomination);
+  const [verificationCarteEnCours, setVerificationCarteEnCours] = useState(false);
+  const ajouterCarteCadeauPanier = async () => {
     const numero = carteNumeroForm.trim();
-    if (!montant) { setError("Choisis un montant de carte cadeau."); return; }
     if (!numero) { setError("Indique le numéro imprimé sur la carte."); return; }
     if (cartesCadeauxPanier.some((c) => c.numero === numero)) { setError("Ce numéro de carte est déjà dans le panier."); return; }
-    setCartesCadeauxPanier([...cartesCadeauxPanier, { id: uid(), montant, numero }]);
-    setCarteDenomination(""); setCarteNumeroForm(""); setCarteFormOuvert(false); setError("");
+    setVerificationCarteEnCours(true);
+    try {
+      const res = await api.denominationsCartesCadeaux.verifierCarte(numero, boutique);
+      setCartesCadeauxPanier([...cartesCadeauxPanier, { id: uid(), montant: res.montant, numero }]);
+      setCarteNumeroForm(""); setCarteFormOuvert(false); setError("");
+    } catch (e) { setError(e.message); } finally { setVerificationCarteEnCours(false); }
   };
   const retirerCarteCadeauPanier = (id) => setCartesCadeauxPanier(cartesCadeauxPanier.filter((c) => c.id !== id));
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
-    setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteDenomination(""); setCarteNumeroForm("");
+    setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
 
   // Le client se desiste avant paiement : on vide le panier en cours sans rien
@@ -211,7 +213,7 @@ export default function VentesSection() {
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
-        cartesCadeauxAEmettre: cartesCadeauxPanier.map(({ montant, numero }) => ({ montant, numero })),
+        cartesCadeauxAEmettre: cartesCadeauxPanier.map(({ numero }) => ({ numero })),
         paiements: paiements.map((p) => ({ mode: p.mode, montant: Number(p.montant), carteNumero: (p.mode === "bon_achat" || p.mode === "avoir") ? p.carteNumero : undefined })),
       });
       setReceipt(vente);
@@ -476,14 +478,11 @@ export default function VentesSection() {
                 )}
                 {carteFormOuvert && (
                   <div className="rounded-lg p-3" style={{ background: "#F1E9DC" }}>
-                    <select value={carteDenomination} onChange={(e) => setCarteDenomination(e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
-                      <option value="">— Montant de la carte —</option>
-                      {denominationsCartes.map((d) => <option key={d.id} value={d.montant}>{fmt(d.montant)} F</option>)}
-                    </select>
-                    <input value={carteNumeroForm} onChange={(e) => setCarteNumeroForm(e.target.value)} placeholder="Numéro imprimé sur la carte" style={{ ...inputStyle, marginTop: "8px" }} />
+                    <input value={carteNumeroForm} onChange={(e) => setCarteNumeroForm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ajouterCarteCadeauPanier()} placeholder="Numéro imprimé sur la carte" style={{ ...inputStyle, marginTop: 0 }} autoFocus />
+                    <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Le montant est retrouvé automatiquement selon le numéro — pas besoin de le choisir.</p>
                     <div className="flex gap-2 mt-2">
-                      <button onClick={() => { setCarteFormOuvert(false); setCarteDenomination(""); setCarteNumeroForm(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
-                      <button onClick={ajouterCarteCadeauPanier} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter au panier</button>
+                      <button onClick={() => { setCarteFormOuvert(false); setCarteNumeroForm(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                      <button onClick={ajouterCarteCadeauPanier} disabled={verificationCarteEnCours} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: verificationCarteEnCours ? 0.6 : 1 }}>{verificationCarteEnCours ? "Vérification..." : "Ajouter au panier"}</button>
                     </div>
                   </div>
                 )}
@@ -934,10 +933,14 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   const [dateValidite, setDateValidite] = useState("");
   const [modePaiement, setModePaiement] = useState("especes");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const [denominations, setDenominations] = useState([]);
   const [nouvelleDenomination, setNouvelleDenomination] = useState("");
-  const [reapproValeurs, setReapproValeurs] = useState({});
+  const [stockageOuvertId, setStockageOuvertId] = useState(null);
+  const [stockageBoutique, setStockageBoutique] = useState(BOUTIQUES[0]);
+  const [stockageNumeros, setStockageNumeros] = useState("");
+  const [stockageEnCours, setStockageEnCours] = useState(false);
 
   const load = useCallback(async () => { try { setCartes(await api.bonsValeur.list("CADEAU")); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { load(); }, [load]);
@@ -955,14 +958,18 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   const toggleDenomination = async (d) => {
     try { await api.denominationsCartesCadeaux.activer(d.id, !d.actif); chargerDenominations(); } catch (e) { setError(e.message); }
   };
-  const reapprovisionner = async (d) => {
-    const quantite = Number(reapproValeurs[d.id]);
-    if (!quantite || quantite <= 0) { setError("Indique une quantité valide à ajouter."); return; }
+  const ouvrirStockage = (d) => { setStockageOuvertId(d.id); setStockageBoutique(BOUTIQUES[0]); setStockageNumeros(""); setInfo(""); };
+  const enregistrerStockage = async (d) => {
+    if (!stockageNumeros.trim()) { setError("Colle la liste des numéros reçus (un par ligne)."); return; }
+    setStockageEnCours(true);
     try {
-      await api.denominationsCartesCadeaux.reapprovisionner(d.id, quantite);
-      setReapproValeurs((prev) => ({ ...prev, [d.id]: "" }));
+      const res = await api.denominationsCartesCadeaux.stockerNumeros(d.id, stockageBoutique, stockageNumeros);
+      let msg = `${res.creees} carte(s) ajoutée(s) en stock à ${stockageBoutique}.`;
+      if (res.dejaExistants.length > 0) msg += ` ${res.dejaExistants.length} numéro(s) déjà connu(s) ignoré(s) : ${res.dejaExistants.join(", ")}.`;
+      setInfo(msg); setError("");
+      setStockageNumeros(""); setStockageOuvertId(null);
       chargerDenominations();
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); } finally { setStockageEnCours(false); }
   };
 
   const creer = async () => {
@@ -978,20 +985,38 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
 
       {estAdmin && (
-        <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <div className="rounded-xl p-5 mb-6 max-w-lg" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
           <p className="font-display font-semibold mb-1">Montants des cartes cadeaux</p>
-          <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Les montants imprimés sur tes cartes physiques — utilisés dans le panier de vente pour vendre une carte comme un article.</p>
+          <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Les montants imprimés sur tes cartes physiques. Chaque carte a un numéro déjà imprimé par le fournisseur — colle la liste de numéros reçus à chaque arrivage, par boutique.</p>
+          {info && <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{info}</p>}
           <div className="space-y-2 mb-3">
             {denominations.map((d) => (
-              <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2" style={{ background: "#F1E9DC" }}>
-                <button onClick={() => toggleDenomination(d)} className="text-xs px-2 py-1 rounded-full font-medium" style={d.actif ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "#DDD3C4", color: "#6B5D52", textDecoration: "line-through" }} title={d.actif ? "Cliquer pour désactiver" : "Cliquer pour réactiver"}>
-                  {fmt(d.montant)} F
-                </button>
-                <span className="text-xs" style={{ color: d.stockRestant <= 5 ? "#B04A3B" : "#6B5D52" }}>{d.stockRestant} en stock{d.stockRestant <= 5 ? " ⚠" : ""}</span>
-                <div className="flex items-center gap-1">
-                  <input value={reapproValeurs[d.id] || ""} onChange={(e) => setReapproValeurs((prev) => ({ ...prev, [d.id]: e.target.value.replace(/\D/g, "") }))} placeholder="+ qté" style={{ ...inputStyle, marginTop: 0, width: "70px", padding: "4px 8px", fontSize: "12px" }} />
-                  <button onClick={() => reapprovisionner(d)} className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>Ajouter</button>
+              <div key={d.id} className="rounded-lg px-3 py-2" style={{ background: "#F1E9DC" }}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <button onClick={() => toggleDenomination(d)} className="text-xs px-2 py-1 rounded-full font-medium" style={d.actif ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "#DDD3C4", color: "#6B5D52", textDecoration: "line-through" }} title={d.actif ? "Cliquer pour désactiver" : "Cliquer pour réactiver"}>
+                    {fmt(d.montant)} F
+                  </button>
+                  <div className="flex items-center gap-3 text-xs" style={{ color: "#6B5D52" }}>
+                    {(d.parBoutique || []).map((pb) => (
+                      <span key={pb.boutique} style={{ color: pb.enStock <= 5 ? "#B04A3B" : "#6B5D52" }}>
+                        {pb.boutique} : {pb.enStock} en stock{pb.enStock <= 5 ? " ⚠" : ""}
+                      </span>
+                    ))}
+                  </div>
+                  <button onClick={() => ouvrirStockage(d)} className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>Réceptionner un lot</button>
                 </div>
+                {stockageOuvertId === d.id && (
+                  <div className="mt-3 pt-3" style={{ borderTop: "1px solid #DDD3C4" }}>
+                    <select value={stockageBoutique} onChange={(e) => setStockageBoutique(e.target.value)} style={{ ...inputStyle, marginTop: 0, marginBottom: "8px" }}>
+                      {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
+                    </select>
+                    <textarea value={stockageNumeros} onChange={(e) => setStockageNumeros(e.target.value)} rows={4} placeholder={"Colle ici la liste des numéros reçus, un par ligne :\nCG-0101\nCG-0102\nCG-0103"} style={{ ...inputStyle, marginTop: 0, fontFamily: "monospace", fontSize: "13px" }} />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => setStockageOuvertId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                      <button onClick={() => enregistrerStockage(d)} disabled={stockageEnCours} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: stockageEnCours ? 0.6 : 1 }}>{stockageEnCours ? "Enregistrement..." : "Ajouter au stock"}</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

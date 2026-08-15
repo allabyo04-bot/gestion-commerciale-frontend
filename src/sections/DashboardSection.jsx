@@ -248,16 +248,20 @@ export default function DashboardSection() {
             <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
               <Gift size={14} /> Cartes cadeaux
             </p>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {resumeCartesCadeaux.map((r) => (
-                <div key={r.id} className="flex items-center justify-between text-sm">
-                  <span>{fmt(r.montant)} F {!r.actif && <span className="text-xs" style={{ color: COULEUR.texteDoux }}>(inactif)</span>}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs" style={{ color: COULEUR.texteDoux }}>{r.vendu} vendue(s)</span>
-                    <span className="font-mono px-2 py-0.5 rounded-full text-xs" style={{ background: r.reste <= 5 ? "#FBEAE7" : "#F1E9DC", color: r.reste <= 5 ? "#B04A3B" : "#6B5D52" }}>
-                      {r.reste} reste{r.reste <= 5 ? " ⚠" : ""}
-                    </span>
-                  </span>
+                <div key={r.id}>
+                  <p className="text-sm font-medium">{fmt(r.montant)} F {!r.actif && <span className="text-xs" style={{ color: COULEUR.texteDoux }}>(inactif)</span>}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    {(r.parBoutique || []).map((pb) => (
+                      <span key={pb.boutique} className="flex items-center gap-1.5 text-xs">
+                        <span style={{ color: COULEUR.texteDoux }}>{pb.boutique} :</span>
+                        <span className="font-mono px-2 py-0.5 rounded-full" style={{ background: pb.enStock <= 5 ? "#FBEAE7" : "#F1E9DC", color: pb.enStock <= 5 ? "#B04A3B" : "#6B5D52" }}>
+                          {pb.enStock} en stock{pb.enStock <= 5 ? " ⚠" : ""}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
