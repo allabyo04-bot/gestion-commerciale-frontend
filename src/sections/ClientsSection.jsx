@@ -409,6 +409,11 @@ function ClientModal({ client, onCancel, onSubmit }) {
             ? `Indicatif ${form.pays} : +${PAYS_INDICATIF[form.pays].code} — à saisir sans le "+", juste le numéro local ci-dessus.`
             : "Pays sans indicatif connu — le bouton WhatsApp du reçu ne pourra pas être proposé pour cette cliente."}
         </p>
+        {form.pays === "Côte d'Ivoire" && form.telephone && (form.telephone.replace(/\D/g, "").length !== 10) && (
+          <p className="text-xs mb-3 px-2 py-1.5 rounded-lg" style={{ background: "#FBEAE7", color: "#B04A3B" }}>
+            ⚠ Ce numéro ne fait pas 10 chiffres — inhabituel pour la Côte d'Ivoire. Vérifie qu'il n'appartient pas à un autre pays (le champ "Pays" ci-dessous serait alors à changer).
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Taille/Pointure"><select value={form.pointure} onChange={(e) => set("pointure", e.target.value)} style={inputStyle}><option value="">—</option>{CLIENT_POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}</select></Field>
           <Field label="Pays"><select value={form.pays} onChange={(e) => set("pays", e.target.value)} style={inputStyle}>{PAYS_LIST.map((p) => <option key={p}>{p}</option>)}</select></Field>
