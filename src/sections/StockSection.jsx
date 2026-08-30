@@ -875,7 +875,7 @@ function ImportSection({ brands, onImported }) {
           <div>
             <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Colonnes du fichier</label>
             <select value={modeQuantite} onChange={(e) => setModeQuantite(e.target.value)} style={selectStyle}>
-              <option value="pointure">Par pointure (T35 à T42)</option>
+              <option value="pointure">Par pointure (T{POINTURES[0]} à T{POINTURES[POINTURES.length - 1]})</option>
               <option value="simple">Quantité simple (un seul total)</option>
             </select>
           </div>
@@ -894,7 +894,7 @@ function ImportSection({ brands, onImported }) {
           </button>
         </div>
         <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
-          {modeQuantite === "pointure" ? "Colonnes attendues : REFERENCES, T35 à T42, PRIX DE VENTE." : "Colonnes attendues : REFERENCES, QUANTITE, PRIX DE VENTE."}
+          {modeQuantite === "pointure" ? `Colonnes attendues : REFERENCES, T${POINTURES[0]} à T${POINTURES[POINTURES.length - 1]}, PRIX DE VENTE.` : "Colonnes attendues : REFERENCES, QUANTITE, PRIX DE VENTE."}
           {" "}Le choix "Colonnes du fichier" est indépendant de la famille — utile si un nouveau type de produit (bijoux, etc.) n'a pas besoin de pointures.
         </p>
       </div>
