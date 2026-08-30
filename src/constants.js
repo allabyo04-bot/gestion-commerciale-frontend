@@ -19,7 +19,7 @@ export const INFOS_BOUTIQUE = {
 export const MESSAGE_FIN_TICKET = "Aucun remboursement n'est effectué après achat. Les articles ne sont ni échangés, ni retournés au-delà de dix (10) jours. Passé ce délai, aucune réclamation ne sera acceptée.\n\nMerci pour votre visite";
 
 export const POINTURES = ["35", "36", "36.5", "37", "37.5", "38", "38.5", "39", "39.5", "40", "40.5", "41", "41.5", "42", "42.5", "43", "43.5", "44", "44.5", "45", "45.5", "46", "46.5", "47", "47.5", "48"];
-export const MODES_VENTE = ["Boutique", "Livraison", "Expédition"];
+export const MODES_VENTE = ["Boutique", "Expédition"];
 export const MODES_PAIEMENT = [
   { id: "especes", label: "Espèces", liquide: true },
   { id: "moov_money", label: "Moov Money", liquide: false },
@@ -78,4 +78,4 @@ export function fmt(n) {
 // est construit et prêt, mais caché tant que Djenie n'a pas donné le feu vert (le temps de bien
 // expliquer aux caissières) — repasser à true dès qu'elle donne l'accord. Contrôle à la fois
 // l'onglet dans la navigation (App.jsx) et l'encart correspondant sur le tableau de bord.
-export const LIVRAISON_ACTIF = false;
+export const LIVRAISON_ACTIF = true;

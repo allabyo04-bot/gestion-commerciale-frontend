@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X, Search, PauseCircle } from "lucide-react";
 import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const FAMILLE_COLORS = { Chaussure: { bg: "#8C3B2E", fg: "#FBF3EC" }, Sac: { bg: "#A8823D", fg: "#2B2320" }, "Article d'entretien": { bg: "#5C7A5E", fg: "#FBF3EC" } };
 
@@ -16,6 +17,8 @@ function totalStock(article) {
 function uidLocal() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
 export default function StockSection() {
+  const { user } = useAuth();
+  const estAdmin = !!user?.role?.systeme;
   const [tab, setTab] = useState("articles");
   const [articles, setArticles] = useState(null);
   const [brands, setBrands] = useState([]);
@@ -24,6 +27,8 @@ export default function StockSection() {
   const [modalArticle, setModalArticle] = useState(null);
   const [stockEditor, setStockEditor] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmVeille, setConfirmVeille] = useState(false);
+  const [veilleEnCours, setVeilleEnCours] = useState(false);
   const [newBrand, setNewBrand] = useState("");
   const [filterFamille, setFilterFamille] = useState("Tous");
   const [filterBrand, setFilterBrand] = useState("Toutes");
@@ -51,6 +56,18 @@ export default function StockSection() {
   }, []);
   useEffect(() => { load(); }, [load]);
 useEffect(() => { if (tab === "historique") loadMouvements(articleFiltreId); }, [tab, loadMouvements, articleFiltreId]);
+
+  const [infoVeille, setInfoVeille] = useState("");
+  const mettreToutEnVeille = async () => {
+    setVeilleEnCours(true);
+    try {
+      const res = await api.articles.desactiverTous();
+      setConfirmVeille(false);
+      await load();
+      setError("");
+      setInfoVeille(`${res.desactives} article(s) mis en veille. Ils redeviendront visibles automatiquement dès qu'ils seront réimportés, ou en cliquant sur "Réactiver" sur leur fiche.`);
+    } catch (e) { setError(e.message); } finally { setVeilleEnCours(false); }
+  };
 
   const brandName = (id) => brands.find((b) => b.id === id)?.nom || "—";
 
@@ -127,10 +144,20 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                 <option value="Toutes">Toutes les marques</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </div>
-            <button onClick={openNewArticle} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
-              <Plus size={16} /> Nouvel article
-            </button>
+            <div className="flex items-center gap-2">
+              {estAdmin && (
+                <button onClick={() => setConfirmVeille(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ border: "1px solid #B04A3B", color: "#B04A3B" }}>
+                  <PauseCircle size={16} /> Tout mettre en veille
+                </button>
+              )}
+              <button onClick={openNewArticle} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
+                <Plus size={16} /> Nouvel article
+              </button>
+            </div>
           </div>
+          {infoVeille && (
+            <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{infoVeille}</p>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             {filteredArticles.map((a) => {
@@ -294,6 +321,14 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
       {confirmDelete && (
         <ConfirmModal title="Supprimer cet article ?" message={`${confirmDelete.designation} sera retiré du stock.`} onCancel={() => setConfirmDelete(null)} onConfirm={() => removeArticle(confirmDelete)} />
+      )}
+      {confirmVeille && (
+        <ConfirmModal
+          title="Mettre tout le catalogue en veille ?"
+          message={`Tous les articles actifs (les deux boutiques confondues) deviendront invisibles à la vente. L'historique des ventes déjà réalisées n'est pas touché. Ils redeviendront visibles automatiquement dès que Djenie les réimportera via Excel. ${veilleEnCours ? "Mise en veille en cours..." : ""}`}
+          onCancel={() => setConfirmVeille(false)}
+          onConfirm={mettreToutEnVeille}
+        />
       )}
     </div>
   );

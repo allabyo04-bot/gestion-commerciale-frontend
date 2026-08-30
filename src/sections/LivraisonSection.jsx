@@ -133,7 +133,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError }) 
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
   const resultatsRecherche = rechercheArticle.trim()
-    ? (articles || []).filter((a) => a.designation.toLowerCase().includes(rechercheArticle.trim().toLowerCase()) || a.reference.toLowerCase().includes(rechercheArticle.trim().toLowerCase())).slice(0, 8)
+    ? (articles || []).filter((a) => a.actif !== false && (a.designation.toLowerCase().includes(rechercheArticle.trim().toLowerCase()) || a.reference.toLowerCase().includes(rechercheArticle.trim().toLowerCase()))).slice(0, 8)
     : [];
 
   const choisirArticle = (a) => { setArticleChoisi(a); setRechercheArticle(""); setPointureChoisie(""); setQuantiteChoisie("1"); };
