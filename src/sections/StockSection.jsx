@@ -802,6 +802,8 @@ function ImportSection({ brands, onImported }) {
   const [famille, setFamille] = useState("Chaussure");
   const [modeQuantite, setModeQuantite] = useState("pointure");
   const [boutique, setBoutique] = useState("");
+  const [fichier, setFichier] = useState(null);
+  const [apercu, setApercu] = useState(null);
   const [lignesEdit, setLignesEdit] = useState([]);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
