@@ -164,7 +164,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
               const fc = FAMILLE_COLORS[a.famille];
               const total = totalStock(a);
               return (
-                <div key={a.id} className="stitch card-hover rounded-xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                <div key={a.id} className="stitch card-hover rounded-xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", opacity: a.actif === false ? 0.6 : 1 }}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: "#F1E9DC" }}><Package size={18} color="#8C3B2E" /></div>
@@ -179,6 +179,9 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                     <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: fc.bg, color: fc.fg }}>{a.famille}</span>
                     <span className="text-xs px-2.5 py-1 rounded-full flex items-center gap-1" style={{ background: "#F1E9DC", color: "#6B5D52" }}><Tag size={11} /> {brandName(a.marqueId)}</span>
                     <span className="text-xs px-2.5 py-1 rounded-full font-mono" style={{ background: total > 0 ? "#E9F0EA" : "#FBEAE7", color: total > 0 ? "#3F6B4A" : "#B04A3B" }}>{total} en stock</span>
+                    {a.actif === false && (
+                      <span className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: "#DDD3C4", color: "#6B5D52" }}><PauseCircle size={11} /> En veille</span>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
                     <button onClick={() => setStockEditor(a.id)} className="text-xs font-medium flex items-center gap-1" style={{ color: "#8C3B2E" }}>Gérer le stock <ChevronRight size={13} /></button>
