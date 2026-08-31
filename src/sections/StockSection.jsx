@@ -37,14 +37,23 @@ export default function StockSection() {
   const [loadingMouvements, setLoadingMouvements] = useState(false);
   const [articleFiltreId, setArticleFiltreId] = useState("");
   const [articleFiltreSearch, setArticleFiltreSearch] = useState("");
+  const [mvtDateDebut, setMvtDateDebut] = useState("");
+  const [mvtDateFin, setMvtDateFin] = useState("");
+  const [mvtType, setMvtType] = useState("");
 
   const loadMouvements = useCallback(async (articleId) => {
     setLoadingMouvements(true);
     try {
-      const m = await api.articles.historiqueMouvements(articleId ? { articleId } : {});
+      const params = {
+        ...(articleId ? { articleId } : {}),
+        ...(mvtDateDebut ? { dateDebut: mvtDateDebut } : {}),
+        ...(mvtDateFin ? { dateFin: mvtDateFin } : {}),
+        ...(mvtType ? { type: mvtType } : {}),
+      };
+      const m = await api.articles.historiqueMouvements(params);
       setMouvements(m);
     } catch (e) { setError(e.message); } finally { setLoadingMouvements(false); }
-  }, []);
+  }, [mvtDateDebut, mvtDateFin, mvtType]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -216,7 +225,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
 {!loading && tab === "historique" && (
         <div>
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
             <p className="text-sm" style={{ color: "#6B5D52" }}>Filtrer par article :</p>
             {articleFiltreId ? (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
@@ -240,6 +249,35 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+
+          <div className="flex items-end gap-3 mb-5 flex-wrap">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Du</label>
+              <input type="date" value={mvtDateDebut} onChange={(e) => setMvtDateDebut(e.target.value)} style={selectStyle} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Au</label>
+              <input type="date" value={mvtDateFin} onChange={(e) => setMvtDateFin(e.target.value)} style={selectStyle} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Type</label>
+              <select value={mvtType} onChange={(e) => setMvtType(e.target.value)} style={selectStyle}>
+                <option value="">Tous les types</option>
+                <option value="Ajout">Ajout (mise en stock / import)</option>
+                <option value="Correction">Correction (inventaire)</option>
+                <option value="Virement">Virement entre boutiques</option>
+                <option value="Vente">Vente</option>
+                <option value="Retour">Retour</option>
+                <option value="Echange">Échange</option>
+                <option value="SortieLivraison">Sortie livraison</option>
+                <option value="RetourLivraison">Retour livraison</option>
+              </select>
+            </div>
+            <button onClick={() => loadMouvements(articleFiltreId)} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Filtrer</button>
+            {(mvtDateDebut || mvtDateFin || mvtType) && (
+              <button onClick={() => { setMvtDateDebut(""); setMvtDateFin(""); setMvtType(""); }} className="text-xs" style={{ color: "#6B5D52" }}>Réinitialiser les filtres</button>
             )}
           </div>
 
@@ -568,11 +606,14 @@ function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement 
 function EtatStockSection({ articles }) {
   const [filtreFamille, setFiltreFamille] = useState("Tous");
   const [filtreQuantite, setFiltreQuantite] = useState("tous");
+  const [filtreActif, setFiltreActif] = useState("tous");
 
   const filtered = articles.filter((a) => {
     if (filtreFamille !== "Tous" && a.famille !== filtreFamille) return false;
     if (filtreQuantite === "nulle" && totalStock(a) !== 0) return false;
     if (filtreQuantite === "stock" && totalStock(a) === 0) return false;
+    if (filtreActif === "actifs" && a.actif === false) return false;
+    if (filtreActif === "veille" && a.actif !== false) return false;
     return true;
   });
 
@@ -591,10 +632,18 @@ function EtatStockSection({ articles }) {
           </button>
         ))}
       </div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-3">
         {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"]].map(([id, label]) => (
           <button key={id} onClick={() => setFiltreQuantite(id)} className="px-4 py-2 rounded-full text-sm font-medium"
             style={filtreQuantite === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2 mb-5">
+        {[["tous", "Actifs + en veille"], ["actifs", "Actifs uniquement"], ["veille", "En veille uniquement"]].map(([id, label]) => (
+          <button key={id} onClick={() => setFiltreActif(id)} className="px-4 py-2 rounded-full text-sm font-medium"
+            style={filtreActif === id ? { background: "#6B5D52", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
             {label}
           </button>
         ))}
@@ -633,7 +682,10 @@ function EtatStockSection({ articles }) {
           <tbody>
             {filtered.map((a) => (
               <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9" }}>
-                <td className="px-4 py-2">{a.designation} <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {a.reference}</span></td>
+                <td className="px-4 py-2">
+                  {a.designation} <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {a.reference}</span>
+                  {a.actif === false && <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{ background: "#DDD3C4", color: "#6B5D52" }}>En veille</span>}
+                </td>
                 <td className="px-4 py-2">{a.famille}</td>
                 {BOUTIQUES.map((b) => (
                   <td key={b} className="text-right px-4 py-2">{(a.stocks || []).filter((s) => s.boutique === b).reduce((s, i) => s + i.quantite, 0)}</td>
