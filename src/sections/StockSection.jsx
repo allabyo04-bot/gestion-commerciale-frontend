@@ -622,10 +622,21 @@ function EtatStockSection({ articles }) {
     return true;
   });
 
-  const totalPourBoutiqueEtFamille = (b, f) =>
-    articles.filter((a) => a.famille === f).reduce((s, a) => s + (a.stocks || []).filter((si) => si.boutique === b).reduce((s2, i) => s2 + i.quantite, 0), 0);
+  // Même logique que "filtered" ci-dessus, mais sans le filtre famille — chaque encart applique
+  // ensuite sa propre famille par-dessus, pour que "Actifs uniquement" / "En veille uniquement"
+  // se reflète aussi dans les encarts, pas seulement dans le tableau détaillé en dessous.
+  const articlesPourEncarts = articles.filter((a) => {
+    if (filtreQuantite === "nulle" && totalStock(a) !== 0) return false;
+    if (filtreQuantite === "stock" && totalStock(a) === 0) return false;
+    if (filtreActif === "actifs" && a.actif === false) return false;
+    if (filtreActif === "veille" && a.actif !== false) return false;
+    return true;
+  });
 
-  const totalFamille = (f) => articles.filter((a) => a.famille === f).reduce((s, a) => s + totalStock(a), 0);
+  const totalPourBoutiqueEtFamille = (b, f) =>
+    articlesPourEncarts.filter((a) => a.famille === f).reduce((s, a) => s + (a.stocks || []).filter((si) => si.boutique === b).reduce((s2, i) => s2 + i.quantite, 0), 0);
+
+  const totalFamille = (f) => articlesPourEncarts.filter((a) => a.famille === f).reduce((s, a) => s + totalStock(a), 0);
 
   return (
     <div>
@@ -657,7 +668,9 @@ function EtatStockSection({ articles }) {
       <div className="grid sm:grid-cols-2 gap-4 mb-6">
         {FAMILLES.map((f) => (
           <div key={f} className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-            <p className="text-xs font-mono uppercase tracking-wide mb-2" style={{ color: "#8C3B2E" }}>{f}s en stock</p>
+            <p className="text-xs font-mono uppercase tracking-wide mb-2" style={{ color: "#8C3B2E" }}>
+              {f}s en stock{filtreActif === "actifs" ? " (actifs)" : filtreActif === "veille" ? " (en veille)" : ""}
+            </p>
             <div className="flex gap-6 items-end">
               {BOUTIQUES.map((b) => (
                 <div key={b}>
