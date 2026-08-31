@@ -130,11 +130,14 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
-      <div className="flex gap-2 mb-6">
-        {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"], ["reception", "Réception"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
-        ))}
-      </div>
+      <div className="flex gap-6 items-start">
+        <div className="flex flex-col gap-2 shrink-0" style={{ width: "200px" }}>
+          {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"], ["reception", "Réception"]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-lg text-sm font-medium text-left" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
+          ))}
+        </div>
+
+        <div className="flex-1 min-w-0">
 
       {loading && <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement…</p>}
 
@@ -350,6 +353,8 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
       {tab === "soldes" && <SoldesSection brands={brands} />}
       {tab === "reception" && <ReceptionSection articles={articles} onApplique={load} />}
+        </div>
+      </div>
       {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
