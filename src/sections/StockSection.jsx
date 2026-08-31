@@ -14,6 +14,9 @@ function stockQty(article, boutique, pointure) {
 function totalStock(article) {
   return (article.stocks || []).reduce((s, i) => s + i.quantite, 0);
 }
+function totalStockBoutique(article, boutique) {
+  return (article.stocks || []).filter((s) => s.boutique === boutique).reduce((s2, i) => s2 + i.quantite, 0);
+}
 function uidLocal() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
 export default function StockSection() {
@@ -195,6 +198,9 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                       <span className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: "#DDD3C4", color: "#6B5D52" }}><PauseCircle size={11} /> En veille</span>
                     )}
                   </div>
+                  <p className="text-xs mt-1.5 font-mono" style={{ color: "#A89A87" }}>
+                    {BOUTIQUES.map((b) => `${b} ${totalStockBoutique(a, b)}`).join("  ·  ")}
+                  </p>
                   <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
                     <button onClick={() => setStockEditor(a.id)} className="text-xs font-medium flex items-center gap-1" style={{ color: "#8C3B2E" }}>Gérer le stock <ChevronRight size={13} /></button>
                     <div className="flex gap-3">
