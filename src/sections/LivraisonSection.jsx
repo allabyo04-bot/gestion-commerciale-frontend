@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, MODES_PAIEMENT, fmt } from "../constants.js";
+import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
 
@@ -53,6 +53,7 @@ export default function LivraisonSection() {
         <NouveauBonForm
           articles={articles} boutiqueDefaut={boutiqueDefaut} clients={clients}
           onCree={(bon) => { setTicketAImprimer(bon); charger(); }}
+          onClientCree={(client) => setClients((prev) => [...prev, client])}
           onError={setError}
         />
       )}
@@ -117,13 +118,21 @@ export default function LivraisonSection() {
 // ------------------------------------------------------------
 // NOUVEAU BON — départ du livreur : ce qui sort décrémente le stock tout de suite.
 // ------------------------------------------------------------
-function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError }) {
+function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, onClientCree }) {
   const [boutique, setBoutique] = useState(boutiqueDefaut);
+  const [clientId, setClientId] = useState("");
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
-  const [clientId, setClientId] = useState("");
   const [livreurNom, setLivreurNom] = useState("");
   const [notes, setNotes] = useState("");
+
+  const [rechercheClient, setRechercheClient] = useState("");
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  const [nouveauNom, setNouveauNom] = useState("");
+  const [nouveauTelephone, setNouveauTelephone] = useState("");
+  const [nouvellePointure, setNouvellePointure] = useState("");
+  const [nouvelleVille, setNouvelleVille] = useState("");
+  const [creationEnCours, setCreationEnCours] = useState(false);
 
   const [rechercheArticle, setRechercheArticle] = useState("");
   const [articleChoisi, setArticleChoisi] = useState(null);
@@ -131,6 +140,34 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError }) 
   const [quantiteChoisie, setQuantiteChoisie] = useState("1");
   const [lignes, setLignes] = useState([]);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+
+  const resultatsClients = rechercheClient.trim()
+    ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
+    : [];
+  const choisirClient = (c) => { setClientId(c.id); setClientNom(c.nomPrenoms); setClientTelephone(c.telephone || ""); setRechercheClient(""); };
+  const retirerClient = () => { setClientId(""); setClientNom(""); setClientTelephone(""); };
+
+  const creerNouvelleCliente = async () => {
+    if (!nouveauNom.trim()) { onError("Le nom de la cliente est obligatoire."); return; }
+    if (!nouveauTelephone.trim()) { onError("Le téléphone de la cliente est obligatoire."); return; }
+    if (!nouvellePointure) { onError("La pointure de la cliente est obligatoire."); return; }
+    if (!nouvelleVille.trim()) { onError("La ville de la cliente est obligatoire."); return; }
+    setCreationEnCours(true);
+    try {
+      const client = await api.clients.create({
+        nomPrenoms: nouveauNom.trim(), telephone: nouveauTelephone.trim(), pointure: nouvellePointure, ville: nouvelleVille.trim(),
+        civilite: "Madame", pays: "Côte d'Ivoire",
+        // Anniversaire inconnu à la création rapide pendant une livraison — valeur provisoire,
+        // le repère ci-dessous permet à Djenie de la repérer facilement pour la compléter.
+        jourAnniv: "01", moisAnniv: "Janvier",
+        observation: "Créée via un bon de livraison — anniversaire et informations à compléter.",
+      });
+      choisirClient(client);
+      setCreationOuverte(false);
+      setNouveauNom(""); setNouveauTelephone(""); setNouvellePointure(""); setNouvelleVille("");
+      onClientCree?.(client);
+    } catch (e) { onError(e.message); } finally { setCreationEnCours(false); }
+  };
 
   const resultatsRecherche = rechercheArticle.trim()
     ? (articles || []).filter((a) => a.actif !== false && (a.designation.toLowerCase().includes(rechercheArticle.trim().toLowerCase()) || a.reference.toLowerCase().includes(rechercheArticle.trim().toLowerCase()))).slice(0, 8)
@@ -150,17 +187,18 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError }) 
 
   const valider = async () => {
     if (!boutique) { onError("Choisis la boutique concernée."); return; }
-    if (!clientNom.trim()) { onError("Le nom du client est obligatoire."); return; }
+    if (!clientId) { onError("Choisis une cliente existante, ou crée sa fiche (nom, téléphone, pointure et ville sont obligatoires)."); return; }
+    if (!livreurNom.trim()) { onError("Le nom du livreur est obligatoire."); return; }
     if (lignes.length === 0) { onError("Ajoute au moins un article au bon de livraison."); return; }
     setEnvoiEnCours(true);
     try {
       const bon = await api.bonsLivraison.creer({
-        boutique, clientNom, clientTelephone: clientTelephone || undefined, clientId: clientId || undefined,
-        livreurNom: livreurNom || undefined, notes: notes || undefined,
+        boutique, clientNom, clientTelephone: clientTelephone || undefined, clientId,
+        livreurNom: livreurNom.trim(), notes: notes || undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
       });
       onCree(bon);
-      setClientNom(""); setClientTelephone(""); setClientId(""); setLivreurNom(""); setNotes(""); setLignes([]);
+      retirerClient(); setLivreurNom(""); setNotes(""); setLignes([]);
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
 
@@ -178,24 +216,64 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError }) 
           </select>
         </div>
         <div>
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur (optionnel)</label>
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur</label>
           <input value={livreurNom} onChange={(e) => setLivreurNom(e.target.value)} style={selectStyle} placeholder="Nom du livreur" />
         </div>
-        <div>
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom du client</label>
-          <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={selectStyle} placeholder="Ex : Mme OUEDRAOGO" />
-        </div>
-        <div>
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Téléphone client (optionnel)</label>
-          <input value={clientTelephone} onChange={(e) => setClientTelephone(e.target.value)} style={selectStyle} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Rattacher à une fiche client existante (optionnel)</label>
-          <select value={clientId} onChange={(e) => { setClientId(e.target.value); const c = (clients || []).find((cl) => cl.id === e.target.value); if (c) { setClientNom(c.nomPrenoms); setClientTelephone(c.telephone || ""); } }} style={selectStyle}>
-            <option value="">— Aucune —</option>
-            {(clients || []).map((c) => <option key={c.id} value={c.id}>{c.nomPrenoms}{c.carteFidelite ? ` · Carte ${c.carteFidelite}` : ""}</option>)}
-          </select>
-        </div>
+      </div>
+
+      <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+        <p className="text-sm font-medium mb-3">Cliente</p>
+        {clientId ? (
+          <div className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <span className="text-sm">{clientNom} {clientTelephone ? `· ${clientTelephone}` : ""}</span>
+            <button onClick={retirerClient} style={{ color: "#B04A3B" }}><X size={14} /></button>
+          </div>
+        ) : creationOuverte ? (
+          <div>
+            <div className="grid sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom</label>
+                <input value={nouveauNom} onChange={(e) => setNouveauNom(e.target.value)} style={selectStyle} placeholder="Ex : Mme OUEDRAOGO" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Téléphone</label>
+                <input value={nouveauTelephone} onChange={(e) => setNouveauTelephone(e.target.value)} style={selectStyle} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
+                <select value={nouvellePointure} onChange={(e) => setNouvellePointure(e.target.value)} style={selectStyle}>
+                  <option value="">— Choisir —</option>
+                  {CLIENT_POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Ville</label>
+                <input value={nouvelleVille} onChange={(e) => setNouvelleVille(e.target.value)} style={selectStyle} placeholder="Ex : Abidjan" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setCreationOuverte(false)} className="flex-1 px-3 py-2 rounded-lg text-sm" style={{ color: "#6B5D52" }}>Annuler</button>
+              <button onClick={creerNouvelleCliente} disabled={creationEnCours} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: creationEnCours ? 0.6 : 1 }}>{creationEnCours ? "Création..." : "Créer et utiliser cette cliente"}</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="relative mb-2">
+              <input value={rechercheClient} onChange={(e) => setRechercheClient(e.target.value)} placeholder="Rechercher une cliente par nom ou téléphone…" style={{ ...selectStyle, paddingLeft: "32px", width: "100%" }} />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+              {resultatsClients.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
+                  {resultatsClients.map((c) => (
+                    <button key={c.id} type="button" onClick={() => choisirClient(c)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
+                      {c.nomPrenoms} <span style={{ color: "#6B5D52" }}>{c.telephone ? `· ${c.telephone}` : ""}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setCreationOuverte(true)} className="text-xs font-medium" style={{ color: "#8C3B2E" }}>+ Cette cliente n'a pas encore de fiche — la créer</button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>

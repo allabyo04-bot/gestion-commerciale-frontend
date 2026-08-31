@@ -207,6 +207,9 @@ export default function ClientsSection() {
                   {c.pointure && <p>Pointure T{c.pointure}</p>}
                 </div>
                 {c.carteFidelite && <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-full font-mono" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>Carte {c.carteFidelite}</span>}
+                {c.observation?.includes("via un bon de livraison") && (
+                  <span className="inline-block mt-3 ml-2 text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: "#FBEAE7", color: "#B04A3B" }}>⚠ À compléter</span>
+                )}
                 <div className="flex items-center justify-end gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #EFE7D9" }}>
                   <button onClick={() => voirHistorique(c)} title="Voir les achats" style={{ color: "#3F6B4A" }}><Receipt size={16} /></button>
                   <button onClick={() => openEditClient(c)} style={{ color: "#8C3B2E" }}><Pencil size={16} /></button>
