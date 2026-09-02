@@ -7,6 +7,16 @@ import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Share
 import { ReceiptModal } from "./VentesSection.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function dateDecalee(jours) {
+  const d = new Date();
+  d.setDate(d.getDate() + jours);
+  return d.toISOString().slice(0, 10);
+}
+function debutDuMoisISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
 
 export default function LivraisonSection() {
   const { user } = useAuth();
@@ -29,16 +39,19 @@ export default function LivraisonSection() {
     api.clients.list().then(setClients).catch((e) => setError(e.message));
   }, []);
 
+  const [histDateDebut, setHistDateDebut] = useState("");
+  const [histDateFin, setHistDateFin] = useState("");
+
   const charger = useCallback(async () => {
     try {
       const [enCours, historique] = await Promise.all([
         api.bonsLivraison.lister({ statut: "EN_COURS" }),
-        api.bonsLivraison.lister({}),
+        api.bonsLivraison.lister({ dateDebut: histDateDebut || undefined, dateFin: histDateFin || undefined }),
       ]);
       setBonsEnCours(enCours);
       setBonsHistorique(historique.filter((b) => b.statut !== "EN_COURS"));
     } catch (e) { setError(e.message); }
-  }, []);
+  }, [histDateDebut, histDateFin]);
   useEffect(() => { charger(); }, [charger]);
 
   return (
@@ -88,7 +101,30 @@ export default function LivraisonSection() {
 
       {subTab === "historique" && (
         <div className="space-y-3">
-          {bonsHistorique.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun bon clôturé pour l'instant.</p>}
+          <div className="rounded-xl p-4 mb-2" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              {[
+                ["Aujourd'hui", () => { const j = todayISO(); setHistDateDebut(j); setHistDateFin(j); }],
+                ["Hier", () => { const j = dateDecalee(-1); setHistDateDebut(j); setHistDateFin(j); }],
+                ["7 derniers jours", () => { setHistDateDebut(dateDecalee(-6)); setHistDateFin(todayISO()); }],
+                ["Ce mois-ci", () => { setHistDateDebut(debutDuMoisISO()); setHistDateFin(todayISO()); }],
+                ["Tout", () => { setHistDateDebut(""); setHistDateFin(""); }],
+              ].map(([label, action]) => (
+                <button key={label} onClick={action} className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
+              ))}
+            </div>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Du</label>
+                <input type="date" value={histDateDebut} onChange={(e) => setHistDateDebut(e.target.value)} style={selectStyle} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Au</label>
+                <input type="date" value={histDateFin} onChange={(e) => setHistDateFin(e.target.value)} style={selectStyle} />
+              </div>
+            </div>
+          </div>
+          {bonsHistorique.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun bon clôturé sur cette période.</p>}
           {bonsHistorique.map((b) => (
             <div key={b.id} className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <div className="flex items-center justify-between flex-wrap gap-2">

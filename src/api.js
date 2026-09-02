@@ -151,8 +151,8 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     creer: (data) => request("/api/receptions", { method: "POST", body: data }),
   },
   bonsLivraison: {
-    lister: ({ statut, boutique } = {}) => {
-      const qs = new URLSearchParams({ ...(statut ? { statut } : {}), ...(boutique ? { boutique } : {}) }).toString();
+    lister: ({ statut, boutique, dateDebut, dateFin } = {}) => {
+      const qs = new URLSearchParams({ ...(statut ? { statut } : {}), ...(boutique ? { boutique } : {}), ...(dateDebut ? { dateDebut } : {}), ...(dateFin ? { dateFin } : {}) }).toString();
       return request(`/api/bons-livraison${qs ? `?${qs}` : ""}`);
     },
     get: (id) => request(`/api/bons-livraison/${id}`),
