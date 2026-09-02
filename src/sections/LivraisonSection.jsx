@@ -20,6 +20,7 @@ export default function LivraisonSection() {
   const [ticketAImprimer, setTicketAImprimer] = useState(null);
   const [bonAReconcilier, setBonAReconcilier] = useState(null);
   const [receiptVente, setReceiptVente] = useState(null);
+  const [info, setInfo] = useState("");
 
   const boutiqueDefaut = estAdmin ? "" : (user?.boutique || "");
 
@@ -43,6 +44,12 @@ export default function LivraisonSection() {
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
+      {info && (
+        <p className="text-sm mb-4 px-3 py-2 rounded-lg flex items-center justify-between" style={{ background: "#FBEAE7", color: "#B04A3B" }}>
+          {info}
+          <button onClick={() => setInfo("")} className="ml-3" style={{ color: "#B04A3B" }}><X size={14} /></button>
+        </p>
+      )}
       <div className="flex gap-2 mb-6">
         {[["nouveau", "Nouveau bon"], ["encours", `En cours (${bonsEnCours.length})`], ["historique", "Historique"]].map(([id, label]) => (
           <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
@@ -106,7 +113,12 @@ export default function LivraisonSection() {
         <ReconciliationModal
           bon={bonAReconcilier} clients={clients}
           onClose={() => setBonAReconcilier(null)}
-          onCloture={(res) => { setBonAReconcilier(null); charger(); if (res.vente) setReceiptVente(res.vente); }}
+          onCloture={(res) => {
+            setBonAReconcilier(null); charger();
+            if (res.vente) setReceiptVente(res.vente);
+            if (res.avanceARembourser > 0) setInfo(`⚠ Aucun article n'a finalement été vendu, mais une avance de ${fmt(res.avanceARembourser)} F avait été perçue au départ — pense à la rembourser à la cliente.`);
+            else setInfo("");
+          }}
           onError={setError}
         />
       )}
@@ -140,6 +152,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [quantiteChoisie, setQuantiteChoisie] = useState("1");
   const [lignes, setLignes] = useState([]);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [avance, setAvance] = useState("");
+  const [avanceModePaiement, setAvanceModePaiement] = useState("especes");
 
   const resultatsClients = rechercheClient.trim()
     ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
@@ -190,15 +204,18 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     if (!clientId) { onError("Choisis une cliente existante, ou crée sa fiche (nom, téléphone, pointure et ville sont obligatoires)."); return; }
     if (!livreurNom.trim()) { onError("Le nom du livreur est obligatoire."); return; }
     if (lignes.length === 0) { onError("Ajoute au moins un article au bon de livraison."); return; }
+    const avanceNum = Number(avance) || 0;
+    if (avanceNum > 0 && !avanceModePaiement) { onError("Choisis le mode de paiement de l'avance."); return; }
     setEnvoiEnCours(true);
     try {
       const bon = await api.bonsLivraison.creer({
         boutique, clientNom, clientTelephone: clientTelephone || undefined, clientId,
         livreurNom: livreurNom.trim(), notes: notes || undefined,
+        avance: avanceNum, avanceModePaiement: avanceNum > 0 ? avanceModePaiement : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
       });
       onCree(bon);
-      retirerClient(); setLivreurNom(""); setNotes(""); setLignes([]);
+      retirerClient(); setLivreurNom(""); setNotes(""); setLignes([]); setAvance(""); setAvanceModePaiement("especes");
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
 
@@ -326,9 +343,39 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: "1px solid #EAE1D2" }}>
+                <td colSpan={3} className="text-right px-3 py-2 text-sm font-medium">Valeur totale des articles emportés</td>
+                <td className="text-right px-3 py-2 text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0))} F</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
+
+      <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+        <p className="text-sm font-medium mb-1">Avance déjà perçue de la cliente ? <span className="font-normal" style={{ color: "#6B5D52" }}>(optionnel)</span></p>
+        <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Si la cliente a déjà versé un montant avant le départ du livreur — il apparaîtra sur le ticket, et sera automatiquement déduit du reste à payer au retour.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Montant de l'avance</label>
+            <input type="number" min="0" value={avance} onChange={(e) => setAvance(e.target.value)} style={selectStyle} placeholder="0" />
+          </div>
+          {Number(avance) > 0 && (
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Mode de paiement de l'avance</label>
+              <select value={avanceModePaiement} onChange={(e) => setAvanceModePaiement(e.target.value)} style={selectStyle}>
+                {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+        {Number(avance) > 0 && lignes.length > 0 && (
+          <p className="text-xs mt-3" style={{ color: "#3F6B4A" }}>
+            Reste à payer si la cliente garde tout : {fmt(Math.max(0, lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0) - Number(avance)))} F
+          </p>
+        )}
+      </div>
 
       <div className="mb-4">
         <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Notes (optionnel)</label>
@@ -346,6 +393,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
 // TICKET IMPRIMABLE — deux exemplaires : copie livreur (à signer) + copie boutique.
 // ------------------------------------------------------------
 function BonLivraisonTicket({ bon, onClose }) {
+  const totalArticles = bon.lignes.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
+  const reste = Math.max(0, totalArticles - (bon.avance || 0));
   const corps = (mention) => (
     <div style={{ width: "280px", background: "#FFFFFF", padding: "16px", fontFamily: "monospace", fontSize: "12px", color: "#2B2320" }}>
       <p className="text-center font-bold mb-1">BON DE LIVRAISON</p>
@@ -359,6 +408,15 @@ function BonLivraisonTicket({ bon, onClose }) {
         {bon.lignes.map((l) => (
           <p key={l.id}>- {l.article?.designation || l.designation}{l.pointure ? ` T${l.pointure}` : ""} x{l.quantite} ({fmt(l.prixUnitaire)} F/u)</p>
         ))}
+      </div>
+      <div style={{ borderTop: "1px dashed #999", marginTop: "6px", paddingTop: "6px" }}>
+        <p>Valeur totale : {fmt(totalArticles)} F</p>
+        {bon.avance > 0 && (
+          <>
+            <p>Avance perçue ({bon.avanceModePaiement}) : -{fmt(bon.avance)} F</p>
+            <p style={{ fontWeight: "bold" }}>Reste à payer si tout est gardé : {fmt(reste)} F</p>
+          </>
+        )}
       </div>
       {bon.notes && <p style={{ borderTop: "1px dashed #999", marginTop: "6px", paddingTop: "6px" }}>Note : {bon.notes}</p>}
       <p className="text-center font-bold mt-4" style={{ borderTop: "2px solid #2B2320", paddingTop: "6px" }}>{mention}</p>
@@ -400,7 +458,9 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
 
   const lignesVendues = bon.lignes.filter((l) => statuts[l.id] === "VENDU");
   const totalVendu = lignesVendues.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
-  const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
+  const totalPayeSaisi = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
+  const totalPaye = totalPayeSaisi + (bon.avance || 0);
+  const resteAPercevoir = Math.max(0, totalVendu - (bon.avance || 0));
 
   const ajouterPaiement = () => setPaiements([...paiements, { id: uid(), mode: "especes", montant: "" }]);
   const majPaiement = (id, champ, val) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, [champ]: val } : p)));
@@ -408,8 +468,8 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
 
   const cloturer = async () => {
     if (lignesVendues.length > 0) {
-      if (typeVente === "Comptant" && totalPaye < totalVendu) { onError("Le total payé est inférieur au total des articles vendus."); return; }
-      if (typeVente === "Credit" && totalPaye > totalVendu) { onError("Le montant payé ne peut pas dépasser le total pour une vente à crédit."); return; }
+      if (typeVente === "Comptant" && totalPaye < totalVendu) { onError(`Le total payé (avance comprise) est inférieur au total des articles vendus. Il manque ${fmt(totalVendu - totalPaye)} F.`); return; }
+      if (typeVente === "Credit" && totalPaye > totalVendu) { onError("Le montant payé (avance comprise) ne peut pas dépasser le total pour une vente à crédit."); return; }
     }
     setEnvoiEnCours(true);
     try {
@@ -451,7 +511,12 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
 
         {lignesVendues.length > 0 && (
           <div className="rounded-xl p-4 mb-4" style={{ background: "#F1E9DC" }}>
-            <p className="text-sm font-semibold mb-3">Encaissement — {fmt(totalVendu)} F à percevoir</p>
+            <p className="text-sm font-semibold mb-1">Encaissement — {fmt(totalVendu)} F au total</p>
+            {bon.avance > 0 && (
+              <p className="text-xs mb-3 px-2 py-1.5 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                Avance déjà perçue au départ : {fmt(bon.avance)} F ({bon.avanceModePaiement}) — déjà comptée automatiquement. Il reste à percevoir aujourd'hui : <strong>{fmt(resteAPercevoir)} F</strong>.
+              </p>
+            )}
             <div className="grid sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Type de vente</label>
