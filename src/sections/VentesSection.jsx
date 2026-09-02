@@ -1027,8 +1027,10 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
         </div>
       )}
 
+      {estAdmin && (
       <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-        <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau</p>
+        <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau (création directe, cas particulier)</p>
+        <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Pour un cas exceptionnel uniquement (ex : carte promotionnelle) — pour une vraie carte physique reçue du fournisseur, utilise plutôt "Réceptionner un lot" ci-dessus.</p>
         <Field label="Numero (laisser vide pour generer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Montant (F CFA)"><input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
@@ -1042,6 +1044,7 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
         <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Boutique : <strong>{boutique}</strong> — ce montant sera compté dans le chiffre d'affaires du jour.</p>
         <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Creer la carte</button>
       </div>
+      )}
 
       <div className="space-y-2">
         {cartes.map((c) => (
