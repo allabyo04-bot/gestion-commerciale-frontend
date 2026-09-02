@@ -41,17 +41,19 @@ export default function LivraisonSection() {
 
   const [histDateDebut, setHistDateDebut] = useState("");
   const [histDateFin, setHistDateFin] = useState("");
+  const [filtreBoutique, setFiltreBoutique] = useState(""); // "" = toutes, réservé à l'admin
 
   const charger = useCallback(async () => {
     try {
+      const boutiqueParam = estAdmin ? (filtreBoutique || undefined) : undefined;
       const [enCours, historique] = await Promise.all([
-        api.bonsLivraison.lister({ statut: "EN_COURS" }),
-        api.bonsLivraison.lister({ dateDebut: histDateDebut || undefined, dateFin: histDateFin || undefined }),
+        api.bonsLivraison.lister({ statut: "EN_COURS", boutique: boutiqueParam }),
+        api.bonsLivraison.lister({ dateDebut: histDateDebut || undefined, dateFin: histDateFin || undefined, boutique: boutiqueParam }),
       ]);
       setBonsEnCours(enCours);
       setBonsHistorique(historique.filter((b) => b.statut !== "EN_COURS"));
     } catch (e) { setError(e.message); }
-  }, [histDateDebut, histDateFin]);
+  }, [histDateDebut, histDateFin, filtreBoutique, estAdmin]);
   useEffect(() => { charger(); }, [charger]);
 
   return (
@@ -63,10 +65,16 @@ export default function LivraisonSection() {
           <button onClick={() => setInfo("")} className="ml-3" style={{ color: "#B04A3B" }}><X size={14} /></button>
         </p>
       )}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4 items-center flex-wrap">
         {[["nouveau", "Nouveau bon"], ["encours", `En cours (${bonsEnCours.length})`], ["historique", "Historique"]].map(([id, label]) => (
           <button key={id} onClick={() => setSubTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={subTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
         ))}
+        {estAdmin && (subTab === "encours" || subTab === "historique") && (
+          <select value={filtreBoutique} onChange={(e) => setFiltreBoutique(e.target.value)} style={{ ...selectStyle, marginLeft: "8px" }}>
+            <option value="">Les deux boutiques</option>
+            {BOUTIQUES.map((b) => <option key={b} value={b}>{b} uniquement</option>)}
+          </select>
+        )}
       </div>
 
       {subTab === "nouveau" && (

@@ -273,10 +273,23 @@ export default function DashboardSection() {
             <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
               <Truck size={14} /> Livraisons du jour
             </p>
-            <div className="flex items-center justify-between">
-              <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Paires parties</p><p className="font-display text-2xl font-semibold">{livraisonJour.parties}</p></div>
-              <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Paires rendues</p><p className="font-display text-2xl font-semibold" style={{ color: "#3F6B4A" }}>{livraisonJour.retournees}</p></div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {livraisonJour.parBoutique?.map((b) => (
+                <div key={b.boutique}>
+                  <p className="text-xs font-medium mb-1" style={{ color: COULEUR.texteDoux }}>{b.boutique}</p>
+                  <div className="flex gap-4">
+                    <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Parties</p><p className="font-display text-lg font-semibold">{b.parties}</p></div>
+                    <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Rendues</p><p className="font-display text-lg font-semibold" style={{ color: "#3F6B4A" }}>{b.retournees}</p></div>
+                  </div>
+                </div>
+              ))}
             </div>
+            {(livraisonJour.parBoutique?.length || 0) > 1 && (
+              <div className="flex gap-6 mt-3 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total parties</p><p className="font-display text-xl font-semibold" style={{ color: COULEUR.accent }}>{livraisonJour.parties}</p></div>
+                <div><p className="text-xs" style={{ color: COULEUR.texteDoux }}>Total rendues</p><p className="font-display text-xl font-semibold" style={{ color: "#3F6B4A" }}>{livraisonJour.retournees}</p></div>
+              </div>
+            )}
           </div>
         )}
       </div>
