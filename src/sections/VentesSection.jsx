@@ -1163,28 +1163,52 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
 }
 
 function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
+  const [recherche, setRecherche] = useState("");
+  const [filtreStatut, setFiltreStatut] = useState("tous"); // "tous" | "disponible" | "utilisee" | "historique"
+
   const corriger = async (c) => {
     try { await api.bonsValeur.marquerHistorique(c.id); onCorrige(); } catch (e) { alert(e.message); }
   };
+
+  const cartesFiltrees = cartes.filter((c) => {
+    if (recherche.trim() && !c.numero.toLowerCase().includes(recherche.trim().toLowerCase())) return false;
+    if (filtreStatut === "disponible" && c.utilisee) return false;
+    if (filtreStatut === "utilisee" && !c.utilisee) return false;
+    if (filtreStatut === "historique" && c.modePaiement) return false;
+    return true;
+  });
+
   return (
-    <div className="space-y-2">
-      {cartes.map((c) => (
-        <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-          <div>
-            <p className="font-mono text-sm font-medium">{c.numero}</p>
-            <p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}{!c.modePaiement ? " · Historique" : ""}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="font-mono text-sm">{fmt(c.montant)} F</p>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisee" : "Disponible"}</span>
+    <div>
+      <div className="relative mb-3 max-w-xs">
+        <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher par numéro…" style={{ ...selectStyle, paddingLeft: "30px", width: "100%" }} />
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+      </div>
+      <div className="flex gap-2 mb-4">
+        {[["tous", "Toutes"], ["disponible", "Disponibles"], ["utilisee", "Utilisées"], ["historique", "Historiques"]].map(([id, label]) => (
+          <button key={id} onClick={() => setFiltreStatut(id)} className="text-xs px-3 py-1.5 rounded-full font-medium" style={filtreStatut === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {cartesFiltrees.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune carte ne correspond à cette recherche.</p>}
+        {cartesFiltrees.map((c) => (
+          <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+            <div>
+              <p className="font-mono text-sm font-medium">{c.numero}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}{!c.modePaiement ? " · Historique" : ""}</p>
             </div>
-            {estAdmin && c.modePaiement && (
-              <button onClick={() => { if (window.confirm(`Marquer ${c.numero} comme carte historique ? Elle sera retirée du chiffre d'affaires du jour où elle a été créée.`)) corriger(c); }} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Marquer historique</button>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="font-mono text-sm">{fmt(c.montant)} F</p>
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisee" : "Disponible"}</span>
+              </div>
+              {estAdmin && c.modePaiement && (
+                <button onClick={() => { if (window.confirm(`Marquer ${c.numero} comme carte historique ? Elle sera retirée du chiffre d'affaires du jour où elle a été créée.`)) corriger(c); }} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Marquer historique</button>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
