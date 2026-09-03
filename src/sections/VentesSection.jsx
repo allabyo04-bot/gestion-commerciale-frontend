@@ -584,7 +584,7 @@ export default function VentesSection() {
         </div>
       )}
 
-      {subTab === "retours" && <RetoursSection ventes={ventes} articles={articles} boutique={boutique} onDone={load} />}
+      {subTab === "retours" && <RetoursSection ventes={ventes} boutique={boutique} onDone={load} />}
       {subTab === "cartes" && <CartesCadeauxSection boutique={boutique} estAdmin={estAdmin} />}
       {subTab === "avoirs" && <AvoirsSection />}
       {subTab === "credit" && <CreditSection estAdmin={estAdmin} onDone={load} />}
@@ -767,20 +767,16 @@ function RemisesAdminSection({ onTraite }) {
   );
 }
 
-function RetoursSection({ ventes, articles, boutique, onDone }) {
+function RetoursSection({ ventes, boutique, onDone }) {
   const [numero, setNumero] = useState("");
   const [venteChoisie, setVenteChoisie] = useState(null);
   const [ligneChoisie, setLigneChoisie] = useState("");
   const [type, setType] = useState("Retour");
   const [quantite, setQuantite] = useState(1);
-  const [modeEchange, setModeEchange] = useState("pointure"); // "pointure" | "article"
   const [nouvellePointure, setNouvellePointure] = useState("");
-  const [rechercheNouvelArticle, setRechercheNouvelArticle] = useState("");
-  const [nouvelArticle, setNouvelArticle] = useState(null);
   const [motif, setMotif] = useState("");
   const [montantRembourse, setMontantRembourse] = useState("");
   const [dateValiditeAvoir, setDateValiditeAvoir] = useState("");
-  const [paiementsSupplement, setPaiementsSupplement] = useState([{ id: uid(), mode: "especes", montant: "" }]);
   const [error, setError] = useState("");
   const [succes, setSucces] = useState("");
   const [avoirGenere, setAvoirGenere] = useState(null);
@@ -796,24 +792,6 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
     }
   }, [type, ligne, quantite]);
 
-  const resultatsArticles = rechercheNouvelArticle.trim()
-    ? (articles || []).filter((a) => a.actif !== false && (a.designation.toLowerCase().includes(rechercheNouvelArticle.trim().toLowerCase()) || a.reference.toLowerCase().includes(rechercheNouvelArticle.trim().toLowerCase()))).slice(0, 8)
-    : [];
-
-  const qte = Math.max(1, parseInt(quantite, 10) || 1);
-  const difference = modeEchange === "article" && nouvelArticle && ligne ? (nouvelArticle.prixVente - ligne.prixUnitaire) * qte : 0;
-
-  const ajouterPaiementSupplement = () => setPaiementsSupplement([...paiementsSupplement, { id: uid(), mode: "especes", montant: "" }]);
-  const majPaiementSupplement = (id, champ, val) => setPaiementsSupplement(paiementsSupplement.map((p) => (p.id === id ? { ...p, [champ]: val } : p)));
-  const retirerPaiementSupplement = (id) => setPaiementsSupplement(paiementsSupplement.filter((p) => p.id !== id));
-  const totalPaiementSupplement = paiementsSupplement.reduce((s, p) => s + (Number(p.montant) || 0), 0);
-
-  const resetTout = () => {
-    setVenteChoisie(null); setLigneChoisie(""); setNumero(""); setMotif(""); setQuantite(1);
-    setModeEchange("pointure"); setNouvellePointure(""); setRechercheNouvelArticle(""); setNouvelArticle(null);
-    setMontantRembourse(""); setDateValiditeAvoir(""); setPaiementsSupplement([{ id: uid(), mode: "especes", montant: "" }]);
-  };
-
   const submit = async () => {
     if (!venteChoisie || !ligneChoisie) { setError("Choisis la vente et la ligne concernee."); return; }
     if (type === "Retour") {
@@ -821,39 +799,25 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
       if (!montantRembourse) { setError("Le montant de l'avoir est obligatoire."); return; }
       if (!dateValiditeAvoir) { setError("La date de validite de l'avoir est obligatoire."); return; }
     }
-    if (type === "Echange") {
-      if (!nouvellePointure) { setError("Choisis la pointure du nouvel article."); return; }
-      if (modeEchange === "article") {
-        if (!nouvelArticle) { setError("Choisis le nouvel article."); return; }
-        if (difference > 0 && totalPaiementSupplement !== difference) { setError(`Le nouvel article coûte ${fmt(difference)} F de plus — le paiement doit couvrir exactement ce supplément.`); return; }
-        if (difference < 0) {
-          if (!venteChoisie.clientId) { setError("Un client doit etre associe a cette vente pour generer un avoir."); return; }
-          if (!dateValiditeAvoir) { setError("La date de validite de l'avoir (pour la difference en sa faveur) est obligatoire."); return; }
-        }
-      }
-    }
     const clientNomAvantReset = venteChoisie.client?.nomPrenoms || "";
     try {
       const retourCree = await api.retours.create({
         venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite),
-        nouvellePointure: type === "Echange" ? nouvellePointure : undefined,
-        nouvelArticleId: type === "Echange" && modeEchange === "article" ? nouvelArticle.id : undefined,
-        paiements: type === "Echange" && modeEchange === "article" && difference > 0
-          ? paiementsSupplement.filter((p) => Number(p.montant) > 0).map((p) => ({ mode: p.mode, montant: Number(p.montant) })) : undefined,
-        motif, boutique,
+        nouvellePointure: type === "Echange" ? nouvellePointure : undefined, motif, boutique,
         montantRembourse: type === "Retour" ? Number(montantRembourse) : undefined,
-        dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : (type === "Echange" && difference < 0 ? dateValiditeAvoir : undefined),
+        dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : undefined,
       });
-      if (retourCree.bonValeurGenere) {
+      if (type === "Retour" && retourCree.bonValeurGenere) {
         setAvoirGenere(retourCree.bonValeurGenere);
         setAvoirClientNom(clientNomAvantReset);
         setSucces("");
       } else {
-        setSucces(type === "Retour" ? "Retour enregistre et stock mis a jour." : "Echange enregistre et stock mis a jour.");
+        setSucces("Echange enregistre et stock mis a jour.");
         setAvoirGenere(null);
       }
       setError("");
-      resetTout();
+      setVenteChoisie(null); setLigneChoisie(""); setNumero(""); setMotif(""); setQuantite(1); setNouvellePointure("");
+      setMontantRembourse(""); setDateValiditeAvoir("");
       onDone();
     } catch (e) { setError(e.message); }
   };
@@ -862,7 +826,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
     <div className="max-w-lg">
       {avoirGenere && (
         <div className="mb-4 px-4 py-3 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
-          <p className="font-semibold mb-1">Avoir genere pour la cliente</p>
+          <p className="font-semibold mb-1">Retour enregistre — avoir genere pour la cliente</p>
           <p className="text-sm">Numero : <span className="font-mono font-semibold">{avoirGenere.numero}</span></p>
           <p className="text-sm">Montant : <span className="font-semibold">{fmt(avoirGenere.montant)} F</span></p>
           <p className="text-sm">Valable jusqu'au : <span className="font-semibold">{new Date(avoirGenere.dateValidite).toLocaleDateString("fr-FR")}</span></p>
@@ -895,76 +859,13 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
             <Field label="Type"><select value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}><option>Retour</option><option>Echange</option></select></Field>
             <Field label="Quantite"><input type="number" min="1" max={ligne?.quantite || 1} value={quantite} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} /></Field>
           </div>
-
           {type === "Echange" && (
-            <>
-              <div className="flex gap-2 my-2">
-                {[["pointure", "Meme article, autre pointure"], ["article", "Article different"]].map(([id, label]) => (
-                  <button key={id} onClick={() => { setModeEchange(id); setNouvelArticle(null); setNouvellePointure(""); }} className="text-xs px-3 py-1.5 rounded-full font-medium" style={modeEchange === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
-                ))}
-              </div>
-
-              {modeEchange === "article" && (
-                <div className="rounded-lg p-3 mb-2" style={{ background: "#F1E9DC" }}>
-                  {!nouvelArticle ? (
-                    <div className="relative">
-                      <input value={rechercheNouvelArticle} onChange={(e) => setRechercheNouvelArticle(e.target.value)} placeholder="Rechercher le nouvel article…" style={{ ...inputStyle, marginTop: 0 }} />
-                      {resultatsArticles.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "200px", overflowY: "auto" }}>
-                          {resultatsArticles.map((a) => (
-                            <button key={a.id} onClick={() => { setNouvelArticle(a); setRechercheNouvelArticle(""); setNouvellePointure(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
-                              {a.designation} <span style={{ color: "#6B5D52" }}>({a.reference}) — {fmt(a.prixVente)} F</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{nouvelArticle.designation} — {fmt(nouvelArticle.prixVente)} F</span>
-                      <button onClick={() => { setNouvelArticle(null); setNouvellePointure(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <Field label={modeEchange === "article" ? "Pointure du nouvel article" : "Nouvelle pointure"}>
-                <select value={nouvellePointure} onChange={(e) => setNouvellePointure(e.target.value)} style={inputStyle}>
-                  <option value="">— Choisir —</option>{POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
-                </select>
-              </Field>
-
-              {modeEchange === "article" && nouvelArticle && ligne && (
-                <div className="rounded-lg p-3 mb-2" style={{ background: difference === 0 ? "#F1E9DC" : difference > 0 ? "#FBEAE7" : "#E9F0EA" }}>
-                  <p className="text-sm font-medium" style={{ color: difference === 0 ? "#6B5D52" : difference > 0 ? "#B04A3B" : "#3F6B4A" }}>
-                    {difference === 0 && "Même prix — aucun complément à gérer."}
-                    {difference > 0 && `Le nouvel article coûte ${fmt(difference)} F de plus — à faire payer (jamais remboursé en espèces).`}
-                    {difference < 0 && `La cliente a ${fmt(-difference)} F en sa faveur — un avoir sera généré (jamais remboursé en espèces).`}
-                  </p>
-
-                  {difference > 0 && (
-                    <div className="mt-3">
-                      {paiementsSupplement.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2 mb-2">
-                          <select value={p.mode} onChange={(e) => majPaiementSupplement(p.id, "mode", e.target.value)} style={{ ...inputStyle, marginTop: 0, flex: 1 }}>
-                            {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                          </select>
-                          <input type="number" value={p.montant} onChange={(e) => majPaiementSupplement(p.id, "montant", e.target.value)} placeholder="Montant" style={{ ...inputStyle, marginTop: 0, width: "120px" }} />
-                          {paiementsSupplement.length > 1 && <button onClick={() => retirerPaiementSupplement(p.id)} style={{ color: "#B04A3B" }}><X size={14} /></button>}
-                        </div>
-                      ))}
-                      <button onClick={ajouterPaiementSupplement} className="text-xs" style={{ color: "#8C3B2E" }}>+ Ajouter un mode de paiement</button>
-                      <p className="text-xs mt-2" style={{ color: totalPaiementSupplement === difference ? "#3F6B4A" : "#B04A3B" }}>Payé : {fmt(totalPaiementSupplement)} F / {fmt(difference)} F attendu</p>
-                    </div>
-                  )}
-                  {difference < 0 && (
-                    <Field label="Date de validite de l'avoir"><input type="date" value={dateValiditeAvoir} onChange={(e) => setDateValiditeAvoir(e.target.value)} style={inputStyle} /></Field>
-                  )}
-                </div>
-              )}
-            </>
+            <Field label="Nouvelle pointure">
+              <select value={nouvellePointure} onChange={(e) => setNouvellePointure(e.target.value)} style={inputStyle}>
+                <option value="">— Choisir —</option>{POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+              </select>
+            </Field>
           )}
-
           {type === "Retour" && (
             <div className="rounded-lg p-3 mt-1 mb-1" style={{ background: "#F1E9DC" }}>
               <p className="text-xs font-medium mb-2" style={{ color: "#6B5D52" }}>Un avoir sera genere automatiquement pour la cliente — aucun remboursement en especes.</p>
