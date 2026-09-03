@@ -1157,17 +1157,34 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
       </div>
       )}
 
-      <div className="space-y-2">
-        {cartes.map((c) => (
-          <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-            <div><p className="font-mono text-sm font-medium">{c.numero}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p></div>
+      <CartesCadeauxListeSection estAdmin={estAdmin} cartes={cartes} onCorrige={load} />
+    </div>
+  );
+}
+
+function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
+  const corriger = async (c) => {
+    try { await api.bonsValeur.marquerHistorique(c.id); onCorrige(); } catch (e) { alert(e.message); }
+  };
+  return (
+    <div className="space-y-2">
+      {cartes.map((c) => (
+        <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+          <div>
+            <p className="font-mono text-sm font-medium">{c.numero}</p>
+            <p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}{!c.modePaiement ? " · Historique" : ""}</p>
+          </div>
+          <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="font-mono text-sm">{fmt(c.montant)} F</p>
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.utilisee ? "#FBEAE7" : "#E9F0EA", color: c.utilisee ? "#B04A3B" : "#3F6B4A" }}>{c.utilisee ? "Utilisee" : "Disponible"}</span>
             </div>
+            {estAdmin && c.modePaiement && (
+              <button onClick={() => { if (window.confirm(`Marquer ${c.numero} comme carte historique ? Elle sera retirée du chiffre d'affaires du jour où elle a été créée.`)) corriger(c); }} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Marquer historique</button>
+            )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

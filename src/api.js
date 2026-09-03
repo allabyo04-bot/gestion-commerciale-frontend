@@ -200,6 +200,7 @@ creditListe: (params = {}) => {
     list: (type) => request(`/api/bons-valeur${type ? `?type=${encodeURIComponent(type)}` : ""}`),
     create: (data) => request("/api/bons-valeur", { method: "POST", body: data }),
     verifier: (numero) => request(`/api/bons-valeur/${encodeURIComponent(numero)}/verifier`),
+    marquerHistorique: (id) => request(`/api/bons-valeur/${id}/marquer-historique`, { method: "PUT" }),
   },
  retours: {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
