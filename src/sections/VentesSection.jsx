@@ -1181,7 +1181,7 @@ function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
   return (
     <div>
       <div className="relative mb-3 max-w-xs">
-        <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher par numéro…" style={{ ...selectStyle, paddingLeft: "30px", width: "100%" }} />
+        <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher par numéro…" style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px", width: "100%" }} />
         <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
       </div>
       <div className="flex gap-2 mb-4">
