@@ -472,12 +472,12 @@ function BonLivraisonTicket({ bon, onClose }) {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
-      <div className="rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9" }}>
+      <div className="print-area rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9" }}>
         <div className="no-print flex items-center justify-between mb-4">
           <p className="font-display text-lg font-semibold">Bon {bon.numero}</p>
           <button onClick={onClose} style={{ color: "#6B5D52" }}><X size={18} /></button>
         </div>
-        <div id="ticket-livraison-print">
+        <div>
           {corps("COPIE LIVREUR — À SIGNER")}
           <div style={{ borderTop: "2px dashed #999", margin: "16px 0" }} />
           {corps("COPIE BOUTIQUE")}
