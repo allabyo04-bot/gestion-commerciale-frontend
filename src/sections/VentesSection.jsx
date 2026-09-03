@@ -979,7 +979,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
             </div>
           )}
           <Field label="Motif (optionnel)"><input value={motif} onChange={(e) => setMotif(e.target.value)} style={inputStyle} /></Field>
-          <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer le {type === "Retour" ? "retour" : "echange"}</button>
+          <button onClick={submit} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><RotateCcw size={15} /> Enregistrer {type === "Retour" ? "le retour" : "l'échange"}</button>
         </>
       )}
 
