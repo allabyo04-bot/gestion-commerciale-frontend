@@ -577,6 +577,7 @@ export default function VentesSection() {
                   {v.statut !== "Annulee" && (
                     <button onClick={(e) => { e.stopPropagation(); setVenteAAnnuler(v); setMotifAnnulation(""); setError(""); }} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Annuler</button>
                   )}
+                  <span className="text-xs hidden sm:inline" style={{ color: "#A89A87" }}>Voir le détail →</span>
                 </div>
               </div>
             ))}
