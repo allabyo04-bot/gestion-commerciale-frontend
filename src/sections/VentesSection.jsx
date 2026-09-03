@@ -1032,6 +1032,7 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   const [montant, setMontant] = useState("");
   const [dateValidite, setDateValidite] = useState("");
   const [modePaiement, setModePaiement] = useState("especes");
+  const [historique, setHistorique] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -1075,8 +1076,8 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   const creer = async () => {
     if (!montant) { setError("Le montant est obligatoire."); return; }
     try {
-      await api.bonsValeur.create({ numero: numero.trim() || undefined, montant: Number(montant), dateValidite: dateValidite || undefined, boutique, modePaiement });
-      setNumero(""); setMontant(""); setDateValidite(""); setError(""); load();
+      await api.bonsValeur.create({ numero: numero.trim() || undefined, montant: Number(montant), dateValidite: dateValidite || undefined, boutique, modePaiement: historique ? undefined : modePaiement, historique });
+      setNumero(""); setMontant(""); setDateValidite(""); setHistorique(false); setError(""); load();
     } catch (e) { setError(e.message); }
   };
 
@@ -1131,17 +1132,27 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
       <div className="rounded-xl p-5 mb-6 max-w-md" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="font-display font-semibold mb-3 flex items-center gap-2"><Gift size={16} /> Nouvelle carte cadeau (création directe, cas particulier)</p>
         <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Pour un cas exceptionnel uniquement (ex : carte promotionnelle) — pour une vraie carte physique reçue du fournisseur, utilise plutôt "Réceptionner un lot" ci-dessus.</p>
+        <label className="flex items-center gap-2 mb-3 text-sm" style={{ color: "#6B5D52" }}>
+          <input type="checkbox" checked={historique} onChange={(e) => setHistorique(e.target.checked)} />
+          Carte ancienne, vendue avant ce logiciel (aucun encaissement aujourd'hui)
+        </label>
         <Field label="Numero (laisser vide pour generer automatiquement)"><input value={numero} onChange={(e) => setNumero(e.target.value)} style={inputStyle} placeholder="Ex : CG-0001" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Montant (F CFA)"><input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} style={inputStyle} /></Field>
           <Field label="Validite (optionnel)"><input type="date" value={dateValidite} onChange={(e) => setDateValidite(e.target.value)} style={inputStyle} /></Field>
         </div>
-        <Field label="Mode de paiement reçu">
-          <select value={modePaiement} onChange={(e) => setModePaiement(e.target.value)} style={inputStyle}>
-            {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
-        </Field>
-        <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>Boutique : <strong>{boutique}</strong> — ce montant sera compté dans le chiffre d'affaires du jour.</p>
+        {!historique && (
+          <Field label="Mode de paiement reçu">
+            <select value={modePaiement} onChange={(e) => setModePaiement(e.target.value)} style={inputStyle}>
+              {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </Field>
+        )}
+        <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
+          {historique
+            ? "Carte enregistrée sans impact sur la caisse — ni encaissement, ni sortie de stock comptée aujourd'hui."
+            : <>Boutique : <strong>{boutique}</strong> — ce montant sera compté dans le chiffre d'affaires du jour.</>}
+        </p>
         <button onClick={creer} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}><Plus size={16} /> Creer la carte</button>
       </div>
       )}
