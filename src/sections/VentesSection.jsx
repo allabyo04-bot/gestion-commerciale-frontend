@@ -1165,13 +1165,20 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
 function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
   const [recherche, setRecherche] = useState("");
   const [filtreStatut, setFiltreStatut] = useState("tous"); // "tous" | "disponible" | "utilisee" | "historique"
+  const [filtreMontant, setFiltreMontant] = useState("");
 
   const corriger = async (c) => {
     try { await api.bonsValeur.marquerHistorique(c.id); onCorrige(); } catch (e) { alert(e.message); }
   };
+  const supprimer = async (c) => {
+    try { await api.bonsValeur.remove(c.id); onCorrige(); } catch (e) { alert(e.message); }
+  };
+
+  const montantsDisponibles = [...new Set(cartes.map((c) => c.montant))].sort((a, b) => a - b);
 
   const cartesFiltrees = cartes.filter((c) => {
     if (recherche.trim() && !c.numero.toLowerCase().includes(recherche.trim().toLowerCase())) return false;
+    if (filtreMontant && c.montant !== Number(filtreMontant)) return false;
     if (filtreStatut === "disponible" && c.utilisee) return false;
     if (filtreStatut === "utilisee" && !c.utilisee) return false;
     if (filtreStatut === "historique" && c.modePaiement) return false;
@@ -1180,9 +1187,15 @@ function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
 
   return (
     <div>
-      <div className="relative mb-3 max-w-xs">
-        <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher par numéro…" style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px", width: "100%" }} />
-        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <div className="relative max-w-xs flex-1" style={{ minWidth: "200px" }}>
+          <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher par numéro…" style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px", width: "100%" }} />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+        </div>
+        <select value={filtreMontant} onChange={(e) => setFiltreMontant(e.target.value)} style={{ ...inputStyle, marginTop: 0, width: "auto" }}>
+          <option value="">Tous les montants</option>
+          {montantsDisponibles.map((m) => <option key={m} value={m}>{fmt(m)} F</option>)}
+        </select>
       </div>
       <div className="flex gap-2 mb-4">
         {[["tous", "Toutes"], ["disponible", "Disponibles"], ["utilisee", "Utilisées"], ["historique", "Historiques"]].map(([id, label]) => (
@@ -1204,6 +1217,9 @@ function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
               </div>
               {estAdmin && c.modePaiement && (
                 <button onClick={() => { if (window.confirm(`Marquer ${c.numero} comme carte historique ? Elle sera retirée du chiffre d'affaires du jour où elle a été créée.`)) corriger(c); }} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Marquer historique</button>
+              )}
+              {estAdmin && !c.utilisee && !c.origineVenteId && (
+                <button onClick={() => { if (window.confirm(`Supprimer définitivement la carte ${c.numero} ? Cette action est irréversible.`)) supprimer(c); }} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #B04A3B", color: "#B04A3B" }}>Supprimer</button>
               )}
             </div>
           </div>

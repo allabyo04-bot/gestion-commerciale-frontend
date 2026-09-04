@@ -201,6 +201,7 @@ creditListe: (params = {}) => {
     create: (data) => request("/api/bons-valeur", { method: "POST", body: data }),
     verifier: (numero) => request(`/api/bons-valeur/${encodeURIComponent(numero)}/verifier`),
     marquerHistorique: (id) => request(`/api/bons-valeur/${id}/marquer-historique`, { method: "PUT" }),
+    remove: (id) => request(`/api/bons-valeur/${id}`, { method: "DELETE" }),
   },
  retours: {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
