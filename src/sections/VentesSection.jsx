@@ -151,8 +151,21 @@ export default function VentesSection() {
   };
   const removeLigne = (id) => setLignes(lignes.filter((l) => l.id !== id));
 
-  const addPaiement = (mode) => setPaiements([...paiements, { id: uid(), mode, montant: reste > 0 ? reste : "", carteNumero: "" }]);
+  const addPaiement = (mode) => setPaiements([...paiements, { id: uid(), mode, montant: (mode === "bon_achat" || mode === "avoir") ? "" : (reste > 0 ? reste : ""), carteNumero: "" }]);
   const updatePaiement = (id, patch) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  // Une fois le numero de carte/avoir tape (au blur du champ), on va chercher sa vraie valeur —
+  // jamais le total de la facture, meme si la carte vaut moins que ce qui reste a payer.
+  const verifierEtRemplirCarte = async (p) => {
+    if (!p.carteNumero?.trim()) return;
+    try {
+      const bon = await api.bonsValeur.verifier(p.carteNumero.trim());
+      const resteActualise = totalNet - paiements.filter((x) => x.id !== p.id).reduce((s, x) => s + (Number(x.montant) || 0), 0);
+      updatePaiement(p.id, { montant: Math.min(bon.montant, Math.max(0, resteActualise)) });
+    } catch (e) {
+      // Numero invalide ou deja utilise — on laisse le montant tel quel, validerVente() donnera
+      // le vrai message d'erreur au moment de valider si le numero est toujours mauvais.
+    }
+  };
   const removePaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
   const [verificationCarteEnCours, setVerificationCarteEnCours] = useState(false);
@@ -510,7 +523,7 @@ export default function VentesSection() {
                         <button onClick={() => removePaiement(p.id)} style={{ color: "#B04A3B" }}><Minus size={14} /></button>
                       </div>
                       {(p.mode === "bon_achat" || p.mode === "avoir") && (
-                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} placeholder={p.mode === "avoir" ? "Numero de l'avoir" : "Numero de la carte cadeau"} style={{ ...inputStyle, marginTop: "6px" }} />
+                        <input value={p.carteNumero} onChange={(e) => updatePaiement(p.id, { carteNumero: e.target.value })} onBlur={() => verifierEtRemplirCarte(p)} placeholder={p.mode === "avoir" ? "Numero de l'avoir" : "Numero de la carte cadeau"} style={{ ...inputStyle, marginTop: "6px" }} />
                       )}
                     </div>
                   );
@@ -1361,7 +1374,7 @@ function CreditSection({ estAdmin, onDone }) {
             {error && <p className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
             <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Reste a payer : {fmt(venteSel.resteAPayer)} F</p>
             <Field label="Mode de paiement">
-              <select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>
+              <select value={mode} onChange={(e) => { const m = e.target.value; setMode(m); if (m === "bon_achat" || m === "avoir") setMontant(""); else setMontant(venteSel.resteAPayer); }} style={inputStyle}>
                 {MODES_PAIEMENT.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </Field>
@@ -1370,7 +1383,10 @@ function CreditSection({ estAdmin, onDone }) {
             </Field>
             {(mode === "bon_achat" || mode === "avoir") && (
               <Field label={mode === "avoir" ? "Numero de l'avoir" : "Numero de la carte cadeau"}>
-                <input value={carteNumero} onChange={(e) => setCarteNumero(e.target.value)} style={inputStyle} />
+                <input value={carteNumero} onChange={(e) => setCarteNumero(e.target.value)} onBlur={async () => {
+                  if (!carteNumero.trim()) return;
+                  try { const bon = await api.bonsValeur.verifier(carteNumero.trim()); setMontant(Math.min(bon.montant, venteSel.resteAPayer)); } catch (e) { /* le message d'erreur sortira a la validation */ }
+                }} style={inputStyle} />
               </Field>
             )}
             <button onClick={enregistrerReglement} className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Valider le reglement</button>
