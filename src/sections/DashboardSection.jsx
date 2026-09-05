@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { fmt, MOIS, LIVRAISON_ACTIF } from "../constants.js";
+import { fmt, MOIS, LIVRAISON_ACTIF, MODES_PAIEMENT } from "../constants.js";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -31,6 +31,7 @@ export default function DashboardSection() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [caJour, setCaJour] = useState(null);
+  const [modesJour, setModesJour] = useState(null);
   const [caMois, setCaMois] = useState(null);
   const [alertesStock, setAlertesStock] = useState([]);
   const [credits, setCredits] = useState(null);
@@ -58,6 +59,9 @@ export default function DashboardSection() {
           const resMois = await api.etats.parDate({ dateDebut: debutMoisISO(), dateFin: jour });
           setCaMois({ cumul: { nombreVentes: resMois.nombre, totalVentes: resMois.total } });
         }
+
+        api.etats.parModePaiement({ dateDebut: jour, dateFin: jour, ...(estAdmin ? {} : { boutique: user.boutique }) })
+          .then(setModesJour).catch(() => {});
 
         const paramsBoutique = estAdmin ? {} : { boutique: user.boutique };
         const [creditListe, vendeurRes] = await Promise.all([
@@ -167,6 +171,30 @@ export default function DashboardSection() {
             </p>
             <p className="font-display text-3xl font-semibold">{caMois?.cumul.nombreVentes ?? "…"}</p>
             {caMois && <p className="text-sm mt-1" style={{ color: COULEUR.texteDoux }}>{fmt(caMois.cumul.totalVentes)} F cumulés</p>}
+          </div>
+        </div>
+      )}
+
+      {peutVoirVentes && modesJour && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+          <p className="text-xs font-mono uppercase tracking-wide mb-1 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+            <Wallet size={14} /> Encaissements du jour, par mode de paiement
+          </p>
+          <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>Le chiffre d'affaires ci-dessus, c'est la valeur des articles vendus aujourd'hui. Ici, c'est comment ça a été payé — utile pour vérifier ce qui doit vraiment être en espèces dans le tiroir.</p>
+          <div className="flex flex-wrap gap-4">
+            {modesJour.recap.length === 0 && <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Aucun encaissement aujourd'hui.</p>}
+            {modesJour.recap.map((r) => {
+              const estCarteOuAvoir = r.mode === "bon_achat" || r.mode === "avoir";
+              return (
+                <div key={r.mode} className="rounded-xl px-3 py-2" style={{ background: estCarteOuAvoir ? "#FBEAE7" : "#F1E9DC" }}>
+                  <p className="text-xs" style={{ color: estCarteOuAvoir ? "#B04A3B" : COULEUR.texteDoux }}>
+                    {MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}
+                    {estCarteOuAvoir ? " (déjà encaissé avant)" : ""}
+                  </p>
+                  <p className="font-display text-base font-semibold" style={{ color: estCarteOuAvoir ? "#B04A3B" : COULEUR.texte }}>{fmt(r.montant)} F</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
