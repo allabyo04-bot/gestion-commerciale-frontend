@@ -184,6 +184,7 @@ ajouterStock: (id, boutique, pointure, quantite) =>
       return request(`/api/ventes${qs ? `?${qs}` : ""}`);
     },
     create: (data) => request("/api/ventes", { method: "POST", body: data }),
+    rechercheParNumero: (numero) => request(`/api/ventes/recherche/${encodeURIComponent(numero)}`),
 creditListe: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/ventes/credit/liste${qs ? `?${qs}` : ""}`);

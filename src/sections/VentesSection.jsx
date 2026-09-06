@@ -801,7 +801,16 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
   const [avoirClientNom, setAvoirClientNom] = useState("");
   const [avoirReceipt, setAvoirReceipt] = useState(null);
 
-  const resultats = numero.trim() ? ventes.filter((v) => v.numero.toLowerCase().includes(numero.toLowerCase())) : [];
+  const [rechercheEnCours, setRechercheEnCours] = useState(false);
+  const rechercherVente = async () => {
+    if (!numero.trim()) return;
+    setRechercheEnCours(true);
+    setError(""); setVenteChoisie(null); setAvoirGenere(null);
+    try {
+      const v = await api.ventes.rechercheParNumero(numero.trim());
+      setVenteChoisie(v);
+    } catch (e) { setError(e.message); } finally { setRechercheEnCours(false); }
+  };
   const ligne = venteChoisie?.lignes.find((l) => l.id === ligneChoisie);
 
   useEffect(() => {
@@ -887,15 +896,12 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
 
       <Field label="Numero de recu">
-        <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} style={inputStyle} placeholder="REC-000123" />
-      </Field>
-      {resultats.length > 0 && !venteChoisie && (
-        <div className="mt-2 rounded-lg overflow-hidden" style={{ border: "1px solid #DDD3C4" }}>
-          {resultats.slice(0, 5).map((v) => (
-            <button key={v.id} onClick={() => setVenteChoisie(v)} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>{v.numero} — {fmt(v.total)} F ({v.boutique})</button>
-          ))}
+        <div className="flex gap-2">
+          <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} onKeyDown={(e) => e.key === "Enter" && rechercherVente()} style={inputStyle} placeholder="REC-000123" />
+          <button onClick={rechercherVente} disabled={rechercheEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: rechercheEnCours ? 0.6 : 1 }}>{rechercheEnCours ? "..." : "Rechercher"}</button>
         </div>
-      )}
+      </Field>
+      <p className="text-xs -mt-2 mb-3" style={{ color: "#6B5D52" }}>Fonctionne pour un reçu de n'importe quel jour — tape le numéro complet.</p>
 
       {venteChoisie && (
         <>
