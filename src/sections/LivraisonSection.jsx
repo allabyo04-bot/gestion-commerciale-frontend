@@ -42,6 +42,12 @@ export default function LivraisonSection() {
   const [histDateDebut, setHistDateDebut] = useState("");
   const [histDateFin, setHistDateFin] = useState("");
   const [filtreBoutique, setFiltreBoutique] = useState(""); // "" = toutes, réservé à l'admin
+  const [rechercheEnCours, setRechercheEnCours] = useState("");
+  const bonsEnCoursFiltres = bonsEnCours.filter((b) => {
+    if (!rechercheEnCours.trim()) return true;
+    const q = rechercheEnCours.trim().toLowerCase();
+    return (b.lieuLivraison || "").toLowerCase().includes(q) || b.clientNom.toLowerCase().includes(q) || (b.clientTelephone || "").includes(q);
+  });
 
   const charger = useCallback(async () => {
     try {
@@ -88,13 +94,21 @@ export default function LivraisonSection() {
 
       {subTab === "encours" && (
         <div className="space-y-3">
+          {bonsEnCours.length > 0 && (
+            <div className="relative max-w-md mb-2">
+              <input value={rechercheEnCours} onChange={(e) => setRechercheEnCours(e.target.value)} placeholder="Rechercher par lieu, nom ou téléphone…" style={{ ...selectStyle, paddingLeft: "32px", width: "100%" }} />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+            </div>
+          )}
           {bonsEnCours.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun bon de livraison en cours.</p>}
-          {bonsEnCours.map((b) => (
+          {bonsEnCoursFiltres.length === 0 && bonsEnCours.length > 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune livraison ne correspond à cette recherche.</p>}
+          {bonsEnCoursFiltres.map((b) => (
             <div key={b.id} className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="font-medium text-sm">{b.numero} — {b.clientNom} {b.clientTelephone ? `(${b.clientTelephone})` : ""}</p>
-                  <p className="text-xs" style={{ color: "#6B5D52" }}>{b.boutique} · livreur : {b.livreurNom || "—"} · parti le {new Date(b.dateCreation).toLocaleString("fr-FR")}</p>
+                  {b.lieuLivraison && <p className="text-xs mt-0.5 font-medium" style={{ color: "#8C3B2E" }}>📍 {b.lieuLivraison}</p>}
+                  <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{b.boutique} · livreur : {b.livreurNom || "—"} · parti le {new Date(b.dateCreation).toLocaleString("fr-FR")}</p>
                   <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{b.lignes.map((l) => `${l.article.designation}${l.pointure ? ` T${l.pointure}` : ""} x${l.quantite}`).join(", ")}</p>
                 </div>
                 <div className="flex gap-2">
@@ -138,6 +152,7 @@ export default function LivraisonSection() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="font-medium text-sm">{b.numero} — {b.clientNom}</p>
+                  {b.lieuLivraison && <p className="text-xs" style={{ color: "#8C3B2E" }}>📍 {b.lieuLivraison}</p>}
                   <p className="text-xs" style={{ color: "#6B5D52" }}>
                     {b.boutique} · {b.statut === "ANNULE" ? "Annulé" : `Clôturé le ${new Date(b.dateCloture).toLocaleString("fr-FR")} par ${b.cloturePar?.prenom || ""}`}
                     {b.venteGeneree ? ` · Vente ${b.venteGeneree.numero} (${fmt(b.venteGeneree.total)} F)` : ""}
@@ -179,6 +194,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [clientId, setClientId] = useState("");
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
+  const [lieuLivraison, setLieuLivraison] = useState("");
   const [livreurNom, setLivreurNom] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -226,12 +242,12 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     try {
       const bon = await api.bonsLivraison.creer({
         boutique, clientNom: clientNom.trim() || "Cliente", clientTelephone: clientTelephone.trim(), clientId: clientId || undefined,
-        livreurNom: livreurNom.trim(), notes: notes || undefined,
+        lieuLivraison: lieuLivraison.trim() || undefined, livreurNom: livreurNom.trim(), notes: notes || undefined,
         avance: avanceNum, avanceModePaiement: avanceNum > 0 ? avanceModePaiement : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
       });
       onCree(bon);
-      retirerClient(); setLivreurNom(""); setNotes(""); setLignes([]); setAvance(""); setAvanceModePaiement("especes");
+      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setAvance(""); setAvanceModePaiement("especes");
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
 
@@ -286,6 +302,12 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
               ))}
             </div>
           )}
+        </div>
+
+        <div className="mt-3">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Lieu de livraison (quartier, adresse…)</label>
+          <input value={lieuLivraison} onChange={(e) => setLieuLivraison(e.target.value)} style={selectStyle} placeholder="Ex : Angré 8e Tranche, Cocody Riviera…" />
+          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Aide à retrouver la bonne livraison au retour du livreur, surtout quand plusieurs sont en cours en même temps.</p>
         </div>
       </div>
 
@@ -398,6 +420,7 @@ function BonLivraisonTicket({ bon, onClose }) {
       <p style={{ borderTop: "1px dashed #999", paddingTop: "6px" }}>{bon.boutique}</p>
       <p>Client : {bon.clientNom}</p>
       {bon.clientTelephone && <p>Tél : {bon.clientTelephone}</p>}
+      {bon.lieuLivraison && <p>Lieu : {bon.lieuLivraison}</p>}
       <p>Livreur : {bon.livreurNom || "—"}</p>
       <p>Date : {new Date(bon.dateCreation).toLocaleString("fr-FR")}</p>
       <div style={{ borderTop: "1px dashed #999", marginTop: "6px", paddingTop: "6px" }}>
@@ -485,7 +508,8 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
           <p className="font-display text-lg font-semibold">Retour du livreur — {bon.numero}</p>
           <button onClick={onClose} style={{ color: "#6B5D52" }}><X size={18} /></button>
         </div>
-        <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>{bon.clientNom}{bon.clientTelephone ? ` · ${bon.clientTelephone}` : ""} · {bon.boutique}</p>
+        <p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{bon.clientNom}{bon.clientTelephone ? ` · ${bon.clientTelephone}` : ""} · {bon.boutique}</p>
+        {bon.lieuLivraison && <p className="text-xs mb-4 font-medium" style={{ color: "#8C3B2E" }}>📍 {bon.lieuLivraison}</p>}
 
         <div className="space-y-2 mb-5">
           {bon.lignes.map((l) => (
