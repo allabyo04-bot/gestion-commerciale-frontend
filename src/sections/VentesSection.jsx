@@ -1078,6 +1078,10 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
   const toggleDenomination = async (d) => {
     try { await api.denominationsCartesCadeaux.activer(d.id, !d.actif); chargerDenominations(); } catch (e) { setError(e.message); }
   };
+  const supprimerDenomination = async (d) => {
+    if (!window.confirm(`Supprimer définitivement le montant ${fmt(d.montant)} F ?`)) return;
+    try { await api.denominationsCartesCadeaux.supprimer(d.id); chargerDenominations(); } catch (e) { setError(e.message); }
+  };
   const ouvrirStockage = (d) => { setStockageOuvertId(d.id); setStockageBoutique(BOUTIQUES[0]); setStockageNumeros(""); setInfo(""); };
   const enregistrerStockage = async (d) => {
     if (!stockageNumeros.trim()) { setError("Colle la liste des numéros reçus (un par ligne)."); return; }
@@ -1124,6 +1128,7 @@ function CartesCadeauxSection({ boutique, estAdmin }) {
                     ))}
                   </div>
                   <button onClick={() => ouvrirStockage(d)} className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>Réceptionner un lot</button>
+                  <button onClick={() => supprimerDenomination(d)} className="text-xs px-2 py-1 rounded-lg" style={{ border: "1px solid #B04A3B", color: "#B04A3B" }}>Supprimer</button>
                 </div>
                 {stockageOuvertId === d.id && (
                   <div className="mt-3 pt-3" style={{ borderTop: "1px solid #DDD3C4" }}>

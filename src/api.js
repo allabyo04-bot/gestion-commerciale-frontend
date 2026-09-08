@@ -142,6 +142,7 @@ ajouterStock: (id, boutique, pointure, quantite) =>
     lister: (tous) => request(`/api/denominations-cartes-cadeaux${tous ? "?tous=1" : ""}`),
     creer: (montant) => request("/api/denominations-cartes-cadeaux", { method: "POST", body: { montant } }),
     activer: (id, actif) => request(`/api/denominations-cartes-cadeaux/${id}`, { method: "PUT", body: { actif } }),
+    supprimer: (id) => request(`/api/denominations-cartes-cadeaux/${id}`, { method: "DELETE" }),
     stockerNumeros: (id, boutique, numeros) => request(`/api/denominations-cartes-cadeaux/${id}/stocker-numeros`, { method: "POST", body: { boutique, numeros } }),
     verifierCarte: (numero, boutique) => request(`/api/denominations-cartes-cadeaux/verifier/${encodeURIComponent(numero)}${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
     resume: () => request("/api/denominations-cartes-cadeaux/resume"),
