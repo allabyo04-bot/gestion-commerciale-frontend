@@ -146,6 +146,18 @@ export default function LivraisonSection() {
               </div>
             </div>
           </div>
+          {bonsHistorique.length > 0 && (
+            <div className="flex items-center gap-6 px-1 mb-1">
+              <div>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>Livraisons clôturées sur cette période</p>
+                <p className="font-display text-lg font-semibold">{bonsHistorique.length}</p>
+              </div>
+              <div>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>Montant total généré</p>
+                <p className="font-display text-lg font-semibold" style={{ color: "#8C3B2E" }}>{fmt(bonsHistorique.reduce((s, b) => s + (b.venteGeneree?.total || 0), 0))} F</p>
+              </div>
+            </div>
+          )}
           {bonsHistorique.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun bon clôturé sur cette période.</p>}
           {bonsHistorique.map((b) => (
             <div key={b.id} className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
