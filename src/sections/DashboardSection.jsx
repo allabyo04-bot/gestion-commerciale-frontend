@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet, X } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fmt, MOIS, LIVRAISON_ACTIF, MODES_PAIEMENT } from "../constants.js";
@@ -32,6 +32,7 @@ export default function DashboardSection() {
   const [erreur, setErreur] = useState("");
   const [caJour, setCaJour] = useState(null);
   const [modesJour, setModesJour] = useState(null);
+  const [detailOuvert, setDetailOuvert] = useState(null); // { titre, lignes } | null
   const [caMois, setCaMois] = useState(null);
   const [alertesStock, setAlertesStock] = useState([]);
   const [credits, setCredits] = useState(null);
@@ -185,22 +186,48 @@ export default function DashboardSection() {
             {modesJour.recap.length === 0 && <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Aucun encaissement aujourd'hui.</p>}
             {modesJour.recap.map((r) => {
               const estCarteOuAvoir = r.mode === "bon_achat" || r.mode === "avoir";
+              const libelle = MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode;
               return (
-                <div key={r.mode} className="rounded-xl px-3 py-2" style={{ background: estCarteOuAvoir ? "#FBEAE7" : "#F1E9DC" }}>
+                <button key={r.mode} onClick={() => setDetailOuvert({ titre: libelle, lignes: r.detail })} className="rounded-xl px-3 py-2 text-left" style={{ background: estCarteOuAvoir ? "#FBEAE7" : "#F1E9DC", cursor: "pointer" }}>
                   <p className="text-xs" style={{ color: estCarteOuAvoir ? "#B04A3B" : COULEUR.texteDoux }}>
-                    {MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}
+                    {libelle}
                     {estCarteOuAvoir ? " (déjà encaissé avant)" : ""}
                   </p>
                   <p className="font-display text-base font-semibold" style={{ color: estCarteOuAvoir ? "#B04A3B" : COULEUR.texte }}>{fmt(r.montant)} F</p>
-                </div>
+                </button>
               );
             })}
             {modesJour.totalCredit > 0 && (
-              <div className="rounded-xl px-3 py-2" style={{ background: "#F1E9DC", border: "1px dashed #A8823D" }}>
+              <button onClick={() => setDetailOuvert({ titre: "Crédit (à encaisser plus tard)", lignes: modesJour.creditDetail })} className="rounded-xl px-3 py-2 text-left" style={{ background: "#F1E9DC", border: "1px dashed #A8823D", cursor: "pointer" }}>
                 <p className="text-xs" style={{ color: "#A8823D" }}>Crédit (à encaisser plus tard)</p>
                 <p className="font-display text-base font-semibold" style={{ color: "#A8823D" }}>{fmt(modesJour.totalCredit)} F</p>
-              </div>
+              </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {detailOuvert && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+          <div className="rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto" style={{ background: "#FFFDF9" }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display text-lg font-semibold">{detailOuvert.titre}</p>
+              <button onClick={() => setDetailOuvert(null)} style={{ color: COULEUR.texteDoux }}><X size={18} /></button>
+            </div>
+            {(!detailOuvert.lignes || detailOuvert.lignes.length === 0) && (
+              <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Aucun détail disponible.</p>
+            )}
+            <div className="space-y-2">
+              {detailOuvert.lignes?.map((l, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: COULEUR.fond }}>
+                  <div>
+                    <p className="text-sm font-medium">{l.venteNumero}</p>
+                    <p className="text-xs" style={{ color: COULEUR.texteDoux }}>{l.clientNom} · {new Date(l.heure).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                  <p className="font-mono text-sm font-medium">{fmt(l.montant)} F</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
