@@ -195,6 +195,12 @@ export default function DashboardSection() {
                 </div>
               );
             })}
+            {modesJour.totalCredit > 0 && (
+              <div className="rounded-xl px-3 py-2" style={{ background: "#F1E9DC", border: "1px dashed #A8823D" }}>
+                <p className="text-xs" style={{ color: "#A8823D" }}>Crédit (à encaisser plus tard)</p>
+                <p className="font-display text-base font-semibold" style={{ color: "#A8823D" }}>{fmt(modesJour.totalCredit)} F</p>
+              </div>
+            )}
           </div>
         </div>
       )}
