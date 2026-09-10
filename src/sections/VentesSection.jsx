@@ -811,6 +811,34 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
       setVenteChoisie(v);
     } catch (e) { setError(e.message); } finally { setRechercheEnCours(false); }
   };
+
+  // Recherche alternative par nom ou téléphone, pour une cliente qui n'a pas gardé son reçu —
+  // affiche tout son historique d'achats, puis on choisit la bonne vente dedans.
+  const [modeRecherche, setModeRecherche] = useState("numero"); // "numero" | "client"
+  const [rechercheClient, setRechercheClient] = useState("");
+  const [clientsTrouves, setClientsTrouves] = useState([]);
+  const [clientChoisi, setClientChoisi] = useState(null);
+  const [ventesClient, setVentesClient] = useState([]);
+  const rechercherClient = async () => {
+    if (!rechercheClient.trim()) return;
+    setRechercheEnCours(true);
+    setError(""); setVenteChoisie(null); setAvoirGenere(null); setClientChoisi(null); setVentesClient([]);
+    try {
+      const trouves = await api.clients.rechercheMulti(rechercheClient.trim());
+      if (trouves.length === 0) { setClientsTrouves([]); setError("Aucune cliente ne correspond à cette recherche."); return; }
+      if (trouves.length === 1) { await choisirClientHistorique(trouves[0]); return; }
+      setClientsTrouves(trouves);
+    } catch (e) { setError(e.message); } finally { setRechercheEnCours(false); }
+  };
+  const choisirClientHistorique = async (c) => {
+    setRechercheEnCours(true);
+    try {
+      const complet = await api.clients.historiqueAchats(c.id);
+      setClientChoisi(complet);
+      setVentesClient(complet.ventes.filter((v) => v.statut !== "Annulee"));
+      setClientsTrouves([]);
+    } catch (e) { setError(e.message); } finally { setRechercheEnCours(false); }
+  };
   const ligne = venteChoisie?.lignes.find((l) => l.id === ligneChoisie);
 
   useEffect(() => {
@@ -835,6 +863,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
     setVenteChoisie(null); setLigneChoisie(""); setNumero(""); setMotif(""); setQuantite(1);
     setModeEchange("pointure"); setNouvellePointure(""); setRechercheNouvelArticle(""); setNouvelArticle(null);
     setMontantRembourse(""); setDateValiditeAvoir(""); setPaiementsSupplement([{ id: uid(), mode: "especes", montant: "" }]);
+    setRechercheClient(""); setClientsTrouves([]); setClientChoisi(null); setVentesClient([]);
   };
 
   const submit = async () => {
@@ -855,7 +884,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         }
       }
     }
-    const clientNomAvantReset = venteChoisie.client?.nomPrenoms || "";
+    const clientNomAvantReset = venteChoisie.client?.nomPrenoms || clientChoisi?.nomPrenoms || "";
     try {
       const retourCree = await api.retours.create({
         venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite),
@@ -895,13 +924,66 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
 
-      <Field label="Numero de recu">
-        <div className="flex gap-2">
-          <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} onKeyDown={(e) => e.key === "Enter" && rechercherVente()} style={inputStyle} placeholder="REC-000123" />
-          <button onClick={rechercherVente} disabled={rechercheEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: rechercheEnCours ? 0.6 : 1 }}>{rechercheEnCours ? "..." : "Rechercher"}</button>
-        </div>
-      </Field>
-      <p className="text-xs -mt-2 mb-3" style={{ color: "#6B5D52" }}>Fonctionne pour un reçu de n'importe quel jour — tape le numéro complet.</p>
+      <div className="flex gap-2 mb-3">
+        {[["numero", "Par numéro de reçu"], ["client", "Par nom ou téléphone"]].map(([id, label]) => (
+          <button key={id} onClick={() => { setModeRecherche(id); setError(""); setVenteChoisie(null); setAvoirGenere(null); setClientsTrouves([]); setClientChoisi(null); setVentesClient([]); }} className="text-xs px-3 py-1.5 rounded-full font-medium" style={modeRecherche === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
+        ))}
+      </div>
+
+      {modeRecherche === "numero" ? (
+        <>
+          <Field label="Numero de recu">
+            <div className="flex gap-2">
+              <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} onKeyDown={(e) => e.key === "Enter" && rechercherVente()} style={inputStyle} placeholder="REC-000123" />
+              <button onClick={rechercherVente} disabled={rechercheEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: rechercheEnCours ? 0.6 : 1 }}>{rechercheEnCours ? "..." : "Rechercher"}</button>
+            </div>
+          </Field>
+          <p className="text-xs -mt-2 mb-3" style={{ color: "#6B5D52" }}>Fonctionne pour un reçu de n'importe quel jour — tape le numéro complet.</p>
+        </>
+      ) : (
+        <>
+          <Field label="Nom ou téléphone de la cliente">
+            <div className="flex gap-2">
+              <input value={rechercheClient} onChange={(e) => setRechercheClient(e.target.value)} onKeyDown={(e) => e.key === "Enter" && rechercherClient()} style={inputStyle} placeholder="Ex : Konan Awa, ou 0708735901" />
+              <button onClick={rechercherClient} disabled={rechercheEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: rechercheEnCours ? 0.6 : 1 }}>{rechercheEnCours ? "..." : "Rechercher"}</button>
+            </div>
+          </Field>
+          <p className="text-xs -mt-2 mb-3" style={{ color: "#6B5D52" }}>Utile quand la cliente n'a pas gardé son reçu — affiche tout son historique d'achats.</p>
+
+          {clientsTrouves.length > 0 && (
+            <div className="rounded-lg overflow-hidden mb-3" style={{ border: "1px solid #DDD3C4" }}>
+              <p className="text-xs px-3 py-2" style={{ background: "#F1E9DC", color: "#6B5D52" }}>{clientsTrouves.length} cliente(s) trouvée(s) — choisis-en une :</p>
+              {clientsTrouves.map((c) => (
+                <button key={c.id} onClick={() => choisirClientHistorique(c)} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF", borderTop: "1px solid #EFE7D9" }}>
+                  {c.nomPrenoms} <span style={{ color: "#6B5D52" }}>{c.telephone ? `· ${c.telephone}` : ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {clientChoisi && !venteChoisie && (
+            <div className="rounded-lg overflow-hidden mb-3" style={{ border: "1px solid #DDD3C4" }}>
+              <div className="flex items-center justify-between px-3 py-2" style={{ background: "#F1E9DC" }}>
+                <p className="text-xs font-medium">{clientChoisi.nomPrenoms} — {ventesClient.length} achat(s)</p>
+                <button onClick={() => { setClientChoisi(null); setVentesClient([]); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
+              </div>
+              {ventesClient.length === 0 && <p className="text-sm px-3 py-2" style={{ color: "#6B5D52" }}>Aucun achat trouvé pour cette cliente.</p>}
+              {ventesClient.map((v) => (
+                <button key={v.id} onClick={() => setVenteChoisie(v)} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF", borderTop: "1px solid #EFE7D9" }}>
+                  {v.numero} · {new Date(v.date).toLocaleDateString("fr-FR")} — {fmt(v.total)} F ({v.boutique})
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {venteChoisie && modeRecherche === "client" && (
+        <p className="text-xs mb-3 flex items-center gap-2" style={{ color: "#6B5D52" }}>
+          Vente sélectionnée : <strong>{venteChoisie.numero}</strong>
+          <button onClick={() => setVenteChoisie(null)} style={{ color: "#B04A3B" }}>changer</button>
+        </p>
+      )}
 
       {venteChoisie && (
         <>
