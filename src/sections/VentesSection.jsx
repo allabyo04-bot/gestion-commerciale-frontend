@@ -797,15 +797,14 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
   const [paiementsSupplement, setPaiementsSupplement] = useState([{ id: uid(), mode: "especes", montant: "" }]);
   const [error, setError] = useState("");
   const [succes, setSucces] = useState("");
-  const [avoirGenere, setAvoirGenere] = useState(null);
-  const [avoirClientNom, setAvoirClientNom] = useState("");
-  const [avoirReceipt, setAvoirReceipt] = useState(null);
+  const [recuOperation, setRecuOperation] = useState(null);
+  const [recuAImprimer, setRecuAImprimer] = useState(null);
 
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const rechercherVente = async () => {
     if (!numero.trim()) return;
     setRechercheEnCours(true);
-    setError(""); setVenteChoisie(null); setAvoirGenere(null);
+    setError(""); setVenteChoisie(null); setRecuOperation(null);
     try {
       const v = await api.ventes.rechercheParNumero(numero.trim());
       setVenteChoisie(v);
@@ -822,7 +821,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
   const rechercherClient = async () => {
     if (!rechercheClient.trim()) return;
     setRechercheEnCours(true);
-    setError(""); setVenteChoisie(null); setAvoirGenere(null); setClientChoisi(null); setVentesClient([]);
+    setError(""); setVenteChoisie(null); setRecuOperation(null); setClientChoisi(null); setVentesClient([]);
     try {
       const trouves = await api.clients.rechercheMulti(rechercheClient.trim());
       if (trouves.length === 0) { setClientsTrouves([]); setError("Aucune cliente ne correspond à cette recherche."); return; }
@@ -884,7 +883,8 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         }
       }
     }
-    const clientNomAvantReset = venteChoisie.client?.nomPrenoms || clientChoisi?.nomPrenoms || "";
+    const clientNomAvantReset = venteChoisie.client?.nomPrenoms || clientChoisi?.nomPrenoms || "Client de passage";
+    const venteOrigineNumero = venteChoisie.numero;
     try {
       const retourCree = await api.retours.create({
         venteId: venteChoisie.id, ligneVenteId: ligneChoisie, type, quantite: Number(quantite),
@@ -896,15 +896,8 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         montantRembourse: type === "Retour" ? Number(montantRembourse) : undefined,
         dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : (type === "Echange" && difference < 0 ? dateValiditeAvoir : undefined),
       });
-      if (retourCree.bonValeurGenere) {
-        setAvoirGenere(retourCree.bonValeurGenere);
-        setAvoirClientNom(clientNomAvantReset);
-        setSucces("");
-      } else {
-        setSucces(type === "Retour" ? "Retour enregistre et stock mis a jour." : "Echange enregistre et stock mis a jour.");
-        setAvoirGenere(null);
-      }
-      setError("");
+      setRecuOperation({ retour: retourCree, venteOrigineNumero, clientNom: clientNomAvantReset, boutique });
+      setSucces(""); setError("");
       resetTout();
       onDone();
     } catch (e) { setError(e.message); }
@@ -912,13 +905,19 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
 
   return (
     <div className="max-w-lg">
-      {avoirGenere && (
+      {recuOperation && (
         <div className="mb-4 px-4 py-3 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
-          <p className="font-semibold mb-1">Avoir genere pour la cliente</p>
-          <p className="text-sm">Numero : <span className="font-mono font-semibold">{avoirGenere.numero}</span></p>
-          <p className="text-sm">Montant : <span className="font-semibold">{fmt(avoirGenere.montant)} F</span></p>
-          <p className="text-sm">Valable jusqu'au : <span className="font-semibold">{new Date(avoirGenere.dateValidite).toLocaleDateString("fr-FR")}</span></p>
-          <button onClick={() => setAvoirReceipt(avoirGenere)} className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}><Printer size={14} /> Imprimer le bon d'avoir</button>
+          <p className="font-semibold mb-1">{recuOperation.retour.type === "Retour" ? "Retour enregistré" : "Échange enregistré"}</p>
+          {recuOperation.retour.bonValeurGenere && (
+            <>
+              <p className="text-sm">Avoir généré n° <span className="font-mono font-semibold">{recuOperation.retour.bonValeurGenere.numero}</span> — <span className="font-semibold">{fmt(recuOperation.retour.bonValeurGenere.montant)} F</span></p>
+              <p className="text-sm">Valable jusqu'au : <span className="font-semibold">{new Date(recuOperation.retour.bonValeurGenere.dateValidite).toLocaleDateString("fr-FR")}</span></p>
+            </>
+          )}
+          {recuOperation.retour.supplementPaye > 0 && (
+            <p className="text-sm">Supplément payé par la cliente : <span className="font-semibold">{fmt(recuOperation.retour.supplementPaye)} F</span></p>
+          )}
+          <button onClick={() => setRecuAImprimer(recuOperation)} className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}><Printer size={14} /> Imprimer le reçu</button>
         </div>
       )}
       {succes && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{succes}</p>}
@@ -926,7 +925,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
 
       <div className="flex gap-2 mb-3">
         {[["numero", "Par numéro de reçu"], ["client", "Par nom ou téléphone"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setModeRecherche(id); setError(""); setVenteChoisie(null); setAvoirGenere(null); setClientsTrouves([]); setClientChoisi(null); setVentesClient([]); }} className="text-xs px-3 py-1.5 rounded-full font-medium" style={modeRecherche === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
+          <button key={id} onClick={() => { setModeRecherche(id); setError(""); setVenteChoisie(null); setRecuOperation(null); setClientsTrouves([]); setClientChoisi(null); setVentesClient([]); }} className="text-xs px-3 py-1.5 rounded-full font-medium" style={modeRecherche === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{label}</button>
         ))}
       </div>
 
@@ -934,7 +933,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         <>
           <Field label="Numero de recu">
             <div className="flex gap-2">
-              <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setAvoirGenere(null); }} onKeyDown={(e) => e.key === "Enter" && rechercherVente()} style={inputStyle} placeholder="REC-000123" />
+              <input value={numero} onChange={(e) => { setNumero(e.target.value); setVenteChoisie(null); setRecuOperation(null); }} onKeyDown={(e) => e.key === "Enter" && rechercherVente()} style={inputStyle} placeholder="REC-000123" />
               <button onClick={rechercherVente} disabled={rechercheEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: rechercheEnCours ? 0.6 : 1 }}>{rechercheEnCours ? "..." : "Rechercher"}</button>
             </div>
           </Field>
@@ -1085,7 +1084,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         </>
       )}
 
-      {avoirReceipt && <AvoirReceiptModal avoir={avoirReceipt} boutique={boutique} clientNom={avoirClientNom} onClose={() => setAvoirReceipt(null)} />}
+      {recuAImprimer && <RetourEchangeReceiptModal recu={recuAImprimer} onClose={() => setRecuAImprimer(null)} />}
     </div>
   );
 }
@@ -1120,6 +1119,75 @@ function AvoirReceiptModal({ avoir, boutique, clientNom, onClose }) {
             Ce bon est valable dans les deux boutiques La Pointure Espagnole (Angre et Koumassi), en une seule fois, jusqu'a sa date de validite. Il doit etre presente en caisse — numero obligatoire pour l'utiliser.
           </p>
         </div>
+
+        <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
+      </div>
+    </div>
+  );
+}
+
+// Reçu unique couvrant les trois cas : échange simple (même article, autre pointure), échange
+// vers un article différent (avec supplément ou avoir selon l'écart de prix), et retour classique.
+function RetourEchangeReceiptModal({ recu, onClose }) {
+  const { retour, venteOrigineNumero, clientNom, boutique } = recu;
+  const infos = INFOS_BOUTIQUE[boutique] || {};
+  const estEchange = retour.type === "Echange";
+  const nouvelArticleDesignation = retour.nouvelArticle ? retour.nouvelArticle.designation : retour.ligneVente?.designation;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
+      <div className="print-area rounded-xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9", fontFamily: "'IBM Plex Mono', monospace" }}>
+        <div className="flex items-center justify-between mb-4 no-print"><p className="font-display font-semibold">Reçu {estEchange ? "d'échange" : "de retour"}</p><button onClick={onClose}><X size={18} color="#6B5D52" /></button></div>
+
+        <div className="text-center mb-3">
+          <p className="font-display font-bold text-sm leading-tight">{infos.nom}</p>
+          <p className="font-display font-bold text-sm leading-tight">{infos.ligne2}</p>
+          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{infos.adresse}</p>
+          <p className="text-xs" style={{ color: "#6B5D52" }}>{infos.telephone}</p>
+        </div>
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="my-2" />
+
+        <p className="text-center font-display text-lg font-semibold">{estEchange ? "REÇU D'ÉCHANGE" : "REÇU DE RETOUR"}</p>
+        <p className="text-center text-xs mb-1" style={{ color: "#6B5D52" }}>Vente d'origine : {venteOrigineNumero}</p>
+        <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>{new Date(retour.date).toLocaleString("fr-FR")}</p>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-2 space-y-2">
+          <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Client</span><span className="font-medium">{clientNom || "—"}</span></div>
+        </div>
+
+        <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-3">
+          <p className="text-xs font-semibold mb-1" style={{ color: "#6B5D52" }}>Article rendu</p>
+          <p className="text-sm">{retour.ligneVente?.designation}{retour.ligneVente?.pointure ? ` T${retour.ligneVente.pointure}` : ""} × {retour.quantite}</p>
+        </div>
+
+        {estEchange && (
+          <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-3">
+            <p className="text-xs font-semibold mb-1" style={{ color: "#6B5D52" }}>Article reçu en échange</p>
+            <p className="text-sm">{nouvelArticleDesignation}{retour.nouvellePointure ? ` T${retour.nouvellePointure}` : ""} × {retour.quantite}</p>
+          </div>
+        )}
+
+        {retour.supplementPaye > 0 && (
+          <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-3 flex justify-between text-sm">
+            <span style={{ color: "#6B5D52" }}>Supplément payé</span>
+            <span className="font-semibold">{fmt(retour.supplementPaye)} F</span>
+          </div>
+        )}
+
+        {retour.bonValeurGenere && (
+          <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1">
+            <p className="text-xs font-semibold" style={{ color: "#6B5D52" }}>Avoir généré</p>
+            <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Numéro</span><span className="font-mono font-semibold">{retour.bonValeurGenere.numero}</span></div>
+            <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Montant</span><span className="font-semibold">{fmt(retour.bonValeurGenere.montant)} F</span></div>
+            <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Valable jusqu'au</span><span className="font-medium">{new Date(retour.bonValeurGenere.dateValidite).toLocaleDateString("fr-FR")}</span></div>
+          </div>
+        )}
+
+        {retour.motif && (
+          <p className="text-xs mt-3" style={{ color: "#6B5D52" }}>Motif : {retour.motif}</p>
+        )}
+
+        <p className="text-xs text-center mt-4" style={{ color: "#6B5D52" }}>Traité par {retour.traitePar?.prenom || "—"}</p>
 
         <button onClick={() => window.print()} className="no-print w-full mt-5 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
       </div>
