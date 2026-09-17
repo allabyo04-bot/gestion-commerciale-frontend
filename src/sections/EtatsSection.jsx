@@ -432,6 +432,7 @@ export default function EtatsSection() {
             </div>
           </div>
           <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <div style={{ overflowX: "auto" }}>
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
@@ -472,6 +473,7 @@ export default function EtatsSection() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
         </>
       )}
