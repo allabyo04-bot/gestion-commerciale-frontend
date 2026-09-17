@@ -431,9 +431,8 @@ export default function EtatsSection() {
               <p className="font-display text-lg font-semibold" style={{ color: COULEUR.accent }}>- {formatFCFA(donnees.totalRetours)}</p>
             </div>
           </div>
-          <div className="rounded-2xl overflow-hidden" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
-            <div style={{ overflowX: "auto" }}>
-            <table className="w-full text-sm">
+          <div className="rounded-2xl" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}`, overflowX: "auto", overflowY: "hidden" }}>
+            <table className="text-sm" style={{ width: "100%", minWidth: "900px" }}>
               <thead>
                 <tr style={{ background: COULEUR.fond, color: COULEUR.texteDoux }}>
                   <th className="text-left px-4 py-2">N°</th>
@@ -473,7 +472,6 @@ export default function EtatsSection() {
                 </tr>
               </tfoot>
             </table>
-            </div>
           </div>
         </>
       )}
