@@ -853,6 +853,15 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
   const qte = Math.max(1, parseInt(quantite, 10) || 1);
   const difference = modeEchange === "article" && nouvelArticle && ligne ? (nouvelArticle.prixVente - ligne.prixUnitaire) * qte : 0;
 
+  // Un avoir est valable 21 jours par défaut — pré-rempli, mais modifiable au cas par cas.
+  useEffect(() => {
+    const doitAvoirUneDate = (type === "Retour" && ligne) || (type === "Echange" && modeEchange === "article" && difference < 0);
+    if (doitAvoirUneDate && !dateValiditeAvoir) {
+      const d = new Date(); d.setDate(d.getDate() + 21);
+      setDateValiditeAvoir(d.toISOString().slice(0, 10));
+    }
+  }, [type, ligne, modeEchange, difference]);
+
   const ajouterPaiementSupplement = () => setPaiementsSupplement([...paiementsSupplement, { id: uid(), mode: "especes", montant: "" }]);
   const majPaiementSupplement = (id, champ, val) => setPaiementsSupplement(paiementsSupplement.map((p) => (p.id === id ? { ...p, [champ]: val } : p)));
   const retirerPaiementSupplement = (id) => setPaiementsSupplement(paiementsSupplement.filter((p) => p.id !== id));
@@ -1180,6 +1189,7 @@ function RetourEchangeReceiptModal({ recu, onClose }) {
             <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Numéro</span><span className="font-mono font-semibold">{retour.bonValeurGenere.numero}</span></div>
             <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Montant</span><span className="font-semibold">{fmt(retour.bonValeurGenere.montant)} F</span></div>
             <div className="flex justify-between text-sm"><span style={{ color: "#6B5D52" }}>Valable jusqu'au</span><span className="font-medium">{new Date(retour.bonValeurGenere.dateValidite).toLocaleDateString("fr-FR")}</span></div>
+            <p className="text-xs font-semibold mt-1" style={{ color: "#B04A3B" }}>Passé ce délai, l'avoir est définitivement perdu.</p>
           </div>
         )}
 
