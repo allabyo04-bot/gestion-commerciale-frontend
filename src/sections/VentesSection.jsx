@@ -788,6 +788,11 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
   const [type, setType] = useState("Retour");
   const [quantite, setQuantite] = useState(1);
   const [modeEchange, setModeEchange] = useState("pointure"); // "pointure" | "article"
+  const [remiseFormOuvert, setRemiseFormOuvert] = useState(false);
+  const [remiseType, setRemiseType] = useState("MONTANT");
+  const [remiseValeur, setRemiseValeur] = useState("");
+  const [remiseChargement, setRemiseChargement] = useState(false);
+  const [demandeRemiseEchange, setDemandeRemiseEchange] = useState(null);
   const [nouvellePointure, setNouvellePointure] = useState("");
   const [rechercheNouvelArticle, setRechercheNouvelArticle] = useState("");
   const [nouvelArticle, setNouvelArticle] = useState(null);
@@ -852,6 +857,22 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
 
   const qte = Math.max(1, parseInt(quantite, 10) || 1);
   const difference = modeEchange === "article" && nouvelArticle && ligne ? (nouvelArticle.prixVente - ligne.prixUnitaire) * qte : 0;
+  const montantRemiseAppliqueEchange = demandeRemiseEchange && demandeRemiseEchange.statut !== "REFUSEE" ? demandeRemiseEchange.montantRemise : 0;
+  const supplementApresRemise = Math.max(0, difference - montantRemiseAppliqueEchange);
+
+  const demanderRemiseEchange = async () => {
+    if (!remiseValeur || Number(remiseValeur) <= 0) { setError("Indique une valeur de remise valide."); return; }
+    if (remiseType === "POURCENTAGE" && Number(remiseValeur) > 100) { setError("Un pourcentage ne peut pas dépasser 100."); return; }
+    setRemiseChargement(true);
+    try {
+      const demande = await api.remises.create({
+        totalVente: difference, type: remiseType, valeur: Number(remiseValeur),
+        clientNom: venteChoisie?.client?.nomPrenoms || clientChoisi?.nomPrenoms || undefined,
+      });
+      setDemandeRemiseEchange(demande);
+      setRemiseFormOuvert(false); setRemiseValeur(""); setError("");
+    } catch (e) { setError(e.message); } finally { setRemiseChargement(false); }
+  };
 
   // Un avoir est valable 21 jours par défaut — pré-rempli, mais modifiable au cas par cas.
   useEffect(() => {
@@ -872,6 +893,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
     setModeEchange("pointure"); setNouvellePointure(""); setRechercheNouvelArticle(""); setNouvelArticle(null);
     setMontantRembourse(""); setDateValiditeAvoir(""); setPaiementsSupplement([{ id: uid(), mode: "especes", montant: "" }]);
     setRechercheClient(""); setClientsTrouves([]); setClientChoisi(null); setVentesClient([]);
+    setRemiseFormOuvert(false); setRemiseValeur(""); setDemandeRemiseEchange(null);
   };
 
   const submit = async () => {
@@ -885,7 +907,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
       if (!nouvellePointure) { setError("Choisis la pointure du nouvel article."); return; }
       if (modeEchange === "article") {
         if (!nouvelArticle) { setError("Choisis le nouvel article."); return; }
-        if (difference > 0 && totalPaiementSupplement !== difference) { setError(`Le nouvel article coûte ${fmt(difference)} F de plus — le paiement doit couvrir exactement ce supplément.`); return; }
+        if (difference > 0 && totalPaiementSupplement !== supplementApresRemise) { setError(`Le supplément dû est de ${fmt(supplementApresRemise)} F — le paiement doit couvrir exactement ce montant.`); return; }
         if (difference < 0) {
           if (!venteChoisie.clientId) { setError("Un client doit etre associe a cette vente pour generer un avoir."); return; }
           if (!dateValiditeAvoir) { setError("La date de validite de l'avoir (pour la difference en sa faveur) est obligatoire."); return; }
@@ -901,6 +923,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
         nouvelArticleId: type === "Echange" && modeEchange === "article" ? nouvelArticle.id : undefined,
         paiements: type === "Echange" && modeEchange === "article" && difference > 0
           ? paiementsSupplement.filter((p) => Number(p.montant) > 0).map((p) => ({ mode: p.mode, montant: Number(p.montant) })) : undefined,
+        demandeRemiseId: type === "Echange" && modeEchange === "article" && difference > 0 && demandeRemiseEchange && demandeRemiseEchange.statut !== "REFUSEE" ? demandeRemiseEchange.id : undefined,
         motif, boutique,
         montantRembourse: type === "Retour" ? Number(montantRembourse) : undefined,
         dateValiditeAvoir: type === "Retour" ? dateValiditeAvoir : (type === "Echange" && difference < 0 ? dateValiditeAvoir : undefined),
@@ -1054,6 +1077,41 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
 
                   {difference > 0 && (
                     <div className="mt-3">
+                      {!demandeRemiseEchange && !remiseFormOuvert && (
+                        <button onClick={() => setRemiseFormOuvert(true)} className="flex items-center gap-1.5 text-xs font-medium mb-3" style={{ color: "#8C3B2E" }}>
+                          <Percent size={13} /> Appliquer une remise sur ce supplément
+                        </button>
+                      )}
+                      {!demandeRemiseEchange && remiseFormOuvert && (
+                        <div className="rounded-lg p-3 mb-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                          <div className="flex gap-2 mb-2">
+                            <button type="button" onClick={() => setRemiseType("MONTANT")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "MONTANT" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Montant (F)</button>
+                            <button type="button" onClick={() => setRemiseType("POURCENTAGE")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "POURCENTAGE" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Pourcentage (%)</button>
+                          </div>
+                          <input type="number" min="0" value={remiseValeur} onChange={(e) => setRemiseValeur(e.target.value)} placeholder={remiseType === "MONTANT" ? "Ex : 5000" : "Ex : 10"} style={{ ...inputStyle, marginTop: 0 }} />
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={() => { setRemiseFormOuvert(false); setRemiseValeur(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                            <button onClick={demanderRemiseEchange} disabled={remiseChargement} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{remiseChargement ? "Envoi..." : "Envoyer à Djenie"}</button>
+                          </div>
+                        </div>
+                      )}
+                      {demandeRemiseEchange?.statut === "EN_ATTENTE" && (
+                        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-3" style={{ background: "#FFFFFF", color: "#6B5D52" }}>
+                          <Clock size={13} /> Remise en attente de validation par Djenie ({demandeRemiseEchange.numero}) — la cliente peut déjà payer le montant réduit
+                        </div>
+                      )}
+                      {demandeRemiseEchange?.statut === "APPROUVEE" && (
+                        <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg mb-3" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                          <span className="flex items-center gap-1.5"><CheckCircle2 size={13} /> Remise approuvée : - {fmt(demandeRemiseEchange.montantRemise)} F</span>
+                          <button onClick={() => setDemandeRemiseEchange(null)} style={{ color: "#B04A3B" }}><X size={13} /></button>
+                        </div>
+                      )}
+                      {demandeRemiseEchange?.statut === "REFUSEE" && (
+                        <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg mb-3" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>
+                          <span className="flex items-center gap-1.5"><XCircle size={13} /> Remise refusée par Djenie</span>
+                          <button onClick={() => setDemandeRemiseEchange(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
+                        </div>
+                      )}
                       {paiementsSupplement.map((p) => (
                         <div key={p.id} className="flex items-center gap-2 mb-2">
                           <select value={p.mode} onChange={(e) => majPaiementSupplement(p.id, "mode", e.target.value)} style={{ ...inputStyle, marginTop: 0, flex: 1 }}>
@@ -1064,7 +1122,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
                         </div>
                       ))}
                       <button onClick={ajouterPaiementSupplement} className="text-xs" style={{ color: "#8C3B2E" }}>+ Ajouter un mode de paiement</button>
-                      <p className="text-xs mt-2" style={{ color: totalPaiementSupplement === difference ? "#3F6B4A" : "#B04A3B" }}>Payé : {fmt(totalPaiementSupplement)} F / {fmt(difference)} F attendu</p>
+                      <p className="text-xs mt-2" style={{ color: totalPaiementSupplement === supplementApresRemise ? "#3F6B4A" : "#B04A3B" }}>Payé : {fmt(totalPaiementSupplement)} F / {fmt(supplementApresRemise)} F attendu</p>
                     </div>
                   )}
                   {difference < 0 && (
@@ -1177,9 +1235,16 @@ function RetourEchangeReceiptModal({ recu, onClose }) {
         )}
 
         {retour.supplementPaye > 0 && (
-          <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-3 flex justify-between text-sm">
-            <span style={{ color: "#6B5D52" }}>Supplément payé</span>
-            <span className="font-semibold">{fmt(retour.supplementPaye)} F</span>
+          <div style={{ borderTop: "1px dashed #DDD3C4" }} className="py-3">
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "#6B5D52" }}>Supplément payé</span>
+              <span className="font-semibold">{fmt(retour.supplementPaye)} F</span>
+            </div>
+            {retour.demandeRemise && (
+              <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>
+                Remise appliquée ({retour.demandeRemise.numero}) — {retour.demandeRemise.statut === "APPROUVEE" ? "approuvée" : retour.demandeRemise.statut === "REFUSEE" ? "refusée" : "en attente de validation par Djenie"}
+              </p>
+            )}
           </div>
         )}
 
