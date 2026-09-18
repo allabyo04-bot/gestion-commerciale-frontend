@@ -32,6 +32,8 @@ export default function DashboardSection() {
   const [erreur, setErreur] = useState("");
   const [caJour, setCaJour] = useState(null);
   const [modesJour, setModesJour] = useState(null);
+  const [echeancesProches, setEcheancesProches] = useState(null);
+  const [rappelEnCours, setRappelEnCours] = useState(null);
   const [detailOuvert, setDetailOuvert] = useState(null); // { titre, lignes } | null
   const [caMois, setCaMois] = useState(null);
   const [alertesStock, setAlertesStock] = useState([]);
@@ -41,6 +43,10 @@ export default function DashboardSection() {
   const [remisesEnAttente, setRemisesEnAttente] = useState(null);
   const [resumeCartesCadeaux, setResumeCartesCadeaux] = useState([]);
   const [livraisonJour, setLivraisonJour] = useState(null);
+
+  const chargerEcheances = useCallback(() => {
+    api.bonsValeur.echeancesProches(7).then(setEcheancesProches).catch(() => {});
+  }, []);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -63,6 +69,8 @@ export default function DashboardSection() {
 
         api.etats.parModePaiement({ dateDebut: jour, dateFin: jour, ...(estAdmin ? {} : { boutique: user.boutique }) })
           .then(setModesJour).catch(() => {});
+
+        chargerEcheances();
 
         const paramsBoutique = estAdmin ? {} : { boutique: user.boutique };
         const [creditListe, vendeurRes] = await Promise.all([
@@ -130,9 +138,17 @@ export default function DashboardSection() {
     } finally {
       setChargement(false);
     }
-  }, [estAdmin, peutVoirVentes, peutVoirStock, user]);
+  }, [estAdmin, peutVoirVentes, peutVoirStock, user, chargerEcheances]);
 
   useEffect(() => { charger(); }, [charger]);
+
+  const toggleRappel = async (bon) => {
+    setRappelEnCours(bon.id);
+    try {
+      await api.bonsValeur.marquerRappel(bon.id, !bon.rappelEffectue);
+      chargerEcheances();
+    } catch (e) { /* ignore, l'utilisateur peut retenter */ } finally { setRappelEnCours(null); }
+  };
 
   if (chargement) return <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Chargement…</p>;
 
@@ -203,6 +219,39 @@ export default function DashboardSection() {
                 <p className="font-display text-base font-semibold" style={{ color: "#A8823D" }}>{fmt(modesJour.totalCredit)} F</p>
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {peutVoirVentes && echeancesProches && echeancesProches.length > 0 && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+          <style>{`
+            @keyframes clignoteRappel { 0%, 100% { background: #FBEAE7; } 50% { background: #F6C9C0; } }
+            .rappel-a-faire { animation: clignoteRappel 1.4s ease-in-out infinite; }
+          `}</style>
+          <p className="text-xs font-mono uppercase tracking-wide mb-1 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+            <AlertTriangle size={14} /> Avoirs et cartes cadeaux à échéance dans moins de 7 jours
+          </p>
+          <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>Pense à appeler la cliente pour lui rappeler de venir l'utiliser avant qu'il ne soit définitivement perdu.</p>
+          <div className="space-y-2">
+            {echeancesProches.map((b) => {
+              const joursRestants = Math.ceil((new Date(b.dateValidite) - new Date()) / (1000 * 60 * 60 * 24));
+              return (
+                <div key={b.id} className={`flex items-center justify-between rounded-lg px-4 py-3 ${!b.rappelEffectue ? "rappel-a-faire" : ""}`} style={{ background: b.rappelEffectue ? "#E9F0EA" : "#FBEAE7" }}>
+                  <div>
+                    <p className="text-sm font-medium">{b.type === "AVOIR" ? "Avoir" : "Carte cadeau"} {b.numero} — {fmt(b.montant)} F</p>
+                    <p className="text-xs" style={{ color: "#6B5D52" }}>
+                      {b.client ? `${b.client.nomPrenoms}${b.client.telephone ? ` · ${b.client.telephone}` : ""}` : "Client inconnu"}
+                      {" · Expire dans "}{joursRestants <= 0 ? "moins d'un jour" : `${joursRestants} jour${joursRestants > 1 ? "s" : ""}`}
+                      {" (le "}{new Date(b.dateValidite).toLocaleDateString("fr-FR")}{")"}
+                    </p>
+                  </div>
+                  <button onClick={() => toggleRappel(b)} disabled={rappelEnCours === b.id} className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap" style={b.rappelEffectue ? { border: "1px solid #DDD3C4", color: "#6B5D52" } : { background: "#8C3B2E", color: "#FBF3EC" }}>
+                    {b.rappelEffectue ? "Appelée ✓ (annuler)" : "Marquer appelée"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

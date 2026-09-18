@@ -204,6 +204,8 @@ creditListe: (params = {}) => {
     verifier: (numero) => request(`/api/bons-valeur/${encodeURIComponent(numero)}/verifier`),
     marquerHistorique: (id) => request(`/api/bons-valeur/${id}/marquer-historique`, { method: "PUT" }),
     remove: (id) => request(`/api/bons-valeur/${id}`, { method: "DELETE" }),
+    echeancesProches: (jours) => request(`/api/bons-valeur/echeances-proches${jours ? `?jours=${jours}` : ""}`),
+    marquerRappel: (id, effectue) => request(`/api/bons-valeur/${id}/rappel`, { method: "PUT", body: { effectue } }),
   },
  retours: {
     list: (boutique) => request(`/api/retours${boutique ? `?boutique=${encodeURIComponent(boutique)}` : ""}`),
