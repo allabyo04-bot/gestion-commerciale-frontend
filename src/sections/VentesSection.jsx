@@ -764,6 +764,10 @@ function RemisesAdminSection({ onTraite }) {
                 <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
                   Vente {d.vente.numero} du {new Date(d.vente.date).toLocaleDateString("fr-FR")} — après approbation, vérifier le CA de <strong>ce jour-là</strong> dans États → Par date (pas "aujourd'hui" si la vente date d'un autre jour)
                 </p>
+              ) : d.retour ? (
+                <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
+                  Supplément d'échange sur la vente {d.retour.vente?.numero || "—"} du {new Date(d.retour.date).toLocaleDateString("fr-FR")} — le montant réduit a déjà été encaissé, approuver ou refuser sert ici uniquement de trace pour toi
+                </p>
               ) : (
                 <p className="text-xs mt-1" style={{ color: "#6B5D52", fontStyle: "italic" }}>
                   Ancienne demande sans vente rattachée — approuver ou refuser n'aura aucun impact sur le CA
