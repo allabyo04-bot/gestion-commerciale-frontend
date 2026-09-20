@@ -339,7 +339,7 @@ export default function VentesSection() {
                     <button type="button" onClick={() => setTypeVente("Credit")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Credit" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Credit</button>
                   </div>
                 </Field>
-                <Field label="Client (nom ou n° carte)">
+                <Field label="Client (nom, n° carte ou téléphone)">
                   {clientId ? (
                     <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
                       <span className="text-sm">{clients.find((c) => c.id === clientId)?.nomPrenoms}</span>
@@ -351,9 +351,9 @@ export default function VentesSection() {
                       <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
                       {clientSearch.trim() && (
                         <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden max-h-40 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4" }}>
-                          {clients.filter((c) => c.nomPrenoms.toLowerCase().includes(clientSearch.toLowerCase()) || (c.carteFidelite || "").toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 6).map((c) => (
+                          {clients.filter((c) => c.nomPrenoms.toLowerCase().includes(clientSearch.toLowerCase()) || (c.carteFidelite || "").toLowerCase().includes(clientSearch.toLowerCase()) || (c.telephone || "").includes(clientSearch.trim())).slice(0, 6).map((c) => (
                             <button key={c.id} onClick={() => { setClientId(c.id); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>
-                              {c.nomPrenoms} {c.carteFidelite ? <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {c.carteFidelite}</span> : null}
+                              {c.nomPrenoms} {c.carteFidelite ? <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {c.carteFidelite}</span> : null} {c.telephone ? <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {c.telephone}</span> : null}
                             </button>
                           ))}
                         </div>
