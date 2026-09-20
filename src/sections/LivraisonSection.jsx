@@ -109,7 +109,7 @@ export default function LivraisonSection() {
                   <p className="font-medium text-sm">{b.numero} — {b.clientNom} {b.clientTelephone ? `(${b.clientTelephone})` : ""}</p>
                   {b.lieuLivraison && <p className="text-xs mt-0.5 font-medium" style={{ color: "#8C3B2E" }}>📍 {b.lieuLivraison}</p>}
                   <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{b.boutique} · livreur : {b.livreurNom || "—"} · parti le {new Date(b.dateCreation).toLocaleString("fr-FR")}</p>
-                  <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{b.lignes.map((l) => `${l.article.designation}${l.pointure ? ` T${l.pointure}` : ""} x${l.quantite}`).join(", ")}</p>
+                  <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{[...b.lignes.map((l) => `${l.article.designation}${l.pointure ? ` T${l.pointure}` : ""} x${l.quantite}`), ...(b.cartesLignes || []).map((c) => `Carte ${c.bonValeur.numero} (${fmt(c.bonValeur.montant)} F)`)].join(", ")}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setTicketAImprimer(b)} className="text-xs px-3 py-1.5 rounded-lg" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Réimprimer</button>
@@ -217,6 +217,9 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [pointureChoisie, setPointureChoisie] = useState("");
   const [quantiteChoisie, setQuantiteChoisie] = useState("1");
   const [lignes, setLignes] = useState([]);
+  const [rechercheCarte, setRechercheCarte] = useState("");
+  const [cartesCadeaux, setCartesCadeaux] = useState([]); // { numero, montant }
+  const [carteEnCours, setCarteEnCours] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [avance, setAvance] = useState("");
   const [avanceModePaiement, setAvanceModePaiement] = useState("especes");
@@ -243,11 +246,25 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   };
   const retirerLigne = (id) => setLignes(lignes.filter((l) => l.id !== id));
 
+  const ajouterCarte = async () => {
+    const numero = rechercheCarte.trim();
+    if (!numero) return;
+    if (!boutique) { onError("Choisis d'abord la boutique concernée."); return; }
+    if (cartesCadeaux.some((c) => c.numero === numero)) { onError("Cette carte est déjà ajoutée."); return; }
+    setCarteEnCours(true);
+    try {
+      const res = await api.denominationsCartesCadeaux.verifierCarte(numero, boutique);
+      setCartesCadeaux([...cartesCadeaux, { numero, montant: res.montant }]);
+      setRechercheCarte("");
+    } catch (e) { onError(e.message); } finally { setCarteEnCours(false); }
+  };
+  const retirerCarte = (numero) => setCartesCadeaux(cartesCadeaux.filter((c) => c.numero !== numero));
+
   const valider = async () => {
     if (!boutique) { onError("Choisis la boutique concernée."); return; }
     if (!clientTelephone.trim()) { onError("Le numéro de téléphone de la cliente est obligatoire."); return; }
     if (!livreurNom.trim()) { onError("Le nom du livreur est obligatoire."); return; }
-    if (lignes.length === 0) { onError("Ajoute au moins un article au bon de livraison."); return; }
+    if (lignes.length === 0 && cartesCadeaux.length === 0) { onError("Ajoute au moins un article ou une carte cadeau au bon de livraison."); return; }
     const avanceNum = Number(avance) || 0;
     if (avanceNum > 0 && !avanceModePaiement) { onError("Choisis le mode de paiement de l'avance."); return; }
     setEnvoiEnCours(true);
@@ -257,9 +274,10 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
         lieuLivraison: lieuLivraison.trim() || undefined, livreurNom: livreurNom.trim(), notes: notes || undefined,
         avance: avanceNum, avanceModePaiement: avanceNum > 0 ? avanceModePaiement : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
+        cartesCadeaux: cartesCadeaux.map(({ numero }) => ({ numero })),
       });
       onCree(bon);
-      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setAvance(""); setAvanceModePaiement("especes");
+      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes");
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
 
@@ -383,6 +401,31 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
         </div>
       )}
 
+      <div className="mb-4">
+        <p className="text-sm font-medium mb-2">Cartes cadeaux emportées par le livreur (optionnel)</p>
+        <div className="flex gap-2">
+          <input value={rechercheCarte} onChange={(e) => setRechercheCarte(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ajouterCarte()} placeholder="Numéro de la carte…" style={selectStyle} />
+          <button onClick={ajouterCarte} disabled={carteEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: carteEnCours ? 0.6 : 1 }}>{carteEnCours ? "..." : "Ajouter"}</button>
+        </div>
+        {cartesCadeaux.length > 0 && (
+          <div className="rounded-xl overflow-hidden mt-2" style={{ border: "1px solid #EAE1D2" }}>
+            {cartesCadeaux.map((c) => (
+              <div key={c.numero} className="flex items-center justify-between px-3 py-2" style={{ borderTop: "1px solid #EFE7D9" }}>
+                <span className="text-sm">Carte {c.numero}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">{fmt(c.montant)} F</span>
+                  <button onClick={() => retirerCarte(c.numero)} style={{ color: "#B04A3B" }}><X size={14} /></button>
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-3 py-2" style={{ background: "#F1E9DC" }}>
+              <span className="text-sm font-medium">Valeur totale des cartes emportées</span>
+              <span className="text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(cartesCadeaux.reduce((s, c) => s + c.montant, 0))} F</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
         <p className="text-sm font-medium mb-1">Avance déjà perçue de la cliente ? <span className="font-normal" style={{ color: "#6B5D52" }}>(optionnel)</span></p>
         <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Si la cliente a déjà versé un montant avant le départ du livreur — il apparaîtra sur le ticket, et sera automatiquement déduit du reste à payer au retour.</p>
@@ -423,7 +466,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
 // TICKET IMPRIMABLE — deux exemplaires : copie livreur (à signer) + copie boutique.
 // ------------------------------------------------------------
 function BonLivraisonTicket({ bon, onClose }) {
-  const totalArticles = bon.lignes.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
+  const totalArticles = bon.lignes.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0) + (bon.cartesLignes || []).reduce((s, c) => s + c.bonValeur.montant, 0);
   const reste = Math.max(0, totalArticles - (bon.avance || 0));
   const corps = (mention) => (
     <div style={{ width: "280px", background: "#FFFFFF", padding: "16px", fontFamily: "monospace", fontSize: "12px", color: "#2B2320" }}>
@@ -438,6 +481,9 @@ function BonLivraisonTicket({ bon, onClose }) {
       <div style={{ borderTop: "1px dashed #999", marginTop: "6px", paddingTop: "6px" }}>
         {bon.lignes.map((l) => (
           <p key={l.id}>- {l.article?.designation || l.designation}{l.pointure ? ` T${l.pointure}` : ""} x{l.quantite} ({fmt(l.prixUnitaire)} F/u)</p>
+        ))}
+        {(bon.cartesLignes || []).map((c) => (
+          <p key={c.id}>- Carte cadeau {c.bonValeur.numero} ({fmt(c.bonValeur.montant)} F)</p>
         ))}
       </div>
       <div style={{ borderTop: "1px dashed #999", marginTop: "6px", paddingTop: "6px" }}>
@@ -482,13 +528,15 @@ function BonLivraisonTicket({ bon, onClose }) {
 // ------------------------------------------------------------
 function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
   const [statuts, setStatuts] = useState(Object.fromEntries(bon.lignes.map((l) => [l.id, "VENDU"])));
+  const [statutsCartes, setStatutsCartes] = useState(Object.fromEntries((bon.cartesLignes || []).map((c) => [c.id, "VENDU"])));
   const [clientId, setClientId] = useState(bon.clientId || "");
   const [typeVente, setTypeVente] = useState("Comptant");
   const [paiements, setPaiements] = useState([{ id: uid(), mode: "especes", montant: "" }]);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
   const lignesVendues = bon.lignes.filter((l) => statuts[l.id] === "VENDU");
-  const totalVendu = lignesVendues.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
+  const cartesVendues = (bon.cartesLignes || []).filter((c) => statutsCartes[c.id] === "VENDU");
+  const totalVendu = lignesVendues.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0) + cartesVendues.reduce((s, c) => s + c.bonValeur.montant, 0);
   const totalPayeSaisi = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
   const totalPaye = totalPayeSaisi + (bon.avance || 0);
   const resteAPercevoir = Math.max(0, totalVendu - (bon.avance || 0));
@@ -498,16 +546,17 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
   const retirerPaiement = (id) => setPaiements(paiements.filter((p) => p.id !== id));
 
   const cloturer = async () => {
-    if (lignesVendues.length > 0) {
-      if (typeVente === "Comptant" && totalPaye < totalVendu) { onError(`Le total payé (avance comprise) est inférieur au total des articles vendus. Il manque ${fmt(totalVendu - totalPaye)} F.`); return; }
+    if (lignesVendues.length > 0 || cartesVendues.length > 0) {
+      if (typeVente === "Comptant" && totalPaye < totalVendu) { onError(`Le total payé (avance comprise) est inférieur au total des articles et cartes vendus. Il manque ${fmt(totalVendu - totalPaye)} F.`); return; }
       if (typeVente === "Credit" && totalPaye > totalVendu) { onError("Le montant payé (avance comprise) ne peut pas dépasser le total pour une vente à crédit."); return; }
     }
     setEnvoiEnCours(true);
     try {
       const res = await api.bonsLivraison.cloturer(bon.id, {
         clientId: clientId || undefined, typeVente,
-        paiements: lignesVendues.length > 0 ? paiements.filter((p) => Number(p.montant) > 0).map((p) => ({ mode: p.mode, montant: Number(p.montant) })) : [],
+        paiements: (lignesVendues.length > 0 || cartesVendues.length > 0) ? paiements.filter((p) => Number(p.montant) > 0).map((p) => ({ mode: p.mode, montant: Number(p.montant) })) : [],
         lignes: bon.lignes.map((l) => ({ ligneId: l.id, statut: statuts[l.id] })),
+        cartes: (bon.cartesLignes || []).map((c) => ({ ligneCarteId: c.id, statut: statutsCartes[c.id] })),
       });
       onCloture(res);
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
@@ -541,7 +590,27 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
           ))}
         </div>
 
-        {lignesVendues.length > 0 && (
+        {(bon.cartesLignes || []).length > 0 && (
+          <div className="space-y-2 mb-5">
+            {bon.cartesLignes.map((c) => (
+              <div key={c.id} className="rounded-lg p-3 flex items-center justify-between flex-wrap gap-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                <div>
+                  <p className="text-sm font-medium">Carte cadeau {c.bonValeur.numero}</p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{fmt(c.bonValeur.montant)} F</p>
+                </div>
+                <div className="flex gap-1.5">
+                  {[["VENDU", "Vendue", "#3F6B4A", "#E9F0EA"], ["RETOURNE", "Rendue", "#6B5D52", "#F1E9DC"]].map(([val, label, fg, bg]) => (
+                    <button key={val} onClick={() => setStatutsCartes({ ...statutsCartes, [c.id]: val })} className="text-xs px-2.5 py-1.5 rounded-full font-medium" style={statutsCartes[c.id] === val ? { background: fg, color: "#FBF3EC" } : { background: bg, color: fg }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {(lignesVendues.length > 0 || cartesVendues.length > 0) && (
           <div className="rounded-xl p-4 mb-4" style={{ background: "#F1E9DC" }}>
             <p className="text-sm font-semibold mb-1">Encaissement — {fmt(totalVendu)} F au total</p>
             {bon.avance > 0 && (
