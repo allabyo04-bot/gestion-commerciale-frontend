@@ -223,6 +223,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [avance, setAvance] = useState("");
   const [avanceModePaiement, setAvanceModePaiement] = useState("especes");
+  const [avanceOuvert, setAvanceOuvert] = useState(false);
+  const [notesOuvert, setNotesOuvert] = useState(false);
 
   const resultatsClients = rechercheClient.trim()
     ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
@@ -277,187 +279,237 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
         cartesCadeaux: cartesCadeaux.map(({ numero }) => ({ numero })),
       });
       onCree(bon);
-      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes");
+      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes"); setAvanceOuvert(false); setNotesOuvert(false);
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
+
+  const champ = { ...selectStyle, width: "100%" };
+  const nbArticles = lignes.reduce((s, l) => s + l.quantite, 0);
+  const peutValider = lignes.length > 0 || cartesCadeaux.length > 0;
+  const avanceVisible = avanceOuvert || Number(avance) > 0;
+  const notesVisible = notesOuvert || notes.trim() !== "";
+  const lienStyle = { color: "#8C3B2E" };
 
   return (
     <div className="rounded-2xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
       <p className="font-display text-lg font-semibold mb-1">Nouveau bon de livraison</p>
       <p className="text-xs mb-4" style={{ color: "#6B5D52" }}>Le stock est retiré dès l'enregistrement — c'est le départ du livreur qui est noté ici, pas encore une vente.</p>
 
-      <div className="grid sm:grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
-          <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}>
-            <option value="">— Choisir —</option>
-            {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur</label>
-          <input value={livreurNom} onChange={(e) => setLivreurNom(e.target.value)} style={selectStyle} placeholder="Nom du livreur" />
-        </div>
-      </div>
-
-      <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
-        <p className="text-sm font-medium mb-3">Cliente</p>
-        <div className="grid sm:grid-cols-2 gap-3 mb-2">
-          <div>
-            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Téléphone</label>
-            <input value={clientTelephone} onChange={(e) => setClientTelephone(e.target.value)} style={selectStyle} placeholder="Ex : 0708735901" />
-          </div>
-          <div>
-            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom (optionnel)</label>
-            <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={selectStyle} placeholder="Si connu" />
-          </div>
-        </div>
-
-        {clientId && (
-          <p className="text-xs mb-2 flex items-center gap-2" style={{ color: "#3F6B4A" }}>
-            ✓ Rattachée à une fiche existante
-            <button onClick={() => setClientId("")} style={{ color: "#B04A3B" }}><X size={12} /></button>
-          </p>
-        )}
-
-        <div className="relative">
-          <input value={rechercheClient} onChange={(e) => setRechercheClient(e.target.value)} placeholder="Rechercher une fiche existante pour remplir automatiquement…" style={{ ...selectStyle, paddingLeft: "32px", width: "100%" }} />
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
-          {resultatsClients.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
-              {resultatsClients.map((c) => (
-                <button key={c.id} type="button" onClick={() => choisirClient(c)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
-                  {c.nomPrenoms} <span style={{ color: "#6B5D52" }}>{c.telephone ? `· ${c.telephone}` : ""}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-3">
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Lieu de livraison (quartier, adresse…)</label>
-          <input value={lieuLivraison} onChange={(e) => setLieuLivraison(e.target.value)} style={selectStyle} placeholder="Ex : Angré 8e Tranche, Cocody Riviera…" />
-          <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Aide à retrouver la bonne livraison au retour du livreur, surtout quand plusieurs sont en cours en même temps.</p>
-        </div>
-      </div>
-
-      <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
-        <p className="text-sm font-medium mb-3">Articles emportés par le livreur</p>
-        <div className="relative mb-3">
-          <input value={rechercheArticle} onChange={(e) => { setRechercheArticle(e.target.value); setArticleChoisi(null); }} placeholder="Rechercher par désignation ou référence…" style={{ ...selectStyle, paddingLeft: "32px", width: "100%" }} />
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
-          {resultatsRecherche.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
-              {resultatsRecherche.map((a) => (
-                <button key={a.id} type="button" onClick={() => choisirArticle(a)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
-                  {a.designation} <span style={{ color: "#6B5D52" }}>({a.reference})</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {articleChoisi && (
-          <div className="grid sm:grid-cols-4 gap-3 items-end">
-            <div className="sm:col-span-1"><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>Article</p><p className="text-sm font-medium">{articleChoisi.designation}</p></div>
-            {articleChoisi.famille === "Chaussure" && (
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
-                <select value={pointureChoisie} onChange={(e) => setPointureChoisie(e.target.value)} style={selectStyle}>
-                  <option value="">—</option>
-                  {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
-                </select>
-              </div>
-            )}
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
+        {/* ---------- Colonne gauche : livraison + cliente ---------- */}
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Quantité</label>
-              <input type="number" min="1" value={quantiteChoisie} onChange={(e) => setQuantiteChoisie(e.target.value)} style={selectStyle} />
-            </div>
-            <button onClick={ajouterLigne} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter</button>
-          </div>
-        )}
-      </div>
-
-      {lignes.length > 0 && (
-        <div className="rounded-xl overflow-hidden mb-4" style={{ border: "1px solid #EAE1D2" }}>
-          <table className="w-full text-sm">
-            <thead><tr style={{ background: "#F1E9DC", color: "#6B5D52" }}><th className="text-left px-3 py-2">Article</th><th className="text-left px-3 py-2">Pointure</th><th className="text-right px-3 py-2">Quantité</th><th></th></tr></thead>
-            <tbody>
-              {lignes.map((l) => (
-                <tr key={l.id} style={{ borderTop: "1px solid #EFE7D9" }}>
-                  <td className="px-3 py-2">{l.designation}</td>
-                  <td className="px-3 py-2">{l.pointure ? `T${l.pointure}` : "—"}</td>
-                  <td className="text-right px-3 py-2">{l.quantite}</td>
-                  <td className="text-right px-3 py-2"><button onClick={() => retirerLigne(l.id)} style={{ color: "#B04A3B" }}><X size={14} /></button></td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: "1px solid #EAE1D2" }}>
-                <td colSpan={3} className="text-right px-3 py-2 text-sm font-medium">Valeur totale des articles emportés</td>
-                <td className="text-right px-3 py-2 text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0))} F</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-
-      <div className="mb-4">
-        <p className="text-sm font-medium mb-2">Cartes cadeaux emportées par le livreur (optionnel)</p>
-        <div className="flex gap-2">
-          <input value={rechercheCarte} onChange={(e) => setRechercheCarte(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ajouterCarte()} placeholder="Numéro de la carte…" style={selectStyle} />
-          <button onClick={ajouterCarte} disabled={carteEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: carteEnCours ? 0.6 : 1 }}>{carteEnCours ? "..." : "Ajouter"}</button>
-        </div>
-        {cartesCadeaux.length > 0 && (
-          <div className="rounded-xl overflow-hidden mt-2" style={{ border: "1px solid #EAE1D2" }}>
-            {cartesCadeaux.map((c) => (
-              <div key={c.numero} className="flex items-center justify-between px-3 py-2" style={{ borderTop: "1px solid #EFE7D9" }}>
-                <span className="text-sm">Carte {c.numero}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">{fmt(c.montant)} F</span>
-                  <button onClick={() => retirerCarte(c.numero)} style={{ color: "#B04A3B" }}><X size={14} /></button>
-                </div>
-              </div>
-            ))}
-            <div className="flex items-center justify-between px-3 py-2" style={{ background: "#F1E9DC" }}>
-              <span className="text-sm font-medium">Valeur totale des cartes emportées</span>
-              <span className="text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(cartesCadeaux.reduce((s, c) => s + c.montant, 0))} F</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl p-4 mb-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
-        <p className="text-sm font-medium mb-1">Avance déjà perçue de la cliente ? <span className="font-normal" style={{ color: "#6B5D52" }}>(optionnel)</span></p>
-        <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Si la cliente a déjà versé un montant avant le départ du livreur — il apparaîtra sur le ticket, et sera automatiquement déduit du reste à payer au retour.</p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Montant de l'avance</label>
-            <input type="number" min="0" value={avance} onChange={(e) => setAvance(e.target.value)} style={selectStyle} placeholder="0" />
-          </div>
-          {Number(avance) > 0 && (
-            <div>
-              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Mode de paiement de l'avance</label>
-              <select value={avanceModePaiement} onChange={(e) => setAvanceModePaiement(e.target.value)} style={selectStyle}>
-                {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+              <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={champ}>
+                <option value="">— Choisir —</option>
+                {BOUTIQUES.map((b) => <option key={b}>{b}</option>)}
               </select>
             </div>
-          )}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur</label>
+              <input value={livreurNom} onChange={(e) => setLivreurNom(e.target.value)} style={champ} placeholder="Nom du livreur" />
+            </div>
+          </div>
+
+          <div className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+            <p className="text-sm font-medium mb-3">Cliente</p>
+
+            <div className="relative">
+              <input value={rechercheClient} onChange={(e) => setRechercheClient(e.target.value)} placeholder="Rechercher une fiche existante pour remplir automatiquement…" style={{ ...champ, paddingLeft: "32px" }} />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+              {resultatsClients.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
+                  {resultatsClients.map((c) => (
+                    <button key={c.id} type="button" onClick={() => choisirClient(c)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
+                      {c.nomPrenoms} <span style={{ color: "#6B5D52" }}>{c.telephone ? `· ${c.telephone}` : ""}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {clientId && (
+              <p className="text-xs mt-2 flex items-center gap-2" style={{ color: "#3F6B4A" }}>
+                ✓ Rattachée à une fiche existante
+                <button onClick={() => setClientId("")} style={{ color: "#B04A3B" }}><X size={12} /></button>
+              </p>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Téléphone</label>
+                <input value={clientTelephone} onChange={(e) => setClientTelephone(e.target.value)} style={champ} placeholder="Ex : 0708735901" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom (optionnel)</label>
+                <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={champ} placeholder="Si connu" />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Lieu de livraison (quartier, adresse…)</label>
+              <input value={lieuLivraison} onChange={(e) => setLieuLivraison(e.target.value)} style={champ} placeholder="Ex : Angré 8e Tranche, Cocody Riviera…" />
+              <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Aide à retrouver la bonne livraison au retour du livreur.</p>
+            </div>
+          </div>
         </div>
-        {Number(avance) > 0 && lignes.length > 0 && (
-          <p className="text-xs mt-3" style={{ color: "#3F6B4A" }}>
-            Reste à payer si la cliente garde tout : {fmt(Math.max(0, lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0) - Number(avance)))} F
-          </p>
+
+        {/* ---------- Colonne droite : ce que le livreur emporte ---------- */}
+        <div className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+          <p className="text-sm font-medium mb-3">Ce que le livreur emporte</p>
+
+          <p className="text-xs font-medium mb-1" style={{ color: "#6B5D52" }}>Articles</p>
+          <div className="relative mb-3">
+            <input value={rechercheArticle} onChange={(e) => { setRechercheArticle(e.target.value); setArticleChoisi(null); }} placeholder="Rechercher par désignation ou référence…" style={{ ...champ, paddingLeft: "32px" }} />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
+            {resultatsRecherche.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2", maxHeight: "220px", overflowY: "auto" }}>
+                {resultatsRecherche.map((a) => (
+                  <button key={a.id} type="button" onClick={() => choisirArticle(a)} className="w-full text-left px-3 py-2 text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
+                    {a.designation} <span style={{ color: "#6B5D52" }}>({a.reference})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {articleChoisi && (
+            <div className="mb-3 space-y-2">
+              <div><p className="text-xs mb-0.5" style={{ color: "#6B5D52" }}>Article choisi</p><p className="text-sm font-medium">{articleChoisi.designation}</p></div>
+              <div className="flex gap-3 items-end flex-wrap">
+                {articleChoisi.famille === "Chaussure" && (
+                  <div style={{ width: "110px" }}>
+                    <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
+                    <select value={pointureChoisie} onChange={(e) => setPointureChoisie(e.target.value)} style={champ}>
+                      <option value="">—</option>
+                      {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div style={{ width: "100px" }}>
+                  <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Quantité</label>
+                  <input type="number" min="1" value={quantiteChoisie} onChange={(e) => setQuantiteChoisie(e.target.value)} style={champ} />
+                </div>
+                <button onClick={ajouterLigne} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter</button>
+              </div>
+            </div>
+          )}
+
+          {lignes.length > 0 && (
+            <div className="rounded-xl overflow-hidden mb-3" style={{ border: "1px solid #EAE1D2", background: "#FFFFFF" }}>
+              <table className="w-full text-sm">
+                <thead><tr style={{ background: "#F1E9DC", color: "#6B5D52" }}><th className="text-left px-3 py-2">Article</th><th className="text-left px-3 py-2">Pointure</th><th className="text-right px-3 py-2">Quantité</th><th></th></tr></thead>
+                <tbody>
+                  {lignes.map((l) => (
+                    <tr key={l.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                      <td className="px-3 py-2">{l.designation}</td>
+                      <td className="px-3 py-2">{l.pointure ? `T${l.pointure}` : "—"}</td>
+                      <td className="text-right px-3 py-2">{l.quantite}</td>
+                      <td className="text-right px-3 py-2"><button onClick={() => retirerLigne(l.id)} style={{ color: "#B04A3B" }}><X size={14} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: "1px solid #EAE1D2" }}>
+                    <td colSpan={3} className="text-right px-3 py-2 text-sm font-medium">Valeur totale des articles emportés</td>
+                    <td className="text-right px-3 py-2 text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0))} F</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          <div className="pt-3" style={{ borderTop: "1px solid #EFE7D9" }}>
+            <p className="text-xs font-medium mb-1" style={{ color: "#6B5D52" }}>Cartes cadeaux (optionnel)</p>
+            <div className="flex gap-2">
+              <input value={rechercheCarte} onChange={(e) => setRechercheCarte(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ajouterCarte()} placeholder="Numéro de la carte…" style={{ ...champ, flex: 1, minWidth: 0 }} />
+              <button onClick={ajouterCarte} disabled={carteEnCours} className="px-4 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: carteEnCours ? 0.6 : 1 }}>{carteEnCours ? "..." : "Ajouter"}</button>
+            </div>
+            {cartesCadeaux.length > 0 && (
+              <div className="rounded-xl overflow-hidden mt-2" style={{ border: "1px solid #EAE1D2", background: "#FFFFFF" }}>
+                {cartesCadeaux.map((c) => (
+                  <div key={c.numero} className="flex items-center justify-between px-3 py-2" style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <span className="text-sm">Carte {c.numero}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">{fmt(c.montant)} F</span>
+                      <button onClick={() => retirerCarte(c.numero)} style={{ color: "#B04A3B" }}><X size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-3 py-2" style={{ background: "#F1E9DC" }}>
+                  <span className="text-sm font-medium">Valeur totale des cartes emportées</span>
+                  <span className="text-sm font-semibold" style={{ color: "#8C3B2E" }}>{fmt(cartesCadeaux.reduce((s, c) => s + c.montant, 0))} F</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Avance et notes : repliés tant qu'ils sont vides ---------- */}
+      <div className="mt-4">
+        {(!avanceVisible || !notesVisible) && (
+          <div className="flex gap-5 flex-wrap">
+            {!avanceVisible && <button type="button" onClick={() => setAvanceOuvert(true)} className="text-sm font-medium" style={lienStyle}>+ Avance déjà perçue de la cliente</button>}
+            {!notesVisible && <button type="button" onClick={() => setNotesOuvert(true)} className="text-sm font-medium" style={lienStyle}>+ Ajouter une note</button>}
+          </div>
+        )}
+
+        {(avanceVisible || notesVisible) && (
+          <div className="grid lg:grid-cols-2 gap-4 items-start" style={{ marginTop: !avanceVisible || !notesVisible ? "12px" : 0 }}>
+            {avanceVisible && (
+              <div className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium">Avance déjà perçue de la cliente <span className="font-normal" style={{ color: "#6B5D52" }}>(optionnel)</span></p>
+                  {Number(avance) === 0 && <button type="button" onClick={() => setAvanceOuvert(false)} className="text-xs" style={{ color: "#6B5D52" }}>Masquer</button>}
+                </div>
+                <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Elle apparaîtra sur le ticket et sera déduite du reste à payer au retour.</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Montant de l'avance</label>
+                    <input type="number" min="0" value={avance} onChange={(e) => setAvance(e.target.value)} style={champ} placeholder="0" />
+                  </div>
+                  {Number(avance) > 0 && (
+                    <div>
+                      <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Mode de paiement de l'avance</label>
+                      <select value={avanceModePaiement} onChange={(e) => setAvanceModePaiement(e.target.value)} style={champ}>
+                        {MODES_PAIEMENT.filter((m) => m.id !== "bon_achat" && m.id !== "avoir").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {Number(avance) > 0 && lignes.length > 0 && (
+                  <p className="text-xs mt-3" style={{ color: "#3F6B4A" }}>
+                    Reste à payer si la cliente garde tout : {fmt(Math.max(0, lignes.reduce((s, l) => s + l.prixVente * l.quantite, 0) - Number(avance)))} F
+                  </p>
+                )}
+              </div>
+            )}
+
+            {notesVisible && (
+              <div className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium">Notes <span className="font-normal" style={{ color: "#6B5D52" }}>(optionnel)</span></label>
+                  {notes.trim() === "" && <button type="button" onClick={() => setNotesOuvert(false)} className="text-xs" style={{ color: "#6B5D52" }}>Masquer</button>}
+                </div>
+                <input value={notes} onChange={(e) => setNotes(e.target.value)} style={champ} placeholder="Ex : livraison prévue avant 18h" />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="mb-4">
-        <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Notes (optionnel)</label>
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} style={selectStyle} placeholder="Ex : livraison prévue avant 18h" />
+      {/* ---------- Barre fixe en bas : récapitulatif + bouton d'enregistrement ---------- */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 px-5 py-3 rounded-b-2xl flex items-center justify-between flex-wrap gap-3" style={{ background: "#FFFFFF", borderTop: "1px solid #EAE1D2", boxShadow: "0 -4px 12px rgba(43,35,32,0.06)" }}>
+        <p className="text-sm" style={{ color: "#6B5D52" }}>
+          <span className="font-medium" style={{ color: "#2B2320" }}>{nbArticles}</span> article{nbArticles > 1 ? "s" : ""}
+          {" · "}<span className="font-medium" style={{ color: "#2B2320" }}>{cartesCadeaux.length}</span> carte{cartesCadeaux.length > 1 ? "s" : ""} cadeau
+          {Number(avance) > 0 && <>{" · "}avance <span className="font-medium" style={{ color: "#2B2320" }}>{fmt(Number(avance))} F</span></>}
+        </p>
+        <button onClick={valider} disabled={envoiEnCours || !peutValider} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: envoiEnCours || !peutValider ? 0.6 : 1 }}>
+          <Truck size={16} /> {envoiEnCours ? "Enregistrement..." : "Enregistrer le départ et imprimer le bon"}
+        </button>
       </div>
-
-      <button onClick={valider} disabled={envoiEnCours || lignes.length === 0} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", opacity: envoiEnCours || lignes.length === 0 ? 0.6 : 1 }}>
-        <Truck size={16} /> {envoiEnCours ? "Enregistrement..." : "Enregistrer le départ et imprimer le bon"}
-      </button>
     </div>
   );
 }
