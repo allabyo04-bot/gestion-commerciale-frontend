@@ -22,7 +22,7 @@ function debutMoisISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-export default function DashboardSection() {
+export default function DashboardSection({ onNaviguerVentes } = {}) {
   const { user, permissions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
   const peutVoirVentes = !!permissions.ventes;
@@ -108,7 +108,9 @@ export default function DashboardSection() {
         setRemisesEnAttente({
           nombre: remisesRes.length,
           total: remisesRes.reduce((s, r) => s + r.montantRemise, 0),
-          top: remisesRes.slice(0, 5),
+          top: [...remisesRes]
+            .sort((a, b) => new Date(a.createdAt || a.vente?.date || a.retour?.date || 0) - new Date(b.createdAt || b.vente?.date || b.retour?.date || 0))
+            .slice(0, 5),
         });
         setResumeCartesCadeaux(resumeRes);
 
@@ -309,7 +311,12 @@ export default function DashboardSection() {
             <p className="text-xs font-mono uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
               <CreditCard size={14} /> Créances en cours
             </p>
-            <p className="font-display text-2xl font-semibold mb-1">{fmt(credits.total)} F</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-display text-2xl font-semibold">{fmt(credits.total)} F</p>
+              {onNaviguerVentes && (
+                <button type="button" onClick={() => onNaviguerVentes("credit")} className="text-xs font-medium" style={{ color: COULEUR.accent }}>Voir tout →</button>
+              )}
+            </div>
             <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>{credits.nombreClients} client(s) concerné(s)</p>
           {credits.top.length > 0 && (
               <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
@@ -338,7 +345,12 @@ export default function DashboardSection() {
               <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Rien à traiter pour l'instant.</p>
             ) : (
               <>
-                <p className="font-display text-2xl font-semibold mb-1">{remisesEnAttente.nombre} demande(s)</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-display text-2xl font-semibold">{remisesEnAttente.nombre} demande(s)</p>
+                  {onNaviguerVentes && (
+                    <button type="button" onClick={() => onNaviguerVentes("remises-admin")} className="text-xs font-medium" style={{ color: "#B04A3B" }}>Voir tout →</button>
+                  )}
+                </div>
                 <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>{fmt(remisesEnAttente.total)} F à régulariser au total</p>
                 <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
                   {remisesEnAttente.top.map((r) => (

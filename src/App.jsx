@@ -18,6 +18,7 @@ import { LIVRAISON_ACTIF } from "./constants.js";
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
   const [tab, setTab] = useState("accueil");
+  const [ventesSubTabDemande, setVentesSubTabDemande] = useState(null);
   const [nbRemisesEnAttente, setNbRemisesEnAttente] = useState(0);
   const estAdmin = !!user?.role?.systeme;
   useEffect(() => {
@@ -80,8 +81,12 @@ function Shell() {
         </div>
       </header>
       <div className="max-w-6xl mx-auto px-6 sm:px-10 py-8">
-        {activeTab === "accueil" && <DashboardSection />}
-        {activeTab === "ventes" && <VentesSection />}
+        {activeTab === "accueil" && (
+          <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} />
+        )}
+        {activeTab === "ventes" && (
+          <VentesSection subTabInitial={ventesSubTabDemande} onSubTabInitialConsomme={() => setVentesSubTabDemande(null)} />
+        )}
         {activeTab === "livraison" && <LivraisonSection />}
         {activeTab === "etats" && <EtatsSection />}
         {activeTab === "depenses" && <DepensesSection />}

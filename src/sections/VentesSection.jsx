@@ -11,10 +11,16 @@ function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 // forme les caissières à son utilisation — repasser à true dès qu'elle donne le feu vert.
 const WHATSAPP_RECU_ACTIF = true;
 
-export default function VentesSection() {
+export default function VentesSection({ subTabInitial, onSubTabInitialConsomme } = {}) {
   const { user } = useAuth();
   const estAdmin = !!user?.role?.systeme;
-  const [subTab, setSubTab] = useState("nouvelle");
+  const [subTab, setSubTab] = useState(subTabInitial || "nouvelle");
+  useEffect(() => {
+    if (subTabInitial) {
+      setSubTab(subTabInitial);
+      onSubTabInitialConsomme?.();
+    }
+  }, [subTabInitial, onSubTabInitialConsomme]);
   const [articles, setArticles] = useState([]);
   const [brands, setBrands] = useState([]);
   const [clients, setClients] = useState([]);
