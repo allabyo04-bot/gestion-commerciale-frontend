@@ -765,7 +765,7 @@ function RemisesAdminSection({ onTraite }) {
         ))}
       </div>
       {vue === "EN_ATTENTE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Cette liste se met a jour automatiquement toutes les 5 secondes.</p>}
-      {vue === "APPROUVEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Corrections de CA déjà appliquées — le CA du jour de la vente a été ajusté à la baisse (pas celui du jour d'approbation). Pense à reporter chaque ajustement dans Ciel sur la bonne date.</p>}
+      {vue === "APPROUVEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Corrections de CA déjà appliquées — le CA du jour de la vente a été ajusté à la baisse (pas celui du jour d'approbation). Pense à reporter chaque ajustement dans ta comptabilité sur la bonne date.</p>}
       {vue === "REFUSEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Historique des remises refusées — utile pour retrouver un écart en caisse resté à régulariser manuellement.</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
       {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>{vue === "EN_ATTENTE" ? "Aucune demande en attente pour le moment." : vue === "APPROUVEE" ? "Aucune remise approuvée pour l'instant." : "Aucune remise refusée."}</p>}

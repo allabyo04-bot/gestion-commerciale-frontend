@@ -366,12 +366,12 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
                   {remisesEnAttente.top.map((r) => {
                     const jours = Math.floor((Date.now() - new Date(r.createdAt).getTime()) / 86400000);
                     return (
-                      <div key={r.id} className="flex items-center justify-between text-sm">
-                        <span>
+                      <div key={r.id} className="flex items-start justify-between gap-3 text-sm">
+                        <span className="min-w-0">
                           {r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}{r.vente ? ` · vente du ${new Date(r.vente.date).toLocaleDateString("fr-FR")}` : ""}
                           {jours >= 1 && <span className="ml-1.5" style={{ color: jours >= 3 ? "#B04A3B" : COULEUR.texteDoux }}>· en attente depuis {jours} jour{jours > 1 ? "s" : ""}</span>}
                         </span>
-                        <span className="font-mono" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
+                        <span className="font-mono shrink-0 whitespace-nowrap text-right" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
                       </div>
                     );
                   })}
@@ -392,19 +392,19 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
               )}
             </div>
             <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>
-              Le CA de ces journées a été corrigé après coup — pense à reporter l'ajustement dans Ciel sur la date de la vente, pas celle de l'approbation.
+              Le CA de ces journées a été corrigé après coup — pense à reporter l'ajustement dans ta comptabilité sur la date de la vente, pas celle de l'approbation.
             </p>
             <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
               {correctionsRemises.map((r) => {
                 const dateVente = r.vente?.date || r.retour?.date;
                 return (
-                  <div key={r.id} className="flex items-center justify-between text-sm">
-                    <span>
+                  <div key={r.id} className="flex items-start justify-between gap-3 text-sm">
+                    <span className="min-w-0">
                       {r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}
                       {dateVente && <> · vente du <strong>{new Date(dateVente).toLocaleDateString("fr-FR")}</strong></>}
                       <span className="ml-1.5" style={{ color: COULEUR.texteDoux }}>(approuvée le {new Date(r.dateTraitement).toLocaleDateString("fr-FR")})</span>
                     </span>
-                    <span className="font-mono" style={{ color: "#3F6B4A" }}>-{fmt(r.montantRemise)} F</span>
+                    <span className="font-mono shrink-0 whitespace-nowrap text-right" style={{ color: "#3F6B4A" }}>-{fmt(r.montantRemise)} F</span>
                   </div>
                 );
               })}
