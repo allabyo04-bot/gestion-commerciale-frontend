@@ -41,6 +41,7 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
   const [meilleurVendeur, setMeilleurVendeur] = useState(null);
   const [anniversaires, setAnniversaires] = useState([]);
   const [remisesEnAttente, setRemisesEnAttente] = useState(null);
+  const [correctionsRemises, setCorrectionsRemises] = useState(null);
   const [resumeCartesCadeaux, setResumeCartesCadeaux] = useState([]);
   const [livraisonJour, setLivraisonJour] = useState(null);
 
@@ -101,8 +102,9 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
         }));
         setAnniversaires(bientotAvecCumul);
 
-        const [remisesRes, resumeRes] = await Promise.all([
+        const [remisesRes, remisesApprouveesRes, resumeRes] = await Promise.all([
           api.remises.list("EN_ATTENTE"),
+          api.remises.list("APPROUVEE"),
           api.denominationsCartesCadeaux.resume(),
         ]);
         setRemisesEnAttente({
@@ -112,6 +114,14 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
             .sort((a, b) => new Date(a.createdAt || a.vente?.date || a.retour?.date || 0) - new Date(b.createdAt || b.vente?.date || b.retour?.date || 0))
             .slice(0, 5),
         });
+        // Corrections de CA déjà appliquées suite à une remise approuvée — utile pour repérer
+        // quelles journées ont bougé après coup (voir le jour de la vente, pas celui de
+        // l'approbation, dans États → Par date).
+        setCorrectionsRemises(
+          [...remisesApprouveesRes]
+            .sort((a, b) => new Date(b.dateTraitement) - new Date(a.dateTraitement))
+            .slice(0, 5)
+        );
         setResumeCartesCadeaux(resumeRes);
 
         if (LIVRAISON_ACTIF) {
@@ -353,15 +363,52 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
                 </div>
                 <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>{fmt(remisesEnAttente.total)} F à régulariser au total</p>
                 <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
-                  {remisesEnAttente.top.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between text-sm">
-                      <span>{r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}{r.vente ? ` · vente du ${new Date(r.vente.date).toLocaleDateString("fr-FR")}` : ""}</span>
-                      <span className="font-mono" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
-                    </div>
-                  ))}
+                  {remisesEnAttente.top.map((r) => {
+                    const jours = Math.floor((Date.now() - new Date(r.createdAt).getTime()) / 86400000);
+                    return (
+                      <div key={r.id} className="flex items-center justify-between text-sm">
+                        <span>
+                          {r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}{r.vente ? ` · vente du ${new Date(r.vente.date).toLocaleDateString("fr-FR")}` : ""}
+                          {jours >= 1 && <span className="ml-1.5" style={{ color: jours >= 3 ? "#B04A3B" : COULEUR.texteDoux }}>· en attente depuis {jours} jour{jours > 1 ? "s" : ""}</span>}
+                        </span>
+                        <span className="font-mono" style={{ color: "#B04A3B" }}>{fmt(r.montantRemise)} F</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {estAdmin && correctionsRemises && correctionsRemises.length > 0 && (
+          <div className="rounded-2xl p-5" style={{ background: COULEUR.carte, border: `1px solid ${COULEUR.bordure}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-mono uppercase tracking-wide flex items-center gap-1.5" style={{ color: COULEUR.accent }}>
+                <Percent size={14} /> Corrections de CA suite à remise
+              </p>
+              {onNaviguerVentes && (
+                <button type="button" onClick={() => onNaviguerVentes("remises-admin")} className="text-xs font-medium" style={{ color: COULEUR.accent }}>Voir tout →</button>
+              )}
+            </div>
+            <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>
+              Le CA de ces journées a été corrigé après coup — pense à reporter l'ajustement dans Ciel sur la date de la vente, pas celle de l'approbation.
+            </p>
+            <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+              {correctionsRemises.map((r) => {
+                const dateVente = r.vente?.date || r.retour?.date;
+                return (
+                  <div key={r.id} className="flex items-center justify-between text-sm">
+                    <span>
+                      {r.numero}{r.clientNom ? ` · ${r.clientNom}` : ""}
+                      {dateVente && <> · vente du <strong>{new Date(dateVente).toLocaleDateString("fr-FR")}</strong></>}
+                      <span className="ml-1.5" style={{ color: COULEUR.texteDoux }}>(approuvée le {new Date(r.dateTraitement).toLocaleDateString("fr-FR")})</span>
+                    </span>
+                    <span className="font-mono" style={{ color: "#3F6B4A" }}>-{fmt(r.montantRemise)} F</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

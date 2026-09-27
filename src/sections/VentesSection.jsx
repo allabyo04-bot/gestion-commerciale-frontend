@@ -757,7 +757,7 @@ function RemisesAdminSection({ onTraite }) {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        {[["EN_ATTENTE", "En attente"], ["REFUSEE", "Refusées"]].map(([id, label]) => (
+        {[["EN_ATTENTE", "En attente"], ["APPROUVEE", "Approuvées"], ["REFUSEE", "Refusées"]].map(([id, label]) => (
           <button key={id} onClick={() => setVue(id)} className="px-4 py-2 rounded-full text-sm font-medium"
             style={vue === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
             {label}
@@ -765,9 +765,10 @@ function RemisesAdminSection({ onTraite }) {
         ))}
       </div>
       {vue === "EN_ATTENTE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Cette liste se met a jour automatiquement toutes les 5 secondes.</p>}
+      {vue === "APPROUVEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Corrections de CA déjà appliquées — le CA du jour de la vente a été ajusté à la baisse (pas celui du jour d'approbation). Pense à reporter chaque ajustement dans Ciel sur la bonne date.</p>}
       {vue === "REFUSEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Historique des remises refusées — utile pour retrouver un écart en caisse resté à régulariser manuellement.</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
-      {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>{vue === "EN_ATTENTE" ? "Aucune demande en attente pour le moment." : "Aucune remise refusée."}</p>}
+      {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>{vue === "EN_ATTENTE" ? "Aucune demande en attente pour le moment." : vue === "APPROUVEE" ? "Aucune remise approuvée pour l'instant." : "Aucune remise refusée."}</p>}
       <div className="space-y-3">
         {demandes.map((d) => (
           <div key={d.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -782,6 +783,11 @@ function RemisesAdminSection({ onTraite }) {
               {vue === "REFUSEE" && (
                 <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>
                   Refusée le {new Date(d.dateTraitement).toLocaleString("fr-FR")} par {d.traitePar?.prenom} {d.traitePar?.nom} — le CA de la vente est resté au plein tarif, l'écart en caisse (le cas échéant) reste à régulariser manuellement
+                </p>
+              )}
+              {vue === "APPROUVEE" && (
+                <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
+                  Approuvée le {new Date(d.dateTraitement).toLocaleString("fr-FR")} par {d.traitePar?.prenom} {d.traitePar?.nom} — le CA a été corrigé sur le jour de la vente ci-dessous, pas sur celui-ci
                 </p>
               )}
               {d.vente ? (
