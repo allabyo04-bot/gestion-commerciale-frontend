@@ -63,6 +63,19 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  fidelite: {
+    client: (id) => request(`/api/fidelite/client/${id}`),
+    paliersBonus: () => request("/api/fidelite/paliers-bonus"),
+    creerPalierBonus: (data) => request("/api/fidelite/paliers-bonus", { method: "POST", body: data }),
+    majPalierBonus: (id, data) => request(`/api/fidelite/paliers-bonus/${id}`, { method: "PUT", body: data }),
+    supprimerPalierBonus: (id) => request(`/api/fidelite/paliers-bonus/${id}`, { method: "DELETE" }),
+    paliersStatut: () => request("/api/fidelite/paliers-statut"),
+    creerPalierStatut: (data) => request("/api/fidelite/paliers-statut", { method: "POST", body: data }),
+    majPalierStatut: (id, data) => request(`/api/fidelite/paliers-statut/${id}`, { method: "PUT", body: data }),
+    supprimerPalierStatut: (id) => request(`/api/fidelite/paliers-statut/${id}`, { method: "DELETE" }),
+    changementsStatut: (tous) => request(`/api/fidelite/changements-statut${tous ? "?tous=1" : ""}`),
+    marquerChangementStatutVu: (id) => request(`/api/fidelite/changements-statut/${id}/vu`, { method: "PUT" }),
+  },
   journalAudit: {
     list: (params = {}) => {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();

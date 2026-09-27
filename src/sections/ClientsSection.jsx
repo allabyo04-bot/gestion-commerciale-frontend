@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt, Download, Crown } from "lucide-react";
 import { api } from "../api.js";
-import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, PAYS_INDICATIF, QUARTIERS_PAR_COMMUNE, BOUTIQUES, fmt } from "../constants.js";
+import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, PAYS_INDICATIF, QUARTIERS_PAR_COMMUNE, BOUTIQUES, FIDELITE_ACTIF, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 
 export default function ClientsSection() {
@@ -255,6 +255,51 @@ function AnniversairesReport({ clients }) {
   );
 }
 
+function BlocFidelite({ clientId }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => { api.fidelite.client(clientId).then(setInfo).catch(() => {}); }, [clientId]);
+  if (!info) return null;
+
+  return (
+    <div className="rounded-xl p-5 mb-5" style={{ background: "#FFFDF9", border: "1px solid #EAE1D2" }}>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <p className="text-xs font-mono uppercase tracking-wide flex items-center gap-1.5" style={{ color: "#A8823D" }}>
+          <Crown size={14} /> Fidélité Cendrillon
+        </p>
+        {info.statut && <span className="text-sm font-semibold px-3 py-1 rounded-full" style={{ background: "#FBF3E3", color: "#A8823D" }}>{info.statut}</span>}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3 text-sm mb-3">
+        <div>
+          <span style={{ color: "#6B5D52" }}>Cumul pour le prochain bonus : </span>
+          <span className="font-mono font-semibold">{fmt(info.cumulFideliteCourant)} F</span>
+        </div>
+        <div>
+          <span style={{ color: "#6B5D52" }}>Volume total (statut) : </span>
+          <span className="font-mono">{fmt(info.cumulFideliteTotal)} F</span>
+        </div>
+      </div>
+      {info.bonusDisponible > 0 && (
+        <p className="text-sm font-medium mb-3" style={{ color: "#3F6B4A" }}>
+          🎁 Bonus disponible : {fmt(info.bonusDisponible)} F (dès son prochain achat d'au moins ce montant)
+        </p>
+      )}
+      {info.historique && info.historique.length > 0 && (
+        <div className="pt-3" style={{ borderTop: "1px solid #EFE7D9" }}>
+          <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Bonus déjà utilisés</p>
+          <div className="space-y-1">
+            {info.historique.map((h) => (
+              <div key={h.id} className="flex items-center justify-between text-xs">
+                <span style={{ color: "#6B5D52" }}>{new Date(h.createdAt).toLocaleDateString("fr-FR")} · vente {h.vente?.numero}</span>
+                <span className="font-mono" style={{ color: "#3F6B4A" }}>-{fmt(h.montant)} F</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoriqueAchatsView({ client }) {
   const achats = client?.ventes || [];
   const totalCumule = achats.reduce((s, v) => s + v.total, 0);
@@ -262,6 +307,7 @@ function HistoriqueAchatsView({ client }) {
 
   return (
     <div>
+      {FIDELITE_ACTIF && <BlocFidelite clientId={client.id} />}
       <div className="rounded-xl p-5 mb-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div><p className="font-display text-lg font-semibold">{client.nomPrenoms}</p><p className="text-xs font-mono" style={{ color: "#6B5D52" }}>{client.carteFidelite ? `Carte ${client.carteFidelite} · ` : ""}{client.code}</p></div>

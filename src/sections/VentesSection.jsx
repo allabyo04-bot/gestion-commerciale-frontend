@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, fmt } from "../constants.js";
+import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
@@ -46,6 +46,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [boutique, setBoutique] = useState(estAdmin ? "" : (user?.boutique || BOUTIQUES[0]));
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [fideliteClient, setFideliteClient] = useState(null);
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
   const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
@@ -126,6 +127,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const total = lignes.reduce((s, l) => s + l.sousTotal, 0);
 
   useEffect(() => {
+    if (!FIDELITE_ACTIF || !clientId || typeVente !== "Comptant") { setFideliteClient(null); return; }
+    api.fidelite.client(clientId).then(setFideliteClient).catch(() => setFideliteClient(null));
+  }, [clientId, typeVente]);
+  const bonusApplicable = fideliteClient?.bonusDisponible > 0 && total >= fideliteClient.bonusDisponible;
+
+  useEffect(() => {
     if (demandeRemise && demandeRemise.totalVente !== total) {
       setDemandeRemise(null);
       setError("Le panier a change depuis la demande de remise : elle a ete annulee. Refais une demande si besoin.");
@@ -134,8 +141,9 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   }, [total]);
 
   const montantRemiseApplique = demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.montantRemise : 0;
+  const montantBonusApplique = bonusApplicable ? fideliteClient.bonusDisponible : 0;
   const totalCartesCadeauxPanier = cartesCadeauxPanier.reduce((s, c) => s + c.montant, 0);
-  const totalNet = total - montantRemiseApplique + totalCartesCadeauxPanier;
+  const totalNet = total - montantRemiseApplique - montantBonusApplique + totalCartesCadeauxPanier;
   const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
   const reste = totalNet - totalPaye;
 
@@ -368,6 +376,17 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   )}
                 </Field>
               </div>
+              {FIDELITE_ACTIF && fideliteClient && (fideliteClient.bonusDisponible > 0 || (fideliteClient.prochainPalierDistance != null && fideliteClient.prochainPalierDistance <= 50000)) && (
+                <div className="mt-3 px-3 py-2 rounded-lg text-sm" style={bonusApplicable ? { background: "#E9F0EA", color: "#3F6B4A" } : { background: "#FBF3E3", color: "#A8823D" }}>
+                  {bonusApplicable ? (
+                    <>🎁 Bonus fidélité de <strong>{fmt(fideliteClient.bonusDisponible)} F</strong> — sera déduit automatiquement à la validation.</>
+                  ) : fideliteClient.bonusDisponible > 0 ? (
+                    <>🎁 Cette cliente a un bonus de {fmt(fideliteClient.bonusDisponible)} F, mais le panier actuel ({fmt(total)} F) n'atteint pas ce montant — il reste disponible pour un prochain achat.</>
+                  ) : fideliteClient.prochainPalierDistance != null && fideliteClient.prochainPalierDistance <= 50000 ? (
+                    <>👑 Cendrillon : il ne manque que {fmt(fideliteClient.prochainPalierDistance)} F à cette cliente pour débloquer son prochain bonus.</>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl p-5" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -473,7 +492,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                     <button onClick={() => setDemandeRemise(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
                   </div>
                 )}
-                {(montantRemiseApplique > 0 || totalCartesCadeauxPanier > 0) && (
+                {montantBonusApplique > 0 && (
+                  <div className="flex items-center justify-between mt-2 text-sm font-semibold" style={{ color: "#3F6B4A" }}>
+                    <span>🎁 BONUS FIDÉLITÉ</span><span>- {fmt(montantBonusApplique)} F</span>
+                  </div>
+                )}
+                {(montantRemiseApplique > 0 || montantBonusApplique > 0 || totalCartesCadeauxPanier > 0) && (
                   <div className="flex items-center justify-between mt-2 text-sm font-semibold">
                     <span style={{ color: "#6B5D52" }}>Net a payer</span><span style={{ color: "#3F6B4A" }}>{fmt(totalNet)} F</span>
                   </div>
@@ -643,6 +667,11 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 export function ReceiptModal({ vente, onClose }) {
   const infos = INFOS_BOUTIQUE[vente.boutique] || {};
 const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
+  const [fideliteRecu, setFideliteRecu] = useState(null);
+  useEffect(() => {
+    if (!FIDELITE_ACTIF || !vente.client?.id) return;
+    api.fidelite.client(vente.client.id).then(setFideliteRecu).catch(() => {});
+  }, [vente.client?.id]);
 
   const numeroWhatsApp = (numero, pays) => {
     if (!numero) return null;
@@ -690,14 +719,30 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
           {vente.lignes.map((l) => <div key={l.id} className="flex justify-between gap-2 text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span className="whitespace-nowrap">{fmt(l.sousTotal)} F</span></div>)}
           {vente.cartesCadeauxEmises?.map((c) => <div key={c.id} className="flex justify-between gap-2 text-xs"><span>Carte cadeau n° {c.numero}</span><span className="whitespace-nowrap">{fmt(c.montant)} F</span></div>)}
         </div>
-        {vente.montantRemise > 0 ? (
+        {(vente.montantRemise > 0 || vente.montantBonusFidelite > 0) ? (
           <div className="mt-3 space-y-1">
-            <div className="flex justify-between gap-2 text-xs" style={{ color: "#6B5D52" }}><span>Sous-total</span><span className="whitespace-nowrap">{fmt(vente.total + vente.montantRemise)} F</span></div>
-            <div className="flex justify-between gap-2 text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Remise accordee</span><span className="whitespace-nowrap">- {fmt(vente.montantRemise)} F</span></div>
+            <div className="flex justify-between gap-2 text-xs" style={{ color: "#6B5D52" }}><span>Sous-total</span><span className="whitespace-nowrap">{fmt(vente.total + vente.montantRemise + (vente.montantBonusFidelite || 0))} F</span></div>
+            {vente.montantRemise > 0 && (
+              <div className="flex justify-between gap-2 text-xs font-medium" style={{ color: "#3F6B4A" }}><span>Remise accordee</span><span className="whitespace-nowrap">- {fmt(vente.montantRemise)} F</span></div>
+            )}
+            {vente.montantBonusFidelite > 0 && (
+              <div className="flex justify-between gap-2 text-xs font-medium" style={{ color: "#3F6B4A" }}><span>BONUS FIDÉLITÉ</span><span className="whitespace-nowrap">- {fmt(vente.montantBonusFidelite)} F</span></div>
+            )}
             <div className="flex justify-between gap-2 font-semibold text-sm"><span>NET A PAYER</span><span className="whitespace-nowrap">{fmt(vente.total)} F</span></div>
           </div>
         ) : (
           <div className="flex justify-between gap-2 font-semibold mt-3 text-sm"><span>TOTAL</span><span className="whitespace-nowrap">{fmt(vente.total)} F</span></div>
+        )}
+        {FIDELITE_ACTIF && fideliteRecu && (
+          <div className="mt-3 pt-2 text-xs" style={{ borderTop: "1px dashed #DDD3C4", color: "#A8823D" }}>
+            {fideliteRecu.statut && <div className="font-semibold">👑 STATUT : {fideliteRecu.statut.toUpperCase()}</div>}
+            <div>Cumul fidélité en cours : {fmt(fideliteRecu.cumulFideliteCourant)} F</div>
+            {fideliteRecu.bonusDisponible > 0 ? (
+              <div>Bonus disponible : {fmt(fideliteRecu.bonusDisponible)} F dès ton prochain achat</div>
+            ) : fideliteRecu.prochainPalierDistance != null ? (
+              <div>Plus que {fmt(fideliteRecu.prochainPalierDistance)} F avant ton prochain bonus</div>
+            ) : null}
+          </div>
         )}
 {vente.typeVente === "Credit" && (
           <div className="mt-1 space-y-1">

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet, X } from "lucide-react";
+import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet, X, Crown } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { fmt, MOIS, LIVRAISON_ACTIF, MODES_PAIEMENT } from "../constants.js";
+import { fmt, MOIS, LIVRAISON_ACTIF, FIDELITE_ACTIF, MODES_PAIEMENT } from "../constants.js";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -42,6 +42,8 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
   const [anniversaires, setAnniversaires] = useState([]);
   const [remisesEnAttente, setRemisesEnAttente] = useState(null);
   const [correctionsRemises, setCorrectionsRemises] = useState(null);
+  const [changementsStatut, setChangementsStatut] = useState(null);
+  const [statutEnCours, setStatutEnCours] = useState(null);
   const [resumeCartesCadeaux, setResumeCartesCadeaux] = useState([]);
   const [livraisonJour, setLivraisonJour] = useState(null);
 
@@ -127,6 +129,9 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
         if (LIVRAISON_ACTIF) {
           api.etats.livraisonJour().then(setLivraisonJour).catch(() => {});
         }
+        if (FIDELITE_ACTIF) {
+          api.fidelite.changementsStatut().then(setChangementsStatut).catch(() => {});
+        }
       }      
 
     // Alerte stock faible : utile pour un gestionnaire de stock au quotidien, pas pour Djenie
@@ -160,6 +165,14 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
       await api.bonsValeur.marquerRappel(bon.id, !bon.rappelEffectue);
       chargerEcheances();
     } catch (e) { /* ignore, l'utilisateur peut retenter */ } finally { setRappelEnCours(null); }
+  };
+
+  const marquerStatutVu = async (changement) => {
+    setStatutEnCours(changement.id);
+    try {
+      await api.fidelite.marquerChangementStatutVu(changement.id);
+      setChangementsStatut((liste) => liste.filter((c) => c.id !== changement.id));
+    } catch (e) { /* ignore, l'utilisateur peut retenter */ } finally { setStatutEnCours(null); }
   };
 
   if (chargement) return <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Chargement…</p>;
@@ -264,6 +277,31 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {FIDELITE_ACTIF && peutVoirVentes && changementsStatut && changementsStatut.length > 0 && (
+        <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: "1px solid #A8823D" }}>
+          <p className="text-xs font-mono uppercase tracking-wide mb-1 flex items-center gap-1.5" style={{ color: "#A8823D" }}>
+            <Crown size={14} /> Nouveaux statuts Cendrillon
+          </p>
+          <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>Une occasion de reconnaître ces clientes — à toi de voir s'il y a un geste commercial à faire.</p>
+          <div className="space-y-2">
+            {changementsStatut.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FBF3E3" }}>
+                <div>
+                  <p className="text-sm font-medium">{c.client?.nomPrenoms || "Cliente inconnue"}</p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>
+                    {c.ancienStatut ? `${c.ancienStatut} → ` : ""}<strong>{c.nouveauStatut}</strong>
+                    {c.client?.telephone ? ` · ${c.client.telephone}` : ""}
+                  </p>
+                </div>
+                <button onClick={() => marquerStatutVu(c)} disabled={statutEnCours === c.id} className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap" style={{ background: "#A8823D", color: "#2B2320" }}>
+                  Vu
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

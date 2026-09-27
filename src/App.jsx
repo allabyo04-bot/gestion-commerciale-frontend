@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, ScrollText } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, ScrollText, Crown } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import UtilisateursSection from "./sections/UtilisateursSection.jsx";
@@ -11,10 +11,11 @@ import DashboardSection from "./sections/DashboardSection.jsx";
 import DepensesSection from "./sections/DepensesSection.jsx";
 import LivraisonSection from "./sections/LivraisonSection.jsx";
 import JournalAuditSection from "./sections/JournalAuditSection.jsx";
+import FideliteSection from "./sections/FideliteSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
-import { LIVRAISON_ACTIF } from "./constants.js";
+import { LIVRAISON_ACTIF, FIDELITE_ACTIF } from "./constants.js";
 
 function Shell() {
   const { user, loading, logout, permissions } = useAuth();
@@ -50,6 +51,8 @@ function Shell() {
     // Réservé à l'administrateur (Djenie) — pas une question de permission par rôle, comme côté
     // serveur qui vérifie directement role.systeme plutôt qu'une permission dédiée.
     ...(estAdmin ? [{ id: "journal-audit", label: "Journal d'audit", icon: ScrollText }] : []),
+    // Chantier en cours, masqué tant que Djenie n'a pas donné le feu vert (voir constants.js).
+    ...(estAdmin && FIDELITE_ACTIF ? [{ id: "fidelite", label: "Fidélité", icon: Crown }] : []),
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
   return (
@@ -101,6 +104,7 @@ function Shell() {
         {activeTab === "stock" && <StockSection />}
         {activeTab === "roles" && <RolesSection />}
         {activeTab === "journal-audit" && <JournalAuditSection />}
+        {activeTab === "fidelite" && <FideliteSection />}
         {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
       </div>
     </div>
