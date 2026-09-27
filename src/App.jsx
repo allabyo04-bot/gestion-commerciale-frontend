@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, ScrollText } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import UtilisateursSection from "./sections/UtilisateursSection.jsx";
@@ -10,6 +10,7 @@ import EtatsSection from "./sections/EtatsSection.jsx";
 import DashboardSection from "./sections/DashboardSection.jsx";
 import DepensesSection from "./sections/DepensesSection.jsx";
 import LivraisonSection from "./sections/LivraisonSection.jsx";
+import JournalAuditSection from "./sections/JournalAuditSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
@@ -46,6 +47,9 @@ function Shell() {
     { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
     { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
+    // Réservé à l'administrateur (Djenie) — pas une question de permission par rôle, comme côté
+    // serveur qui vérifie directement role.systeme plutôt qu'une permission dédiée.
+    ...(estAdmin ? [{ id: "journal-audit", label: "Journal d'audit", icon: ScrollText }] : []),
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
   return (
@@ -96,6 +100,7 @@ function Shell() {
         {activeTab === "utilisateurs" && <UtilisateursSection />}
         {activeTab === "stock" && <StockSection />}
         {activeTab === "roles" && <RolesSection />}
+        {activeTab === "journal-audit" && <JournalAuditSection />}
         {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
       </div>
     </div>
