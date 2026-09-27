@@ -354,7 +354,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
 
       {!loading && tab === "virements" && <VirementsSection articles={articles || []} onDone={load} />}
-      {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} />}
+      {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} estAdmin={estAdmin} />}
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
       {tab === "soldes" && <SoldesSection brands={brands} />}
@@ -614,15 +614,71 @@ function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement 
   );
 }
 
-function EtatStockSection({ articles }) {
+// Une ligne de stock est "basse" si elle passe SOUS le seuil fixe, OU sous le pourcentage de son
+// stock initial (quand celui-ci est connu — voir StockItem.quantiteInitiale). Un article qui n'a
+// jamais été réapprovisionné depuis l'ajout de ce suivi n'a que le seuil fixe qui s'applique.
+function ligneEnStockBas(stockItem, parametres) {
+  if (!parametres) return false;
+  if (stockItem.quantite <= parametres.seuilFixe) return true;
+  if (stockItem.quantiteInitiale != null && stockItem.quantiteInitiale > 0) {
+    return stockItem.quantite <= (stockItem.quantiteInitiale * parametres.seuilPourcentage) / 100;
+  }
+  return false;
+}
+function articleEnStockBas(article, parametres) {
+  return (article.stocks || []).some((s) => ligneEnStockBas(s, parametres));
+}
+
+function ReglagesStockBas({ parametres, onMaj }) {
+  const [seuilFixe, setSeuilFixe] = useState(parametres.seuilFixe);
+  const [seuilPourcentage, setSeuilPourcentage] = useState(parametres.seuilPourcentage);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const modifie = seuilFixe !== parametres.seuilFixe || seuilPourcentage !== parametres.seuilPourcentage;
+
+  const enregistrer = async () => {
+    setEnvoi(true); setErreur("");
+    try {
+      const maj = await api.articles.majParametresStock(seuilFixe, seuilPourcentage);
+      onMaj(maj);
+    } catch (e) { setErreur(e.message); } finally { setEnvoi(false); }
+  };
+
+  return (
+    <div className="rounded-2xl p-4 mb-5 flex flex-wrap items-end gap-4" style={{ background: "#FFFDF9", border: "1px solid #EAE1D2" }}>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Alerte si quantité ≤</label>
+        <input type="number" min="0" value={seuilFixe} onChange={(e) => setSeuilFixe(parseInt(e.target.value, 10) || 0)}
+          className="w-24" style={inputStyle} />
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Ou si quantité ≤ ce % du stock initial</label>
+        <input type="number" min="0" max="100" value={seuilPourcentage} onChange={(e) => setSeuilPourcentage(parseInt(e.target.value, 10) || 0)}
+          className="w-24" style={inputStyle} />
+      </div>
+      {modifie && (
+        <button onClick={enregistrer} disabled={envoi} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>
+          {envoi ? "Enregistrement..." : "Enregistrer"}
+        </button>
+      )}
+      {erreur && <p className="text-xs w-full" style={{ color: "#B04A3B" }}>{erreur}</p>}
+    </div>
+  );
+}
+
+function EtatStockSection({ articles, estAdmin }) {
   const [filtreFamille, setFiltreFamille] = useState("Tous");
   const [filtreQuantite, setFiltreQuantite] = useState("tous");
   const [filtreActif, setFiltreActif] = useState("tous");
+  const [parametresStock, setParametresStock] = useState(null);
+
+  useEffect(() => { api.articles.parametresStock().then(setParametresStock).catch(() => {}); }, []);
 
   const filtered = articles.filter((a) => {
     if (filtreFamille !== "Tous" && a.famille !== filtreFamille) return false;
     if (filtreQuantite === "nulle" && totalStock(a) !== 0) return false;
     if (filtreQuantite === "stock" && totalStock(a) === 0) return false;
+    if (filtreQuantite === "bas" && !articleEnStockBas(a, parametresStock)) return false;
     if (filtreActif === "actifs" && a.actif === false) return false;
     if (filtreActif === "veille" && a.actif !== false) return false;
     return true;
@@ -634,6 +690,7 @@ function EtatStockSection({ articles }) {
   const articlesPourEncarts = articles.filter((a) => {
     if (filtreQuantite === "nulle" && totalStock(a) !== 0) return false;
     if (filtreQuantite === "stock" && totalStock(a) === 0) return false;
+    if (filtreQuantite === "bas" && !articleEnStockBas(a, parametresStock)) return false;
     if (filtreActif === "actifs" && a.actif === false) return false;
     if (filtreActif === "veille" && a.actif !== false) return false;
     return true;
@@ -654,8 +711,9 @@ function EtatStockSection({ articles }) {
           </button>
         ))}
       </div>
+      {estAdmin && parametresStock && <ReglagesStockBas parametres={parametresStock} onMaj={setParametresStock} />}
       <div className="flex gap-2 mb-3">
-        {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"]].map(([id, label]) => (
+        {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"], ["bas", "Stock bas"]].map(([id, label]) => (
           <button key={id} onClick={() => setFiltreQuantite(id)} className="px-4 py-2 rounded-full text-sm font-medium"
             style={filtreQuantite === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
             {label}
@@ -704,19 +762,26 @@ function EtatStockSection({ articles }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((a) => (
+            {filtered.map((a) => {
+              const bas = articleEnStockBas(a, parametresStock);
+              return (
               <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9" }}>
                 <td className="px-4 py-2">
                   {a.designation} <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {a.reference}</span>
                   {a.actif === false && <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{ background: "#DDD3C4", color: "#6B5D52" }}>En veille</span>}
+                  {bas && <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{ background: "#FBEAE7", color: "#B04A3B" }}>⚠ Stock bas</span>}
                 </td>
                 <td className="px-4 py-2">{a.famille}</td>
-                {BOUTIQUES.map((b) => (
-                  <td key={b} className="text-right px-4 py-2">{(a.stocks || []).filter((s) => s.boutique === b).reduce((s, i) => s + i.quantite, 0)}</td>
-                ))}
+                {BOUTIQUES.map((b) => {
+                  const stockLigne = (a.stocks || []).filter((s) => s.boutique === b);
+                  const total = stockLigne.reduce((s, i) => s + i.quantite, 0);
+                  const basIci = stockLigne.some((s) => ligneEnStockBas(s, parametresStock));
+                  return <td key={b} className="text-right px-4 py-2" style={basIci ? { color: "#B04A3B", fontWeight: 600 } : undefined}>{total}</td>;
+                })}
                 <td className="text-right px-4 py-2 font-semibold">{totalStock(a)}</td>
               </tr>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
               <tr><td colSpan={2 + BOUTIQUES.length + 1} className="px-4 py-6 text-center" style={{ color: "#6B5D52" }}>Aucun article.</td></tr>
             )}

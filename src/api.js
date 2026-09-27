@@ -89,6 +89,9 @@ ajouterStock: (id, boutique, pointure, quantite) =>
       request(`/api/articles/${id}/stock/ajouter`, { method: "POST", body: { boutique, pointure, quantite } }),
     virementStock: (id, boutiqueSource, boutiqueDestination, pointure, quantite) =>
       request(`/api/articles/${id}/stock/virement`, { method: "POST", body: { boutiqueSource, boutiqueDestination, pointure, quantite } }),
+    parametresStock: () => request("/api/articles/parametres-stock"),
+    majParametresStock: (seuilFixe, seuilPourcentage) =>
+      request("/api/articles/parametres-stock", { method: "PUT", body: { seuilFixe, seuilPourcentage } }),
     importApercu: async (formData) => {
       const token = localStorage.getItem("gc_token");
       const res = await fetch(`${API_URL}/api/articles/import/apercu`, {

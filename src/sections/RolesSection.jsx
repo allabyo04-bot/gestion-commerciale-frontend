@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { ErrorBanner } from "../components/Shared.jsx";
 
 const PERM_LABELS = [
-  ["ventes", "Ventes"], ["stock", "Stock"], ["clients", "Clients / CRM"],
+  ["ventes", "Ventes"], ["livraison", "Livraison"], ["stock", "Stock"], ["clients", "Clients / CRM"],
   ["rapports", "Rapports"], ["utilisateurs", "Utilisateurs"], ["configuration", "Configuration"],
 ];
 const ROLE_COLORS = {
@@ -47,7 +47,7 @@ export default function RolesSection() {
     const codeConfirmation = window.prompt("Code de confirmation (action sensible) :");
     if (codeConfirmation === null) return;
     try {
-      await api.roles.create({ nom, permissions: { ventes: false, stock: false, clients: false, rapports: false, utilisateurs: false, configuration: false }, codeConfirmation });
+      await api.roles.create({ nom, permissions: { ventes: false, livraison: false, stock: false, clients: false, rapports: false, utilisateurs: false, configuration: false }, codeConfirmation });
       setNewRoleName("");
       load();
     } catch (e) { setError(e.message); }

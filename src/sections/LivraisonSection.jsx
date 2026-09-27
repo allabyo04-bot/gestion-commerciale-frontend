@@ -651,7 +651,7 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
                   <p className="text-xs" style={{ color: "#6B5D52" }}>{fmt(c.bonValeur.montant)} F</p>
                 </div>
                 <div className="flex gap-1.5">
-                  {[["VENDU", "Vendue", "#3F6B4A", "#E9F0EA"], ["RETOURNE", "Rendue", "#6B5D52", "#F1E9DC"]].map(([val, label, fg, bg]) => (
+                  {[["VENDU", "Vendue", "#3F6B4A", "#E9F0EA"], ["RETOURNE", "Rendue", "#6B5D52", "#F1E9DC"], ["PERDUE", "Perdue", "#B04A3B", "#FBEAE7"]].map(([val, label, fg, bg]) => (
                     <button key={val} onClick={() => setStatutsCartes({ ...statutsCartes, [c.id]: val })} className="text-xs px-2.5 py-1.5 rounded-full font-medium" style={statutsCartes[c.id] === val ? { background: fg, color: "#FBF3EC" } : { background: bg, color: fg }}>
                       {label}
                     </button>

@@ -728,18 +728,22 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
 }
 
 function RemisesAdminSection({ onTraite }) {
+  const [vue, setVue] = useState("EN_ATTENTE"); // "EN_ATTENTE" | "REFUSEE"
   const [demandes, setDemandes] = useState([]);
   const [error, setError] = useState("");
   const [traitementId, setTraitementId] = useState(null);
 
   const load = useCallback(async () => {
-    try { setDemandes(await api.remises.list("EN_ATTENTE")); } catch (e) { setError(e.message); }
-  }, []);
+    try { setDemandes(await api.remises.list(vue)); } catch (e) { setError(e.message); }
+  }, [vue]);
   useEffect(() => {
     load();
+    // L'actualisation automatique n'a d'intérêt que sur les demandes en attente — la liste des
+    // refusées ne bouge pas toute seule.
+    if (vue !== "EN_ATTENTE") return;
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, vue]);
 
   const traiter = async (demande, statut) => {
     setTraitementId(demande.id);
@@ -752,9 +756,18 @@ function RemisesAdminSection({ onTraite }) {
 
   return (
     <div>
-      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Cette liste se met a jour automatiquement toutes les 5 secondes.</p>
+      <div className="flex gap-2 mb-4">
+        {[["EN_ATTENTE", "En attente"], ["REFUSEE", "Refusées"]].map(([id, label]) => (
+          <button key={id} onClick={() => setVue(id)} className="px-4 py-2 rounded-full text-sm font-medium"
+            style={vue === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {vue === "EN_ATTENTE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Cette liste se met a jour automatiquement toutes les 5 secondes.</p>}
+      {vue === "REFUSEE" && <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Historique des remises refusées — utile pour retrouver un écart en caisse resté à régulariser manuellement.</p>}
       {error && <p className="text-sm mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>{error}</p>}
-      {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune demande en attente pour le moment.</p>}
+      {demandes.length === 0 && <p className="text-sm" style={{ color: "#6B5D52" }}>{vue === "EN_ATTENTE" ? "Aucune demande en attente pour le moment." : "Aucune remise refusée."}</p>}
       <div className="space-y-3">
         {demandes.map((d) => (
           <div key={d.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
@@ -766,13 +779,18 @@ function RemisesAdminSection({ onTraite }) {
               <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>
                 Panier {fmt(d.totalVente)} F · Remise demandee : {d.type === "POURCENTAGE" ? `${d.valeur}%` : `${fmt(d.valeur)} F`} → <strong style={{ color: "#8C3B2E" }}>-{fmt(d.montantRemise)} F</strong>
               </p>
+              {vue === "REFUSEE" && (
+                <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>
+                  Refusée le {new Date(d.dateTraitement).toLocaleString("fr-FR")} par {d.traitePar?.prenom} {d.traitePar?.nom} — le CA de la vente est resté au plein tarif, l'écart en caisse (le cas échéant) reste à régulariser manuellement
+                </p>
+              )}
               {d.vente ? (
                 <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
-                  Vente {d.vente.numero} du {new Date(d.vente.date).toLocaleDateString("fr-FR")} — après approbation, vérifier le CA de <strong>ce jour-là</strong> dans États → Par date (pas "aujourd'hui" si la vente date d'un autre jour)
+                  Vente {d.vente.numero} du {new Date(d.vente.date).toLocaleDateString("fr-FR")}{vue === "EN_ATTENTE" ? " — après approbation, vérifier le CA de ce jour-là dans États → Par date (pas \"aujourd'hui\" si la vente date d'un autre jour)" : ""}
                 </p>
               ) : d.retour ? (
                 <p className="text-xs mt-1" style={{ color: "#3F6B4A" }}>
-                  Supplément d'échange sur la vente {d.retour.vente?.numero || "—"} du {new Date(d.retour.date).toLocaleDateString("fr-FR")} — le montant réduit a déjà été encaissé, approuver ou refuser sert ici uniquement de trace pour toi
+                  Supplément d'échange sur la vente {d.retour.vente?.numero || "—"} du {new Date(d.retour.date).toLocaleDateString("fr-FR")}{vue === "EN_ATTENTE" ? " — le montant réduit a déjà été encaissé, approuver ou refuser sert ici uniquement de trace pour toi" : ""}
                 </p>
               ) : (
                 <p className="text-xs mt-1" style={{ color: "#6B5D52", fontStyle: "italic" }}>
@@ -780,10 +798,12 @@ function RemisesAdminSection({ onTraite }) {
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => traiter(d, "REFUSEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Refuser</button>
-              <button onClick={() => traiter(d, "APPROUVEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Approuver</button>
-            </div>
+            {vue === "EN_ATTENTE" && (
+              <div className="flex gap-2">
+                <button onClick={() => traiter(d, "REFUSEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#B04A3B" }}>Refuser</button>
+                <button onClick={() => traiter(d, "APPROUVEE")} disabled={traitementId === d.id} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Approuver</button>
+              </div>
+            )}
           </div>
         ))}
       </div>

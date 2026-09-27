@@ -316,6 +316,7 @@ export default function EtatsSection() {
           <p className="text-sm mb-1">Règlements de crédit reçus aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsRecus)}</strong></p>
           <p className="text-sm mb-1">Cartes cadeaux vendues aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalCartesCadeauxVendues)}</strong></p>
           <p className="text-sm mb-1">Règlements de créances historiques aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalReglementsCreancesHistoriques)}</strong></p>
+          <p className="text-sm mb-1">Avances de livraison perçues aujourd'hui : <strong style={{ color: COULEUR.accent }}>+ {formatFCFA(fermeture.totalAvancesLivraison)}</strong></p>
           <p className="text-sm font-semibold mb-3" style={{ borderTop: `1px solid ${COULEUR.bordure}`, paddingTop: "8px" }}>Total encaissé (caisse) : <strong>{formatFCFA(fermeture.totalEncaisseGlobal)}</strong></p>
 
           {fermeture.remisesEnAttente?.length > 0 && (
@@ -400,6 +401,25 @@ export default function EtatsSection() {
                       <td className="py-1">{r.clientNom}</td>
                       <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === r.mode)?.label || r.mode}</td>
                       <td className="text-right py-1">{formatFCFA(r.montant)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {fermeture.avancesLivraisonDetail?.length > 0 && (
+            <>
+              <p className="text-xs font-semibold mb-1" style={{ color: COULEUR.texteDoux }}>Détail des avances de livraison perçues</p>
+              <table className="w-full text-sm">
+                <thead><tr style={{ color: COULEUR.texteDoux }}><th className="text-left py-1">Bon</th><th className="text-left py-1">Client</th><th className="text-left py-1">Mode</th><th className="text-right py-1">Montant</th></tr></thead>
+                <tbody>
+                  {fermeture.avancesLivraisonDetail.map((a, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${COULEUR.bordure}` }}>
+                      <td className="py-1">{a.bonNumero}</td>
+                      <td className="py-1">{a.clientNom}</td>
+                      <td className="py-1">{MODES_PAIEMENT.find((m) => m.id === a.mode)?.label || a.mode}</td>
+                      <td className="text-right py-1">{formatFCFA(a.montant)}</td>
                     </tr>
                   ))}
                 </tbody>
