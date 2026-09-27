@@ -130,6 +130,11 @@ function FichesClients() {
   return (
     <div>
       <FiltrePeriode dateDebut={dateDebut} setDateDebut={setDateDebut} dateFin={dateFin} setDateFin={setDateFin} />
+      {(dateDebut || dateFin) && (
+        <p className="text-xs mb-3" style={{ color: "#A8823D" }}>
+          Les anciennes fiches (créées avant ce suivi, date de création inconnue) sont exclues d'un filtre par période — retire le filtre pour les revoir.
+        </p>
+      )}
       {error && <ErrorBanner error={error} />}
       {clients === null ? (
         <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
@@ -152,11 +157,11 @@ function FichesClients() {
                     <span className="ml-1.5 font-mono text-xs" style={{ color: "#6B5D52" }}>{c.code}</span>
                     {!c.telephone && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBEAE7", color: "#B04A3B" }}>Sans téléphone</span>}
                     <div className="text-xs mt-1" style={{ color: "#6B5D52" }}>
-                      Créée par {c.creePar ? `${c.creePar.prenom} ${c.creePar.nom}` : "inconnu (ancienne fiche)"}
+                      Créée par {c.creePar ? `${c.creePar.prenom} ${c.creePar.nom}` : "inconnu (ancienne fiche, avant ce suivi)"}
                     </div>
                   </div>
-                  <span className="text-xs shrink-0 whitespace-nowrap" style={{ color: "#6B5D52" }}>
-                    {new Date(c.createdAt).toLocaleDateString("fr-FR")}
+                  <span className="text-xs shrink-0 whitespace-nowrap text-right" style={{ color: c.creePar ? "#6B5D52" : "#A8823D" }}>
+                    {c.creePar ? new Date(c.createdAt).toLocaleDateString("fr-FR") : "Date inconnue"}
                   </span>
                 </div>
               ))}
