@@ -1538,6 +1538,9 @@ function CartesCadeauxListeSection({ estAdmin, cartes, onCorrige }) {
           <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
             <div>
               <p className="font-mono text-sm font-medium">{c.numero}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>
+                {c.client ? `${c.client.nomPrenoms}${c.client.telephone ? ` · ${c.client.telephone}` : " · téléphone non renseigné"}` : "Client inconnu"}
+              </p>
               <p className="text-xs" style={{ color: "#6B5D52" }}>{c.dateValidite ? `Expire le ${new Date(c.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}{!c.modePaiement ? " · Historique" : ""}</p>
             </div>
             <div className="flex items-center gap-3">
@@ -1576,7 +1579,10 @@ function AvoirsSection() {
           <div key={a.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
             <div>
               <p className="font-mono text-sm font-medium">{a.numero}</p>
-              <p className="text-xs" style={{ color: "#6B5D52" }}>{a.client?.nomPrenoms || "Client inconnu"} · {a.dateValidite ? `Valide jusqu'au ${new Date(a.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>
+                {a.client ? `${a.client.nomPrenoms}${a.client.telephone ? ` · ${a.client.telephone}` : " · téléphone non renseigné"}` : "Client inconnu"}
+              </p>
+              <p className="text-xs" style={{ color: "#6B5D52" }}>{a.dateValidite ? `Valide jusqu'au ${new Date(a.dateValidite).toLocaleDateString("fr-FR")}` : "Sans expiration"}</p>
             </div>
             <div className="text-right">
               <p className="font-mono text-sm">{fmt(a.montant)} F</p>
