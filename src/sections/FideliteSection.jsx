@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Gift, Crown, Plus, Trash2, Pencil, Users } from "lucide-react";
+import { Gift, Crown, Plus, Trash2, Pencil, Users, Bell } from "lucide-react";
 import { api } from "../api.js";
 import { fmt } from "../constants.js";
 import { ErrorBanner } from "../components/Shared.jsx";
@@ -7,7 +7,7 @@ import { ErrorBanner } from "../components/Shared.jsx";
 const inputStyle = { border: "1px solid #DDD3C4", borderRadius: 8, padding: "8px 10px", fontSize: 14 };
 
 function Onglets({ vue, setVue }) {
-  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users]];
+  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users], ["CHANGEMENTS", "Changements de statut", Bell]];
   return (
     <div className="flex gap-2 mb-5">
       {items.map(([id, label, Icon]) => (
@@ -212,6 +212,54 @@ function ClientesBonusDisponible() {
   );
 }
 
+function ChangementsStatut() {
+  const [liste, setListe] = useState(null);
+  const [error, setError] = useState("");
+  const [enCours, setEnCours] = useState(null);
+
+  const load = useCallback(async () => {
+    try { setListe(await api.fidelite.changementsStatut()); } catch (e) { setError(e.message); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const marquerVu = async (c) => {
+    setEnCours(c.id);
+    try { await api.fidelite.marquerChangementStatutVu(c.id); setListe((l) => l.filter((x) => x.id !== c.id)); }
+    catch (e) { setError(e.message); } finally { setEnCours(null); }
+  };
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>
+        Toutes les clientes ayant changé de statut Cendrillon, pas encore marquées vues. Une occasion de les reconnaître — à toi de voir s'il y a un geste commercial à faire.
+      </p>
+      {error && <ErrorBanner error={error} />}
+      {liste === null ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+      ) : liste.length === 0 ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun changement de statut en attente.</p>
+      ) : (
+        <div className="space-y-2">
+          {liste.map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FBF3E3" }}>
+              <div>
+                <p className="text-sm font-medium">{c.client?.nomPrenoms || "Cliente inconnue"}</p>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>
+                  {c.ancienStatut ? `${c.ancienStatut} → ` : ""}<strong>{c.nouveauStatut}</strong>
+                  {c.client?.telephone ? ` · ${c.client.telephone}` : ""}
+                </p>
+              </div>
+              <button onClick={() => marquerVu(c)} disabled={enCours === c.id} className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap" style={{ background: "#A8823D", color: "#2B2320" }}>
+                Vu
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FideliteSection() {
   const [vue, setVue] = useState("BONUS");
   return (
@@ -222,6 +270,7 @@ export default function FideliteSection() {
       {vue === "BONUS" && <PaliersBonus />}
       {vue === "STATUT" && <PaliersStatut />}
       {vue === "CLIENTES" && <ClientesBonusDisponible />}
+      {vue === "CHANGEMENTS" && <ChangementsStatut />}
     </div>
   );
 }

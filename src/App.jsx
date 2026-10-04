@@ -56,56 +56,54 @@ function Shell() {
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320" }}>
-      <header className="no-print px-6 py-5 sm:px-10" style={{ borderBottom: "1px solid #DDD3C4", background: "#FFFDF9" }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4">
-         <div className="flex items-center gap-4">
-            <img src={logo} alt="La Pointure Espagnole" style={{ height: "56px", width: "auto" }} />
-            <div>
-              <p className="text-xs tracking-[0.2em] uppercase font-mono" style={{ color: "#8C3B2E" }}>Gestion Commerciale & CRM</p>
-              <p className="text-xs italic mt-0.5" style={{ color: "#B8A88F", fontFamily: "'Georgia', serif" }}>by Phil et Osée</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex gap-2 flex-wrap">
-              {NAV.map(({ id, label, icon: Icon }) => (
-                <button key={id} onClick={() => setTab(id)} className="relative flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
-                  style={activeTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
-                  <Icon size={14} /> {label}
-                  {id === "ventes" && estAdmin && nbRemisesEnAttente > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full text-[10px] font-bold animate-pulse"
-                      style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
-                      title={`${nbRemisesEnAttente} remise(s) en attente de validation`}>
-                      {nbRemisesEnAttente}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 pl-3" style={{ borderLeft: "1px solid #DDD3C4" }}>
-              <span className="text-sm" style={{ color: "#6B5D52" }}>{user.prenom} {user.nom}</span>
-              <button onClick={logout} aria-label="Se déconnecter" style={{ color: "#8C3B2E" }}><LogOut size={16} /></button>
-            </div>
+    <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320", display: "flex" }}>
+      <aside className="no-print w-16 md:w-60 shrink-0" style={{ borderRight: "1px solid #DDD3C4", background: "#FFFDF9", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <div className="flex items-center justify-center md:justify-start gap-3 px-2 md:px-5 py-5" style={{ borderBottom: "1px solid #DDD3C4" }}>
+          <img src={logo} alt="La Pointure Espagnole" style={{ height: "40px", width: "auto" }} />
+          <div className="hidden md:block">
+            <p className="text-[10px] tracking-[0.15em] uppercase font-mono leading-tight" style={{ color: "#8C3B2E" }}>Gestion Commerciale</p>
+            <p className="text-[10px] italic mt-0.5" style={{ color: "#B8A88F", fontFamily: "'Georgia', serif" }}>by Phil et Osée</p>
           </div>
         </div>
-      </header>
-      <div className="max-w-6xl mx-auto px-6 sm:px-10 py-8">
-        {activeTab === "accueil" && (
-          <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} />
-        )}
-        {activeTab === "ventes" && (
-          <VentesSection subTabInitial={ventesSubTabDemande} onSubTabInitialConsomme={() => setVentesSubTabDemande(null)} />
-        )}
-        {activeTab === "livraison" && <LivraisonSection />}
-        {activeTab === "etats" && <EtatsSection />}
-        {activeTab === "depenses" && <DepensesSection />}
-        {activeTab === "clients" && <ClientsSection />}
-        {activeTab === "utilisateurs" && <UtilisateursSection />}
-        {activeTab === "stock" && <StockSection />}
-        {activeTab === "roles" && <RolesSection />}
-        {activeTab === "journal-audit" && <JournalAuditSection />}
-        {activeTab === "fidelite" && <FideliteSection />}
-        {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
+        <nav className="flex-1 overflow-y-auto px-2 md:px-3 py-4 flex flex-col gap-1">
+          {NAV.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setTab(id)} title={label} className="relative flex items-center justify-center md:justify-start gap-2.5 px-2 md:px-3 py-2.5 rounded-lg text-sm font-medium text-left"
+              style={activeTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52" }}>
+              <Icon size={18} className="shrink-0" /> <span className="truncate hidden md:inline">{label}</span>
+              {id === "ventes" && estAdmin && nbRemisesEnAttente > 0 && (
+                <span className="md:ml-auto absolute top-0.5 right-0.5 md:static flex items-center justify-center rounded-full text-[10px] font-bold animate-pulse shrink-0"
+                  style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
+                  title={`${nbRemisesEnAttente} remise(s) en attente de validation`}>
+                  {nbRemisesEnAttente}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="flex items-center justify-center md:justify-between gap-2 px-2 md:px-4 py-4" style={{ borderTop: "1px solid #DDD3C4" }}>
+          <span className="text-sm truncate hidden md:inline" style={{ color: "#6B5D52" }}>{user.prenom} {user.nom}</span>
+          <button onClick={logout} aria-label="Se déconnecter" title="Se déconnecter" style={{ color: "#8C3B2E" }}><LogOut size={18} /></button>
+        </div>
+      </aside>
+      <div className="flex-1 min-w-0 px-6 sm:px-10 py-8 overflow-y-auto">
+        <div className="max-w-6xl mx-auto">
+          {activeTab === "accueil" && (
+            <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} onNaviguerFidelite={() => setTab("fidelite")} />
+          )}
+          {activeTab === "ventes" && (
+            <VentesSection subTabInitial={ventesSubTabDemande} onSubTabInitialConsomme={() => setVentesSubTabDemande(null)} />
+          )}
+          {activeTab === "livraison" && <LivraisonSection />}
+          {activeTab === "etats" && <EtatsSection />}
+          {activeTab === "depenses" && <DepensesSection />}
+          {activeTab === "clients" && <ClientsSection />}
+          {activeTab === "utilisateurs" && <UtilisateursSection />}
+          {activeTab === "stock" && <StockSection />}
+          {activeTab === "roles" && <RolesSection />}
+          {activeTab === "journal-audit" && <JournalAuditSection />}
+          {activeTab === "fidelite" && <FideliteSection />}
+          {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
+        </div>
       </div>
     </div>
   );

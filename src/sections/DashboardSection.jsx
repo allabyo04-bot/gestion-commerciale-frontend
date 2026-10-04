@@ -22,7 +22,7 @@ function debutMoisISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-export default function DashboardSection({ onNaviguerVentes } = {}) {
+export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite } = {}) {
   const { user, permissions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
   const peutVoirVentes = !!permissions.ventes;
@@ -283,12 +283,17 @@ export default function DashboardSection({ onNaviguerVentes } = {}) {
 
       {FIDELITE_ACTIF && peutVoirVentes && changementsStatut && changementsStatut.length > 0 && (
         <div className="rounded-2xl p-5 mb-6" style={{ background: COULEUR.carte, border: "1px solid #A8823D" }}>
-          <p className="text-xs font-mono uppercase tracking-wide mb-1 flex items-center gap-1.5" style={{ color: "#A8823D" }}>
-            <Crown size={14} /> Nouveaux statuts Cendrillon
-          </p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-mono uppercase tracking-wide flex items-center gap-1.5" style={{ color: "#A8823D" }}>
+              <Crown size={14} /> Nouveaux statuts Cendrillon
+            </p>
+            {changementsStatut.length > 5 && onNaviguerFidelite && (
+              <button type="button" onClick={onNaviguerFidelite} className="text-xs font-medium" style={{ color: "#A8823D" }}>Voir tout →</button>
+            )}
+          </div>
           <p className="text-xs mb-3" style={{ color: COULEUR.texteDoux }}>Une occasion de reconnaître ces clientes — à toi de voir s'il y a un geste commercial à faire.</p>
           <div className="space-y-2">
-            {changementsStatut.map((c) => (
+            {changementsStatut.slice(0, 5).map((c) => (
               <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FBF3E3" }}>
                 <div>
                   <p className="text-sm font-medium">{c.client?.nomPrenoms || "Cliente inconnue"}</p>
