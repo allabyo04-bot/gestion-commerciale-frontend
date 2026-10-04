@@ -271,11 +271,11 @@ function BlocFidelite({ clientId }) {
       <div className="grid sm:grid-cols-2 gap-3 text-sm mb-3">
         <div>
           <span style={{ color: "#6B5D52" }}>Cumul pour le prochain bonus : </span>
-          <span className="font-mono font-semibold">{fmt(info.cumulFideliteCourant)} F</span>
+          <span className="font-mono font-semibold whitespace-nowrap">{fmt(info.cumulFideliteCourant)} F</span>
         </div>
         <div>
           <span style={{ color: "#6B5D52" }}>Volume total (statut) : </span>
-          <span className="font-mono">{fmt(info.cumulFideliteTotal)} F</span>
+          <span className="font-mono whitespace-nowrap">{fmt(info.cumulFideliteTotal)} F</span>
         </div>
       </div>
       {info.bonusDisponible > 0 && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Gift, Crown, Plus, Trash2, Pencil } from "lucide-react";
+import { Gift, Crown, Plus, Trash2, Pencil, Users } from "lucide-react";
 import { api } from "../api.js";
 import { fmt } from "../constants.js";
 import { ErrorBanner } from "../components/Shared.jsx";
@@ -7,7 +7,7 @@ import { ErrorBanner } from "../components/Shared.jsx";
 const inputStyle = { border: "1px solid #DDD3C4", borderRadius: 8, padding: "8px 10px", fontSize: 14 };
 
 function Onglets({ vue, setVue }) {
-  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown]];
+  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users]];
   return (
     <div className="flex gap-2 mb-5">
       {items.map(([id, label, Icon]) => (
@@ -161,6 +161,57 @@ function PaliersStatut() {
   );
 }
 
+function ClientesBonusDisponible() {
+  const [clients, setClients] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.fidelite.clientsBonusDisponible().then(setClients).catch((e) => setError(e.message));
+  }, []);
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>
+        Toutes les clientes ayant actuellement un bonus prêt à être déduit à leur prochain achat — utile pour vérifier et suivre le programme, pas pour un usage quotidien.
+      </p>
+      {error && <ErrorBanner error={error} />}
+      {clients === null ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+      ) : clients.length === 0 ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune cliente n'a de bonus disponible pour l'instant.</p>
+      ) : (
+        <>
+          <p className="text-sm font-medium mb-3">{clients.length} cliente(s) avec un bonus disponible</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: 600 }}>
+              <thead>
+                <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+                  <th className="text-left py-2">Cliente</th>
+                  <th className="text-left py-2">Téléphone</th>
+                  <th className="text-right py-2">Cumul courant</th>
+                  <th className="text-right py-2">Bonus disponible</th>
+                  <th className="text-right py-2">Volume total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map((c) => (
+                  <tr key={c.id} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="py-2">{c.nomPrenoms}</td>
+                    <td className="py-2" style={{ color: "#6B5D52" }}>{c.telephone || "—"}</td>
+                    <td className="text-right py-2 font-mono whitespace-nowrap">{fmt(c.cumulFideliteCourant)} F</td>
+                    <td className="text-right py-2 font-mono font-semibold whitespace-nowrap" style={{ color: "#3F6B4A" }}>{fmt(c.bonusDisponible)} F</td>
+                    <td className="text-right py-2 font-mono whitespace-nowrap" style={{ color: "#6B5D52" }}>{fmt(c.cumulFideliteTotal)} F</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function FideliteSection() {
   const [vue, setVue] = useState("BONUS");
   return (
@@ -170,6 +221,7 @@ export default function FideliteSection() {
       <Onglets vue={vue} setVue={setVue} />
       {vue === "BONUS" && <PaliersBonus />}
       {vue === "STATUT" && <PaliersStatut />}
+      {vue === "CLIENTES" && <ClientesBonusDisponible />}
     </div>
   );
 }
