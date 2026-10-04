@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Gift, Crown, Plus, Trash2, Pencil, Users, Bell } from "lucide-react";
+import { Gift, Crown, Plus, Trash2, Pencil, Users, Bell, Wallet, List } from "lucide-react";
 import { api } from "../api.js";
 import { fmt } from "../constants.js";
 import { ErrorBanner } from "../components/Shared.jsx";
@@ -7,7 +7,7 @@ import { ErrorBanner } from "../components/Shared.jsx";
 const inputStyle = { border: "1px solid #DDD3C4", borderRadius: 8, padding: "8px 10px", fontSize: 14 };
 
 function Onglets({ vue, setVue }) {
-  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users], ["CHANGEMENTS", "Changements de statut", Bell]];
+  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users], ["CHANGEMENTS", "Changements de statut", Bell], ["ACCORDES", "Bonus accordés", Wallet], ["PARSTATUT", "Clientes par statut", List]];
   return (
     <div className="flex gap-2 mb-5">
       {items.map(([id, label, Icon]) => (
@@ -260,6 +260,109 @@ function ChangementsStatut() {
   );
 }
 
+function BonusAccordes() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+
+  const load = useCallback(async () => {
+    try { setData(await api.fidelite.bonusAccordes({ dateDebut, dateFin })); } catch (e) { setError(e.message); }
+  }, [dateDebut, dateFin]);
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>
+        Tout ce que le programme Cendrillon a reversé aux clientes sur la période choisie — utile pour ajuster tes paliers en connaissance de cause.
+      </p>
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Du</label><input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }} /></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Au</label><input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4" }} /></div>
+      </div>
+      {error && <ErrorBanner error={error} />}
+      {data === null ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+      ) : (
+        <>
+          <div className="rounded-xl p-4 mb-4" style={{ background: "#FBF3E3", border: "1px solid #EAE1D2" }}>
+            <p className="text-sm" style={{ color: "#6B5D52" }}>Total accordé sur la période</p>
+            <p className="font-display text-2xl font-semibold" style={{ color: "#A8823D" }}>{fmt(data.total)} F <span className="text-sm font-normal" style={{ color: "#6B5D52" }}>({data.nombre} bonus)</span></p>
+          </div>
+          {data.bonus.length === 0 ? (
+            <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun bonus accordé sur cette période.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {data.bonus.map((b) => (
+                <div key={b.id} className="flex items-center justify-between rounded-lg px-4 py-3 text-sm" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                  <div>
+                    <span className="font-medium">{b.client?.nomPrenoms || "Cliente inconnue"}</span>
+                    <span className="ml-2" style={{ color: "#6B5D52" }}>vente {b.vente?.numero} · {b.vente?.boutique} · {new Date(b.createdAt).toLocaleDateString("fr-FR")}</span>
+                  </div>
+                  <span className="font-mono font-semibold" style={{ color: "#3F6B4A" }}>-{fmt(b.montant)} F</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ClientesParStatut() {
+  const [repartition, setRepartition] = useState(null);
+  const [statutChoisi, setStatutChoisi] = useState(null);
+  const [clients, setClients] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => { api.fidelite.clientsParStatut().then(setRepartition).catch((e) => setError(e.message)); }, []);
+
+  const ouvrir = async (statut) => {
+    setStatutChoisi(statut);
+    setClients(null);
+    try { setClients(await api.fidelite.clientsParStatut(statut)); } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Choisis un statut pour voir la liste des clientes concernées.</p>
+      {error && <ErrorBanner error={error} />}
+      {repartition === null ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+      ) : (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {repartition.map((r) => (
+            <button key={r.statut} onClick={() => ouvrir(r.statut)} className="px-4 py-2 rounded-full text-sm font-medium"
+              style={statutChoisi === r.statut ? { background: "#2B2320", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>
+              {r.statut} ({r.nombre})
+            </button>
+          ))}
+        </div>
+      )}
+      {statutChoisi && (
+        clients === null ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+        ) : clients.length === 0 ? (
+          <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune cliente dans ce statut pour l'instant.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {clients.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3 text-sm" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                <div>
+                  <span className="font-medium">{c.nomPrenoms}</span>
+                  <span className="ml-2" style={{ color: "#6B5D52" }}>{c.telephone || "téléphone non renseigné"}</span>
+                </div>
+                <span className="font-mono" style={{ color: "#6B5D52" }}>{fmt(c.cumulFideliteTotal)} F</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function FideliteSection() {
   const [vue, setVue] = useState("BONUS");
   return (
@@ -271,6 +374,8 @@ export default function FideliteSection() {
       {vue === "STATUT" && <PaliersStatut />}
       {vue === "CLIENTES" && <ClientesBonusDisponible />}
       {vue === "CHANGEMENTS" && <ChangementsStatut />}
+      {vue === "ACCORDES" && <BonusAccordes />}
+      {vue === "PARSTATUT" && <ClientesParStatut />}
     </div>
   );
 }

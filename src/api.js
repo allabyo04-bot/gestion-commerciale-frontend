@@ -66,6 +66,11 @@ export const api = {
   fidelite: {
     client: (id) => request(`/api/fidelite/client/${id}`),
     clientsBonusDisponible: () => request("/api/fidelite/clients-bonus-disponible"),
+    bonusAccordes: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/fidelite/bonus-accordes${qs ? `?${qs}` : ""}`);
+    },
+    clientsParStatut: (statut) => request(`/api/fidelite/clients-par-statut${statut ? `?statut=${encodeURIComponent(statut)}` : ""}`),
     paliersBonus: () => request("/api/fidelite/paliers-bonus"),
     creerPalierBonus: (data) => request("/api/fidelite/paliers-bonus", { method: "POST", body: data }),
     majPalierBonus: (id, data) => request(`/api/fidelite/paliers-bonus/${id}`, { method: "PUT", body: data }),
