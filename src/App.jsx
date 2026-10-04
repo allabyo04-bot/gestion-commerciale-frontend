@@ -45,14 +45,15 @@ function Shell() {
     { id: "etats", label: "États", icon: BarChart3, perm: "ventes" },
     { id: "depenses", label: "Dépenses", icon: Wallet, perm: "ventes" },
     { id: "clients", label: "Clients", icon: Heart, perm: "clients" },
-    { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
+    // Chantier en cours, masqué tant que Djenie n'a pas donné le feu vert (voir constants.js).
+    ...(estAdmin && FIDELITE_ACTIF ? [{ id: "fidelite", label: "Fidélité", icon: Crown }] : []),
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
-    { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
     // Réservé à l'administrateur (Djenie) — pas une question de permission par rôle, comme côté
     // serveur qui vérifie directement role.systeme plutôt qu'une permission dédiée.
     ...(estAdmin ? [{ id: "journal-audit", label: "Journal d'audit", icon: ScrollText }] : []),
-    // Chantier en cours, masqué tant que Djenie n'a pas donné le feu vert (voir constants.js).
-    ...(estAdmin && FIDELITE_ACTIF ? [{ id: "fidelite", label: "Fidélité", icon: Crown }] : []),
+    // Écrans de configuration/sécurité — en fin de liste, pas de l'usage quotidien.
+    { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
+    { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
   const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
   return (
