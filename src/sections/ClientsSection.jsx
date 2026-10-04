@@ -246,7 +246,13 @@ function AnniversairesReport({ clients }) {
       <div className="space-y-2">
         {resultats.map((c) => (
           <div key={c.id} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-            <div className="flex items-center gap-2"><Cake size={15} color="#8C3B2E" /><span className="text-sm font-medium">{c.nomPrenoms}</span></div>
+            <div className="flex items-center gap-2">
+              <Cake size={15} color="#8C3B2E" />
+              <div>
+                <span className="text-sm font-medium">{c.nomPrenoms}</span>
+                <p className="text-xs" style={{ color: "#6B5D52" }}>{c.telephone || "Téléphone non renseigné"}</p>
+              </div>
+            </div>
             <span className="text-sm font-mono" style={{ color: "#6B5D52" }}>{c.jourAnniv} {c.moisAnniv}</span>
           </div>
         ))}
