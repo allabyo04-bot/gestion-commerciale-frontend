@@ -63,6 +63,22 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  suiviClientes: {
+    aRemercier: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/suivi-clientes/a-remercier${qs ? `?${qs}` : ""}`);
+    },
+    aRelancer: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/suivi-clientes/a-relancer${qs ? `?${qs}` : ""}`);
+    },
+    marquerMessage: (clientId, type) => request("/api/suivi-clientes/messages", { method: "POST", body: { clientId, type } }),
+    annulerMessage: (id) => request(`/api/suivi-clientes/messages/${id}`, { method: "DELETE" }),
+    pairesParMarque: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/suivi-clientes/paires-par-marque${qs ? `?${qs}` : ""}`);
+    },
+  },
   fidelite: {
     client: (id) => request(`/api/fidelite/client/${id}`),
     clientsBonusDisponible: () => request("/api/fidelite/clients-bonus-disponible"),

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert, Heart, Truck } from "lucide-react";
+import { Calendar, CreditCard, Store, Lock, Award, Download, ChevronDown, Printer, ShieldAlert, Heart, Truck, Footprints, BellRing } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { MODES_PAIEMENT, LIVRAISON_ACTIF } from "../constants.js";
+import { MODES_PAIEMENT, LIVRAISON_ACTIF, SUIVI_CLIENTES_ACTIF } from "../constants.js";
 import { ReceiptModal } from "./VentesSection.jsx";
+import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -15,11 +16,16 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function EtatsSection() {
+export default function EtatsSection({ sousOngletInitial, onSousOngletInitialConsomme } = {}) {
   const { user } = useAuth();
   const estAdmin = !!user?.role?.systeme;
 
   const [sousOnglet, setSousOnglet] = useState("date");
+  // Arrivée depuis un lien de l'accueil (ex. "Voir le détail" des paires par marque)
+  useEffect(() => {
+    if (sousOngletInitial) { setSousOnglet(sousOngletInitial); onSousOngletInitialConsomme?.(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sousOngletInitial]);
   const [dateDebut, setDateDebut] = useState(todayISO());
   const [dateFin, setDateFin] = useState(todayISO());
   const [boutique, setBoutique] = useState("");
@@ -198,7 +204,14 @@ export default function EtatsSection() {
     ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
     ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
     ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
+    // Suivi des clientes — caché tant que SUIVI_CLIENTES_ACTIF est à false, réservé à l'administratrice
+    ...(estAdmin && SUIVI_CLIENTES_ACTIF ? [
+      { id: "paires", label: "Paires par marque", icon: Footprints },
+      { id: "remercier", label: "Clientes à remercier", icon: Heart },
+      { id: "relancer", label: "Clientes à relancer", icon: BellRing },
+    ] : []),
   ];
+  const ongletSuivi = estAdmin && SUIVI_CLIENTES_ACTIF && ["paires", "remercier", "relancer"].includes(sousOnglet);
 
   return (
     <div>
@@ -214,6 +227,13 @@ export default function EtatsSection() {
         </div>
 
         <div className="flex-1 min-w-0">
+      {ongletSuivi ? (
+        <>
+          {sousOnglet === "paires" && <PairesParMarque />}
+          {sousOnglet === "remercier" && <ClientesARemercier />}
+          {sousOnglet === "relancer" && <ClientesARelancer />}
+        </>
+      ) : (<>
       <div className="flex items-center justify-end gap-2 flex-wrap mb-6">
           <button onClick={exportCSV} disabled={chargement || !donnees}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
@@ -869,6 +889,7 @@ export default function EtatsSection() {
         </div>
       )}
       {receiptVente && <ReceiptModal vente={receiptVente} onClose={() => setReceiptVente(null)} />}
+      </>)}
         </div>
       </div>
     </div>

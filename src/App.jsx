@@ -21,6 +21,7 @@ function Shell() {
   const { user, loading, logout, permissions } = useAuth();
   const [tab, setTab] = useState("accueil");
   const [ventesSubTabDemande, setVentesSubTabDemande] = useState(null);
+  const [etatsSubTabDemande, setEtatsSubTabDemande] = useState(null);
   const [nbRemisesEnAttente, setNbRemisesEnAttente] = useState(0);
   const estAdmin = !!user?.role?.systeme;
   useEffect(() => {
@@ -89,13 +90,13 @@ function Shell() {
       <div className="flex-1 min-w-0 px-6 sm:px-10 py-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {activeTab === "accueil" && (
-            <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} onNaviguerFidelite={() => setTab("fidelite")} />
+            <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} onNaviguerFidelite={() => setTab("fidelite")} onNaviguerEtats={(sousOnglet) => { setEtatsSubTabDemande(sousOnglet); setTab("etats"); }} />
           )}
           {activeTab === "ventes" && (
             <VentesSection subTabInitial={ventesSubTabDemande} onSubTabInitialConsomme={() => setVentesSubTabDemande(null)} />
           )}
           {activeTab === "livraison" && <LivraisonSection />}
-          {activeTab === "etats" && <EtatsSection />}
+          {activeTab === "etats" && <EtatsSection sousOngletInitial={etatsSubTabDemande} onSousOngletInitialConsomme={() => setEtatsSubTabDemande(null)} />}
           {activeTab === "depenses" && <DepensesSection />}
           {activeTab === "clients" && <ClientsSection />}
           {activeTab === "utilisateurs" && <UtilisateursSection />}

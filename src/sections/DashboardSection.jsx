@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percent, Gift, Truck, Wallet, X, Crown } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { fmt, MOIS, LIVRAISON_ACTIF, FIDELITE_ACTIF, MODES_PAIEMENT } from "../constants.js";
+import { fmt, MOIS, LIVRAISON_ACTIF, FIDELITE_ACTIF, SUIVI_CLIENTES_ACTIF, MODES_PAIEMENT } from "../constants.js";
+import { EncartPairesParMarque } from "./SuiviClientesViews.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -22,7 +23,7 @@ function debutMoisISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite } = {}) {
+export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite, onNaviguerEtats } = {}) {
   const { user, permissions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
   const peutVoirVentes = !!permissions.ventes;
@@ -310,6 +311,9 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite 
           </div>
         </div>
       )}
+
+      {/* Paires vendues par marque — caché tant que SUIVI_CLIENTES_ACTIF est à false, administratrice seulement */}
+      {SUIVI_CLIENTES_ACTIF && estAdmin && <EncartPairesParMarque onVoirDetail={onNaviguerEtats ? () => onNaviguerEtats("paires") : undefined} />}
 
       {detailOuvert && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>

@@ -82,3 +82,8 @@ export const LIVRAISON_ACTIF = true;
 // Interrupteur temporaire (voir App.jsx) : le programme de fidélité "Cendrillon" est en cours de
 // construction — masqué tant que Djenie n'a pas donné le feu vert.
 export const FIDELITE_ACTIF = true;
+
+// Interrupteur du chantier "suivi des clientes" (clientes à remercier / à relancer, paires vendues
+// par marque) : construit et poussé, mais caché tant que l'utilisateur n'a pas donné son "go".
+// Même nom côté serveur (src/constants.js du backend) — à passer à true aux DEUX endroits.
+export const SUIVI_CLIENTES_ACTIF = false;
