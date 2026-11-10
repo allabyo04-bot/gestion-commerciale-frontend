@@ -100,6 +100,11 @@ function Note({ children }) {
   return <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBF3E3", color: "#7A5F26" }}>{children}</p>;
 }
 
+// Explique d'où viennent (ou pourquoi manquent) les clientes affichées : chaque étape du filtrage est chiffrée
+function Explication({ children }) {
+  return <p className="text-xs mb-4" style={{ color: C.doux }}>{children}</p>;
+}
+
 // Une ligne cliente : [nombre d'achats] Nom (Nouvelle) · téléphone · détail ... [WhatsApp] [Message envoyé]
 function LigneCliente({ ligne, type, details, onMessage }) {
   const [enCours, setEnCours] = useState(false);
@@ -209,6 +214,13 @@ export function ClientesARemercier() {
             {donnees.lignes.length} cliente(s) · {donnees.nbNouvelles} nouvelle(s)
             {donnees.nbAvecSolde > 0 && <span className="font-normal" style={{ color: C.doux }}> · {donnees.nbAvecSolde} non listée(s) car il leur reste un solde à payer</span>}
           </p>
+          {donnees.diagnostic && (donnees.diagnostic.nbMasqueesTelephone > 0 || donnees.diagnostic.nbMasqueesDejaEnvoyes > 0) && (
+            <Explication>
+              {donnees.diagnostic.nbCandidates} cliente(s) sans solde à payer sur la période
+              {donnees.diagnostic.nbMasqueesTelephone > 0 ? `, ${donnees.diagnostic.nbMasqueesTelephone} masquée(s) faute de téléphone` : ""}
+              {donnees.diagnostic.nbMasqueesDejaEnvoyes > 0 ? `, ${donnees.diagnostic.nbMasqueesDejaEnvoyes} masquée(s) car déjà remerciée(s)` : ""}.
+            </Explication>
+          )}
           {donnees.debutHistorique && <Note>Les achats ne sont connus que depuis le {fmtDate(donnees.debutHistorique)} : une cliente qui achetait déjà avant cette date peut apparaître comme « nouvelle ».</Note>}
           {donnees.lignes.length === 0 ? (
             <p className="text-sm" style={{ color: C.doux }}>Aucune cliente à remercier avec ces critères.</p>
@@ -230,7 +242,7 @@ export function ClientesARemercier() {
 const CLE_DELAI = "suiviClientes.delaiRelance";
 function delaiInitial() {
   try { const v = parseInt(localStorage.getItem(CLE_DELAI), 10); if (v >= 1 && v <= 60) return v; } catch { /* stockage indisponible : valeur par défaut */ }
-  return 6;
+  return 3; // l'historique ne remonte qu'à mi-juillet : 6 mois donnerait une liste vide au démarrage
 }
 
 export function ClientesARelancer() {
@@ -243,12 +255,18 @@ export function ClientesARelancer() {
   const [erreur, setErreur] = useState("");
   const maj = useMajLigne(setDonnees);
 
-  const appliquerDelai = () => {
+  // Le délai s'applique tout seul, dès que la saisie est valide (sans devoir appuyer sur Entrée)
+  useEffect(() => {
     const v = parseInt(saisie, 10);
-    if (!(v >= 1 && v <= 60)) { setSaisie(String(mois)); return; }
-    setMois(v);
-    try { localStorage.setItem(CLE_DELAI, String(v)); } catch { /* sans importance */ }
-  };
+    if (!(v >= 1 && v <= 60) || v === mois) return undefined;
+    const t = setTimeout(() => {
+      setMois(v);
+      try { localStorage.setItem(CLE_DELAI, String(v)); } catch { /* sans importance */ }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [saisie, mois]);
+  // Saisie invalide ou vide laissée telle quelle : on remet le dernier délai valide en quittant la case
+  const corrigerSaisie = () => { if (!(parseInt(saisie, 10) >= 1 && parseInt(saisie, 10) <= 60)) setSaisie(String(mois)); };
 
   useEffect(() => {
     let annule = false;
@@ -269,7 +287,7 @@ export function ClientesARelancer() {
       <div className="flex flex-wrap items-end gap-5 mb-5">
         <div>
           <label className="block text-xs mb-1" style={{ color: C.doux }}>Sans achat depuis (mois)</label>
-          <input type="number" min="1" max="60" value={saisie} onChange={(e) => setSaisie(e.target.value)} onBlur={appliquerDelai}
+          <input type="number" min="1" max="60" value={saisie} onChange={(e) => setSaisie(e.target.value)} onBlur={corrigerSaisie}
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
             className="px-3 py-1.5 rounded-lg text-sm w-24" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }} />
         </div>
@@ -281,7 +299,14 @@ export function ClientesARelancer() {
       {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement...</p>}
       {donnees && (
         <>
-          <p className="text-sm font-medium mb-3">{donnees.lignes.length} cliente(s) à relancer</p>
+          <p className="text-sm font-medium mb-2">{donnees.lignes.length} cliente(s) à relancer</p>
+          {donnees.diagnostic && (
+            <Explication>
+              Dernier achat avant le {fmtDate(donnees.diagnostic.seuil)} (délai de {donnees.mois} mois) : {donnees.diagnostic.nbDormantes} cliente(s) trouvée(s) sur {donnees.diagnostic.nbClientesAvecAchat} ayant déjà acheté
+              {donnees.diagnostic.nbMasqueesTelephone > 0 ? `, ${donnees.diagnostic.nbMasqueesTelephone} masquée(s) faute de téléphone` : ""}
+              {donnees.diagnostic.nbMasqueesDejaEnvoyes > 0 ? `, ${donnees.diagnostic.nbMasqueesDejaEnvoyes} masquée(s) car déjà relancée(s)` : ""}.
+            </Explication>
+          )}
           {moisHistorique !== null && moisHistorique < mois && (
             <Note>Le logiciel ne connaît les achats que depuis le {fmtDate(donnees.debutHistorique)} (environ {moisHistorique} mois). Avec un délai de {mois} mois, la liste sera encore vide ou très courte : essayez un délai plus court (2 ou 3 mois) pour l'utiliser dès maintenant.</Note>
           )}
