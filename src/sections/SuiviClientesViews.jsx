@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { MessageCircle, Check, Undo2 } from "lucide-react";
+import { MessageCircle, Check, Undo2, Download } from "lucide-react";
 import { api } from "../api.js";
 import { fmt, PAYS_INDICATIF } from "../constants.js";
 
@@ -32,8 +32,12 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString("fr-FR") : "—"
 // Même règle que sur le reçu (voir ReceiptModal) : on ne devine jamais l'indicatif d'un pays inconnu.
 function numeroWhatsApp(numero, pays) {
   if (!numero) return null;
-  const chiffres = String(numero).replace(/\D/g, "");
+  const brut = String(numero).trim();
+  const chiffres = brut.replace(/\D/g, "");
   if (!chiffres) return null;
+  // Déjà écrit en format international (+225… ou 00225…) : l'indicatif est fourni par le numéro lui-même
+  if (brut.startsWith("+")) return chiffres;
+  if (brut.startsWith("00")) return chiffres.slice(2);
   const conf = PAYS_INDICATIF[pays];
   if (!conf) return null;
   if (chiffres.startsWith(conf.code)) return chiffres;
@@ -98,6 +102,57 @@ function Case({ label, checked, onChange }) {
 
 function Note({ children }) {
   return <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ background: "#FBF3E3", color: "#7A5F26" }}>{children}</p>;
+}
+
+// ---------- Tri et export ----------
+const TRIS_REMERCIER = [["recent", "Achat le plus récent"], ["montant", "Montant le plus élevé"], ["achats", "Plus d'achats"]];
+const TRIS_RELANCE = [["ancienne", "Absence la plus ancienne"], ["montant", "Montant total le plus élevé"], ["achats", "Plus d'achats"]];
+
+function trier(lignes, mode, cleMontant) {
+  const copie = [...lignes];
+  const date = (l) => new Date(l.derniereVente).getTime();
+  if (mode === "montant") copie.sort((a, b) => (b[cleMontant] || 0) - (a[cleMontant] || 0) || date(b) - date(a));
+  else if (mode === "achats") copie.sort((a, b) => b.nbAchats - a.nbAchats || (b[cleMontant] || 0) - (a[cleMontant] || 0));
+  else if (mode === "recent") copie.sort((a, b) => date(b) - date(a));
+  else if (mode === "ancienne") copie.sort((a, b) => date(a) - date(b));
+  return copie;
+}
+
+function SelectTri({ valeur, options, onChange }) {
+  return (
+    <div>
+      <label className="block text-xs mb-1" style={{ color: C.doux }}>Trier par</label>
+      <select value={valeur} onChange={(e) => onChange(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }}>
+        {options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// Export CSV lisible par Excel (même format que l'export des fiches clients : séparateur ";", accents
+// conservés, zéro de tête des numéros protégé). Contient des coordonnées de clientes : à manipuler avec soin.
+function exporterCsv(nomFichier, entetes, lignes) {
+  const protegerNumero = (n) => (n ? `="${String(n).trim()}"` : "");
+  const toutes = [entetes, ...lignes.map((l) => l.map((cell) => (cell !== null && typeof cell === "object" && "__numero" in cell ? protegerNumero(cell.__numero) : cell ?? "")))];
+  const csv = toutes.map((ligne) => ligne.map((cell) => {
+    const texte = String(cell);
+    if (/^="[^"]*"$/.test(texte)) return texte;
+    return `"${texte.replace(/"/g, '""')}"`;
+  }).join(";")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${nomFichier}_${iso(new Date())}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function BoutonExport({ nombre, onClick }) {
+  return (
+    <button type="button" onClick={onClick} disabled={nombre === 0} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
+      style={{ border: `1px solid ${C.bordure}`, color: nombre === 0 ? C.doux : C.texte, background: "#fff", opacity: nombre === 0 ? 0.5 : 1 }}>
+      <Download size={13} /> Exporter pour Excel ({nombre})
+    </button>
+  );
 }
 
 // Explique d'où viennent (ou pourquoi manquent) les clientes affichées : chaque étape du filtrage est chiffrée
@@ -181,6 +236,7 @@ export function ClientesARemercier() {
   const [boutique, setBoutique] = useState("");
   const [avecTel, setAvecTel] = useState(true);
   const [masquer, setMasquer] = useState(true);
+  const [tri, setTri] = useState("recent");
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState("");
   const maj = useMajLigne(setDonnees);
@@ -205,15 +261,21 @@ export function ClientesARemercier() {
         <SelectBoutique valeur={boutique} onChange={setBoutique} />
         <Case label="Seulement celles avec un téléphone" checked={avecTel} onChange={setAvecTel} />
         <Case label="Masquer celles déjà remerciées" checked={masquer} onChange={setMasquer} />
+        <SelectTri valeur={tri} options={TRIS_REMERCIER} onChange={setTri} />
       </div>
       <Erreur message={erreur} />
       {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement...</p>}
       {donnees && (
         <>
-          <p className="text-sm font-medium mb-3">
-            {donnees.lignes.length} cliente(s) · {donnees.nbNouvelles} nouvelle(s)
-            {donnees.nbAvecSolde > 0 && <span className="font-normal" style={{ color: C.doux }}> · {donnees.nbAvecSolde} non listée(s) car il leur reste un solde à payer</span>}
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <p className="text-sm font-medium">
+              {donnees.lignes.length} cliente(s) · {donnees.nbNouvelles} nouvelle(s)
+              {donnees.nbAvecSolde > 0 && <span className="font-normal" style={{ color: C.doux }}> · {donnees.nbAvecSolde} non listée(s) car il leur reste un solde à payer</span>}
+            </p>
+            <BoutonExport nombre={donnees.lignes.length} onClick={() => exporterCsv("clientes-a-remercier",
+              ["Nom et prénoms", "Téléphone", "WhatsApp", "Nombre d'achats", "Nouvelle cliente", "Dernier achat", "Boutique", "Vendeuse", "Montant sur la période (F)", "Message envoyé le"],
+              trier(donnees.lignes, tri, "montantPeriode").map((l) => [l.nomPrenoms, { __numero: l.telephone }, { __numero: l.whatsapp }, l.nbAchats, l.nouvelle ? "Oui" : "Non", fmtDate(l.derniereVente), l.derniereBoutique || "", l.vendeuse || "", l.montantPeriode, l.dejaEnvoye ? fmtDate(l.dernierMessage?.createdAt) : ""]))} />
+          </div>
           {donnees.diagnostic && (donnees.diagnostic.nbMasqueesTelephone > 0 || donnees.diagnostic.nbMasqueesDejaEnvoyes > 0) && (
             <Explication>
               {donnees.diagnostic.nbCandidates} cliente(s) sans solde à payer sur la période
@@ -226,9 +288,9 @@ export function ClientesARemercier() {
             <p className="text-sm" style={{ color: C.doux }}>Aucune cliente à remercier avec ces critères.</p>
           ) : (
             <div className="space-y-2">
-              {donnees.lignes.map((l) => (
+              {trier(donnees.lignes, tri, "montantPeriode").map((l) => (
                 <LigneCliente key={l.clientId} ligne={l} type="REMERCIEMENT" onMessage={maj}
-                  details={`dernier achat le ${fmtDate(l.derniereVente)} · ${fmt(l.montantPeriode)} F sur la période`} />
+                  details={`dernier achat le ${fmtDate(l.derniereVente)} · ${fmt(l.montantPeriode)} F sur la période${l.vendeuse ? ` · vendeuse : ${l.vendeuse}` : ""}`} />
               ))}
             </div>
           )}
@@ -251,6 +313,7 @@ export function ClientesARelancer() {
   const [boutique, setBoutique] = useState("");
   const [avecTel, setAvecTel] = useState(true);
   const [masquer, setMasquer] = useState(true);
+  const [tri, setTri] = useState("ancienne");
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState("");
   const maj = useMajLigne(setDonnees);
@@ -294,12 +357,18 @@ export function ClientesARelancer() {
         <SelectBoutique valeur={boutique} onChange={setBoutique} />
         <Case label="Seulement celles avec un téléphone" checked={avecTel} onChange={setAvecTel} />
         <Case label="Masquer celles déjà relancées" checked={masquer} onChange={setMasquer} />
+        <SelectTri valeur={tri} options={TRIS_RELANCE} onChange={setTri} />
       </div>
       <Erreur message={erreur} />
       {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement...</p>}
       {donnees && (
         <>
-          <p className="text-sm font-medium mb-2">{donnees.lignes.length} cliente(s) à relancer</p>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <p className="text-sm font-medium">{donnees.lignes.length} cliente(s) à relancer</p>
+            <BoutonExport nombre={donnees.lignes.length} onClick={() => exporterCsv("clientes-a-relancer",
+              ["Nom et prénoms", "Téléphone", "WhatsApp", "Nombre d'achats", "Dernier achat", "Boutique", "Vendeuse", "Montant total (F)", "Message envoyé le"],
+              trier(donnees.lignes, tri, "montantTotal").map((l) => [l.nomPrenoms, { __numero: l.telephone }, { __numero: l.whatsapp }, l.nbAchats, fmtDate(l.derniereVente), l.derniereBoutique || "", l.vendeuse || "", l.montantTotal, l.dejaEnvoye ? fmtDate(l.dernierMessage?.createdAt) : ""]))} />
+          </div>
           {donnees.diagnostic && (
             <Explication>
               Dernier achat avant le {fmtDate(donnees.diagnostic.seuil)} (délai de {donnees.mois} mois) : {donnees.diagnostic.nbDormantes} cliente(s) trouvée(s) sur {donnees.diagnostic.nbClientesAvecAchat} ayant déjà acheté
@@ -317,9 +386,9 @@ export function ClientesARelancer() {
             <p className="text-sm" style={{ color: C.doux }}>Aucune cliente à relancer avec ces critères.</p>
           ) : (
             <div className="space-y-2">
-              {donnees.lignes.map((l) => (
+              {trier(donnees.lignes, tri, "montantTotal").map((l) => (
                 <LigneCliente key={l.clientId} ligne={l} type="RELANCE" onMessage={maj}
-                  details={`dernier achat le ${fmtDate(l.derniereVente)} (${l.derniereBoutique}) · ${fmt(l.montantTotal)} F au total`} />
+                  details={`dernier achat le ${fmtDate(l.derniereVente)} (${l.derniereBoutique}) · ${fmt(l.montantTotal)} F au total${l.vendeuse ? ` · vendeuse : ${l.vendeuse}` : ""}`} />
               ))}
             </div>
           )}
