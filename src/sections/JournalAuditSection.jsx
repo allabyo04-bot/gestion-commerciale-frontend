@@ -10,6 +10,8 @@ const ACTION_LABELS = {
   CONNEXION: "Connexion",
   PIN_MODIFIE: "PIN modifié",
   ROLE_MODIFIE: "Rôle modifié",
+  REPRISE_LIVRAISONS: "Reprise des livraisons",
+  REPRISE_LIVRAISONS_ANNULEE: "Reprise annulée",
 };
 const ACTION_COLORS = {
   PRIX_MODIFIE: { fg: "#A8823D", bg: "#FBF3E3" },
@@ -17,6 +19,8 @@ const ACTION_COLORS = {
   CONNEXION: { fg: "#3F6B4A", bg: "#E9F0EA" },
   PIN_MODIFIE: { fg: "#6B5D52", bg: "#F1E9DC" },
   ROLE_MODIFIE: { fg: "#8C3B2E", bg: "#FBF3EC" },
+  REPRISE_LIVRAISONS: { fg: "#3F6B4A", bg: "#E9F0EA" },
+  REPRISE_LIVRAISONS_ANNULEE: { fg: "#B04A3B", bg: "#FBEAE7" },
 };
 
 function Onglets({ vue, setVue }) {
