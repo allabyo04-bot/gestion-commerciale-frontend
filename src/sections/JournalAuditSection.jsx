@@ -232,21 +232,22 @@ function ControleLivraisons() {
   const jourIso = (d) => d.toISOString().slice(0, 10);
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));
-  const [saisieSeuil, setSaisieSeuil] = useState("4");
-  const [seuil, setSeuil] = useState(4);
+  const [saisieSeuil, setSaisieSeuil] = useState("5");   // "gros bon" = à partir de 5 paires
+  const [seuil, setSeuil] = useState(5);
   const [donnees, setDonnees] = useState(null);
   const [error, setError] = useState("");
 
   // Le seuil s'applique dès que la saisie est valide, sans devoir valider
   useEffect(() => {
     const v = parseInt(saisieSeuil, 10);
-    if (!(v >= 1 && v <= 50) || v === seuil) return undefined;
+    if (!(v >= 2 && v <= 51) || v === seuil) return undefined;
     const t = setTimeout(() => setSeuil(v), 400);
     return () => clearTimeout(t);
   }, [saisieSeuil, seuil]);
 
   const load = useCallback(async () => {
-    try { setError(""); setDonnees(await api.controleLivraisons({ dateDebut, dateFin, seuil: String(seuil) })); }
+    // le serveur compte "plus de N paires" : "à partir de 5" s'envoie donc 4
+    try { setError(""); setDonnees(await api.controleLivraisons({ dateDebut, dateFin, seuil: String(seuil - 1) })); }
     catch (e) { setError(e.message); }
   }, [dateDebut, dateFin, seuil]);
   useEffect(() => { load(); }, [load]);
@@ -269,7 +270,7 @@ function ControleLivraisons() {
               <th className="text-left py-2">{libelle}</th>
               <th className="text-right py-2">Livraisons</th>
               <th className="text-right py-2">Sans fiche cliente</th>
-              <th className="text-right py-2">Plus de {donnees.seuil} paires</th>
+              <th className="text-right py-2">{donnees.seuil + 1} paires ou plus</th>
               <th className="text-right py-2">Paires</th>
             </tr>
           </thead>
@@ -297,9 +298,9 @@ function ControleLivraisons() {
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <FiltrePeriode dateDebut={dateDebut} setDateDebut={setDateDebut} dateFin={dateFin} setDateFin={setDateFin} />
         <div className="mb-4">
-          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Gros bon = plus de (paires)</label>
-          <input type="number" min="1" max="50" value={saisieSeuil} onChange={(e) => setSaisieSeuil(e.target.value)}
-            onBlur={() => { const v = parseInt(saisieSeuil, 10); if (!(v >= 1 && v <= 50)) setSaisieSeuil(String(seuil)); }}
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Gros bon = à partir de (paires)</label>
+          <input type="number" min="2" max="51" value={saisieSeuil} onChange={(e) => setSaisieSeuil(e.target.value)}
+            onBlur={() => { const v = parseInt(saisieSeuil, 10); if (!(v >= 2 && v <= 51)) setSaisieSeuil(String(seuil)); }}
             className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4", width: 110 }} />
         </div>
       </div>
@@ -313,7 +314,7 @@ function ControleLivraisons() {
           <div className="grid sm:grid-cols-3 gap-3 mb-5">
             {carte("Livraisons enregistrées", donnees.total.nbBons, `${donnees.total.nbPaires} paires au total`)}
             {carte("Sans fiche cliente", `${donnees.total.nbSansFiche} (${donnees.total.pctSansFiche} %)`, "Le numéro n'est pas rattaché à une fiche", donnees.total.nbSansFiche > 0)}
-            {carte(`Plus de ${donnees.seuil} paires`, donnees.total.nbGrosBons, "À vérifier : regroupement possible", donnees.total.nbGrosBons > 0)}
+            {carte(`${donnees.seuil + 1} paires ou plus`, donnees.total.nbGrosBons, "À vérifier : regroupement possible", donnees.total.nbGrosBons > 0)}
           </div>
           <p className="text-xs mb-5" style={{ color: "#6B5D52" }}>
             Les livraisons enregistrées avant l'activation de la fiche automatique n'ont pas de fiche cliente : sur une période passée, ces chiffres reflètent l'ancien fonctionnement.
@@ -322,7 +323,7 @@ function ControleLivraisons() {
           {tableau("Par personne qui a enregistré", donnees.parPersonne, (l) => `${l.nom}|${l.boutique}`, "Personne")}
           {donnees.grosBons.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">Livraisons de plus de {donnees.seuil} paires {donnees.grosBons.length === 100 ? "(100 premières)" : ""}</p>
+              <p className="text-sm font-medium mb-2">Livraisons de {donnees.seuil + 1} paires ou plus {donnees.grosBons.length === 100 ? "(100 premières)" : ""}</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" style={{ minWidth: 640 }}>
                   <thead>
