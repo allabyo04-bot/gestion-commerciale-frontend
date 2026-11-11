@@ -92,7 +92,7 @@ export const SUIVI_CLIENTES_ACTIF = true;
 // nouvelle livraison (côté serveur), message d'aide et avertissement au-delà de SEUIL paires dans le
 // formulaire, et page "Livraisons" du Journal d'audit. Construit et poussé, mais caché tant que
 // l'utilisateur n'a pas donné son "go". Même nom côté serveur — à passer à true aux DEUX endroits.
-export const FICHES_LIVRAISON_ACTIF = false;
+export const FICHES_LIVRAISON_ACTIF = true;
 // Au-delà de ce nombre de paires (donc à partir de 5 paires), le formulaire demande de confirmer que la
 // livraison est bien pour une seule cliente (même règle que la page de contrôle).
 export const SEUIL_AVERTISSEMENT_LIVRAISON = 4;
@@ -100,4 +100,4 @@ export const SEUIL_AVERTISSEMENT_LIVRAISON = 4;
 // Interrupteur du chantier "clientes avec un bonus à appeler" : encart sur l'accueil, liste avec
 // téléphone / WhatsApp / "Appelée" dans l'onglet Fidélité, et mention du bonus sur le bon de livraison.
 // Caché tant que l'utilisateur n'a pas donné son "go". Même nom côté serveur — à passer à true aux DEUX endroits.
-export const BONUS_A_APPELER_ACTIF = false;
+export const BONUS_A_APPELER_ACTIF = true;
