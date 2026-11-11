@@ -38,7 +38,10 @@ function numeroWhatsApp(numero, pays) {
   // Déjà écrit en format international (+225… ou 00225…) : l'indicatif est fourni par le numéro lui-même
   if (brut.startsWith("+")) return chiffres;
   if (brut.startsWith("00")) return chiffres.slice(2);
-  const conf = PAYS_INDICATIF[pays];
+  // Pays non renseigné : un numéro à 10 chiffres commençant par 0 suit le plan de numérotation ivoirien (les boutiques
+  // sont à Abidjan). Pour une cliente d'un autre pays, renseigner son pays sur sa fiche (ou écrire son numéro avec +indicatif).
+  const paysEffectif = pays || (chiffres.length === 10 && chiffres.startsWith("0") ? "Côte d'Ivoire" : null);
+  const conf = PAYS_INDICATIF[paysEffectif];
   if (!conf) return null;
   if (chiffres.startsWith(conf.code)) return chiffres;
   const local = chiffres.startsWith("0") && !conf.garderZero ? chiffres.slice(1) : chiffres;
