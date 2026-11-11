@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { ScrollText, Users as UsersIcon, Percent } from "lucide-react";
+import { ScrollText, Users as UsersIcon, Percent, Truck } from "lucide-react";
 import { api } from "../api.js";
-import { fmt } from "../constants.js";
+import { fmt, FICHES_LIVRAISON_ACTIF } from "../constants.js";
 import { ErrorBanner } from "../components/Shared.jsx";
 
 const ACTION_LABELS = {
@@ -24,6 +24,7 @@ function Onglets({ vue, setVue }) {
     ["JOURNAL", "Journal général", ScrollText],
     ["CLIENTS", "Fiches clients", UsersIcon],
     ["REMISES", "Remises par caissière", Percent],
+    ...(FICHES_LIVRAISON_ACTIF ? [["LIVRAISONS", "Livraisons", Truck]] : []),
   ];
   return (
     <div className="flex gap-2 mb-5 flex-wrap">
@@ -225,6 +226,135 @@ function RemisesParCaissiere() {
   );
 }
 
+// Contrôle des livraisons : une livraison = une cliente. Combien sont saisies sans fiche cliente, combien
+// contiennent beaucoup de paires (signe possible de regroupement), par boutique et par personne.
+function ControleLivraisons() {
+  const jourIso = (d) => d.toISOString().slice(0, 10);
+  const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
+  const [dateFin, setDateFin] = useState(jourIso(new Date()));
+  const [saisieSeuil, setSaisieSeuil] = useState("4");
+  const [seuil, setSeuil] = useState(4);
+  const [donnees, setDonnees] = useState(null);
+  const [error, setError] = useState("");
+
+  // Le seuil s'applique dès que la saisie est valide, sans devoir valider
+  useEffect(() => {
+    const v = parseInt(saisieSeuil, 10);
+    if (!(v >= 1 && v <= 50) || v === seuil) return undefined;
+    const t = setTimeout(() => setSeuil(v), 400);
+    return () => clearTimeout(t);
+  }, [saisieSeuil, seuil]);
+
+  const load = useCallback(async () => {
+    try { setError(""); setDonnees(await api.controleLivraisons({ dateDebut, dateFin, seuil: String(seuil) })); }
+    catch (e) { setError(e.message); }
+  }, [dateDebut, dateFin, seuil]);
+  useEffect(() => { load(); }, [load]);
+
+  const dateCourte = (d) => new Date(d).toLocaleDateString("fr-FR");
+  const carte = (titre, valeur, detail, alerte) => (
+    <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: `1px solid ${alerte ? "#E3B9B0" : "#EAE1D2"}` }}>
+      <p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{titre}</p>
+      <p className="font-display text-2xl font-semibold" style={{ color: alerte ? "#B04A3B" : "#2B2320" }}>{valeur}</p>
+      {detail && <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{detail}</p>}
+    </div>
+  );
+  const tableau = (titre, lignes, cle, libelle) => (
+    <div className="mb-6">
+      <p className="text-sm font-medium mb-2">{titre}</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: 560 }}>
+          <thead>
+            <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+              <th className="text-left py-2">{libelle}</th>
+              <th className="text-right py-2">Livraisons</th>
+              <th className="text-right py-2">Sans fiche cliente</th>
+              <th className="text-right py-2">Plus de {donnees.seuil} paires</th>
+              <th className="text-right py-2">Paires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((l) => (
+              <tr key={cle(l)} style={{ borderTop: "1px solid #EFE7D9" }}>
+                <td className="py-2">{libelle === "Personne" ? `${l.nom} (${l.boutique})` : l.boutique}</td>
+                <td className="text-right py-2">{l.nbBons}</td>
+                <td className="text-right py-2" style={{ color: l.nbSansFiche ? "#B04A3B" : "#3F6B4A" }}>{l.nbSansFiche} ({l.pctSansFiche} %)</td>
+                <td className="text-right py-2" style={{ color: l.nbGrosBons ? "#A8823D" : "#6B5D52" }}>{l.nbGrosBons}</td>
+                <td className="text-right py-2">{l.nbPaires}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>
+        Une livraison = une cliente. Voici combien de livraisons sont enregistrées sans fiche cliente, et combien contiennent beaucoup de paires (signe possible de regroupement de plusieurs clientes sur un seul bon).
+      </p>
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <FiltrePeriode dateDebut={dateDebut} setDateDebut={setDateDebut} dateFin={dateFin} setDateFin={setDateFin} />
+        <div className="mb-4">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Gros bon = plus de (paires)</label>
+          <input type="number" min="1" max="50" value={saisieSeuil} onChange={(e) => setSaisieSeuil(e.target.value)}
+            onBlur={() => { const v = parseInt(saisieSeuil, 10); if (!(v >= 1 && v <= 50)) setSaisieSeuil(String(seuil)); }}
+            className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4", width: 110 }} />
+        </div>
+      </div>
+      {error && <ErrorBanner error={error} />}
+      {donnees === null ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
+      ) : donnees.total.nbBons === 0 ? (
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune livraison sur cette période.</p>
+      ) : (
+        <>
+          <div className="grid sm:grid-cols-3 gap-3 mb-5">
+            {carte("Livraisons enregistrées", donnees.total.nbBons, `${donnees.total.nbPaires} paires au total`)}
+            {carte("Sans fiche cliente", `${donnees.total.nbSansFiche} (${donnees.total.pctSansFiche} %)`, "Le numéro n'est pas rattaché à une fiche", donnees.total.nbSansFiche > 0)}
+            {carte(`Plus de ${donnees.seuil} paires`, donnees.total.nbGrosBons, "À vérifier : regroupement possible", donnees.total.nbGrosBons > 0)}
+          </div>
+          <p className="text-xs mb-5" style={{ color: "#6B5D52" }}>
+            Les livraisons enregistrées avant l'activation de la fiche automatique n'ont pas de fiche cliente : sur une période passée, ces chiffres reflètent l'ancien fonctionnement.
+          </p>
+          {tableau("Par boutique", donnees.parBoutique, (l) => l.boutique, "Boutique")}
+          {tableau("Par personne qui a enregistré", donnees.parPersonne, (l) => `${l.nom}|${l.boutique}`, "Personne")}
+          {donnees.grosBons.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2">Livraisons de plus de {donnees.seuil} paires {donnees.grosBons.length === 100 ? "(100 premières)" : ""}</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+                      <th className="text-left py-2">Bon</th><th className="text-left py-2">Date</th><th className="text-left py-2">Boutique</th>
+                      <th className="text-left py-2">Enregistré par</th><th className="text-left py-2">Cliente</th>
+                      <th className="text-right py-2">Paires</th><th className="text-right py-2">Fiche</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {donnees.grosBons.map((b) => (
+                      <tr key={b.numero} style={{ borderTop: "1px solid #EFE7D9" }}>
+                        <td className="py-2 font-mono">{b.numero}</td>
+                        <td className="py-2">{dateCourte(b.dateCreation)}</td>
+                        <td className="py-2">{b.boutique}</td>
+                        <td className="py-2">{b.creePar}</td>
+                        <td className="py-2">{b.clientNom}</td>
+                        <td className="text-right py-2 font-medium">{b.nbPaires}</td>
+                        <td className="text-right py-2" style={{ color: b.avecFiche ? "#3F6B4A" : "#B04A3B" }}>{b.avecFiche ? "Oui" : "Non"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function JournalAuditSection() {
   const [vue, setVue] = useState("JOURNAL");
 
@@ -238,6 +368,7 @@ export default function JournalAuditSection() {
       {vue === "JOURNAL" && <JournalGeneral />}
       {vue === "CLIENTS" && <FichesClients />}
       {vue === "REMISES" && <RemisesParCaissiere />}
+      {vue === "LIVRAISONS" && FICHES_LIVRAISON_ACTIF && <ControleLivraisons />}
     </div>
   );
 }

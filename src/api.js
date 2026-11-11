@@ -63,6 +63,10 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  controleLivraisons: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return request(`/api/controle-livraisons${qs ? `?${qs}` : ""}`);
+  },
   suiviClientes: {
     aRemercier: (params = {}) => {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();

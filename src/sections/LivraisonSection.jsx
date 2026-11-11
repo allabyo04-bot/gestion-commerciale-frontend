@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt } from "../constants.js";
+import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
 
@@ -243,7 +243,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     if (articleChoisi.famille === "Chaussure" && !pointureChoisie) { onError("Choisis une pointure."); return; }
     const quantite = parseInt(quantiteChoisie, 10);
     if (!quantite || quantite <= 0) { onError("Indique une quantité valide."); return; }
-    setLignes([...lignes, { id: uid(), articleId: articleChoisi.id, designation: articleChoisi.designation, pointure: articleChoisi.famille === "Chaussure" ? pointureChoisie : "", quantite, prixVente: articleChoisi.prixVente }]);
+    setLignes([...lignes, { id: uid(), articleId: articleChoisi.id, designation: articleChoisi.designation, famille: articleChoisi.famille, pointure: articleChoisi.famille === "Chaussure" ? pointureChoisie : "", quantite, prixVente: articleChoisi.prixVente }]);
     setArticleChoisi(null); setPointureChoisie(""); setQuantiteChoisie("1");
   };
   const retirerLigne = (id) => setLignes(lignes.filter((l) => l.id !== id));
@@ -269,6 +269,13 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     if (lignes.length === 0 && cartesCadeaux.length === 0) { onError("Ajoute au moins un article ou une carte cadeau au bon de livraison."); return; }
     const avanceNum = Number(avance) || 0;
     if (avanceNum > 0 && !avanceModePaiement) { onError("Choisis le mode de paiement de l'avance."); return; }
+    // Chantier "livraisons" : une livraison = une cliente. Au-delà de quelques paires, on demande de confirmer
+    // (jamais bloquant : une cliente peut très bien commander plusieurs paires).
+    if (FICHES_LIVRAISON_ACTIF) {
+      const nbPaires = lignes.filter((l) => l.famille === "Chaussure").reduce((t, l) => t + l.quantite, 0);
+      if (nbPaires > SEUIL_AVERTISSEMENT_LIVRAISON
+        && !window.confirm(`Cette livraison contient ${nbPaires} paires.\n\nUne livraison = une seule cliente : chaque cliente doit avoir son propre bon, avec son numéro.\n\nCes ${nbPaires} paires sont-elles bien pour la même cliente ?`)) return;
+    }
     setEnvoiEnCours(true);
     try {
       const bon = await api.bonsLivraison.creer({
@@ -278,6 +285,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         cartesCadeaux: cartesCadeaux.map(({ numero }) => ({ numero })),
       });
+      if (bon.ficheCliente && bon.ficheCliente.creee && bon.ficheCliente.fiche) onClientCree(bon.ficheCliente.fiche);
       onCree(bon);
       retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes"); setAvanceOuvert(false); setNotesOuvert(false);
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
@@ -346,6 +354,11 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
                 <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={champ} placeholder="Si connu" />
               </div>
             </div>
+            {FICHES_LIVRAISON_ACTIF && !clientId && (
+              <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
+                Le numéro suffit : la fiche de la cliente est retrouvée, ou créée automatiquement. Nom inconnu ? Laissez-le vide, elle s'appellera « CLIENTE 0001 », « CLIENTE 0002 »… Une livraison = une cliente.
+              </p>
+            )}
 
             <div className="mt-3">
               <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Lieu de livraison (quartier, adresse…)</label>
