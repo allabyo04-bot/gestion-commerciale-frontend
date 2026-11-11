@@ -76,6 +76,10 @@ export const api = {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
       return request(`/api/suivi-clientes/a-relancer${qs ? `?${qs}` : ""}`);
     },
+    bonusAAppeler: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/suivi-clientes/bonus-a-appeler${qs ? `?${qs}` : ""}`);
+    },
     marquerMessage: (clientId, type) => request("/api/suivi-clientes/messages", { method: "POST", body: { clientId, type } }),
     annulerMessage: (id) => request(`/api/suivi-clientes/messages/${id}`, { method: "DELETE" }),
     pairesParMarque: (params = {}) => {

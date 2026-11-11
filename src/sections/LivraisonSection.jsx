@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON } from "../constants.js";
+import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON, BONUS_A_APPELER_ACTIF } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
 
@@ -226,6 +226,25 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [avanceOuvert, setAvanceOuvert] = useState(false);
   const [notesOuvert, setNotesOuvert] = useState(false);
 
+  // Mention du bonus Cendrillon : le bonus ne se déduit PAS sur une livraison. Quand la cliente est identifiée
+  // (fiche choisie, ou numéro déjà connu), on prévient la vendeuse pour qu'elle lui rappelle de l'utiliser en boutique.
+  const cleTel = (t) => { const d = String(t || "").replace(/\D/g, ""); return d.length >= 8 ? d.slice(-10) : null; };
+  const ficheIdentifiee = clientId || (() => {
+    const k = cleTel(clientTelephone);
+    if (!k) return "";
+    const c = (clients || []).find((x) => cleTel(x.telephone) === k || cleTel(x.whatsapp) === k);
+    return c ? c.id : "";
+  })();
+  const [bonusClient, setBonusClient] = useState(null);
+  useEffect(() => {
+    if (!BONUS_A_APPELER_ACTIF || !ficheIdentifiee) { setBonusClient(null); return undefined; }
+    let annule = false;
+    api.fidelite.client(ficheIdentifiee)
+      .then((r) => { if (!annule) setBonusClient(r && r.bonusDisponible > 0 ? { montant: r.bonusDisponible } : null); })
+      .catch(() => { if (!annule) setBonusClient(null); }); // pas la permission Clients (ex. livreur) : simplement pas de mention
+    return () => { annule = true; };
+  }, [ficheIdentifiee]);
+
   const resultatsClients = rechercheClient.trim()
     ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
     : [];
@@ -354,6 +373,11 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
                 <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={champ} placeholder="Si connu" />
               </div>
             </div>
+            {BONUS_A_APPELER_ACTIF && bonusClient && (
+              <p className="text-xs mt-2 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                🎁 Cette cliente a un bonus Cendrillon de {fmt(bonusClient.montant)} F disponible. Il ne s'applique pas aux livraisons : dites-lui de l'utiliser lors d'un achat en boutique (achat d'au moins {fmt(bonusClient.montant)} F).
+              </p>
+            )}
             {FICHES_LIVRAISON_ACTIF && !clientId && (
               <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
                 Le numéro suffit : la fiche de la cliente est retrouvée, ou créée automatiquement. Nom inconnu ? Laissez-le vide, elle s'appellera « CLIENTE 0001 », « CLIENTE 0002 »… Une livraison = une cliente.

@@ -96,3 +96,8 @@ export const FICHES_LIVRAISON_ACTIF = false;
 // Au-delà de ce nombre de paires, le formulaire demande de confirmer que la livraison est bien pour
 // une seule cliente (même valeur par défaut que la page de contrôle).
 export const SEUIL_AVERTISSEMENT_LIVRAISON = 4;
+
+// Interrupteur du chantier "clientes avec un bonus à appeler" : encart sur l'accueil, liste avec
+// téléphone / WhatsApp / "Appelée" dans l'onglet Fidélité, et mention du bonus sur le bon de livraison.
+// Caché tant que l'utilisateur n'a pas donné son "go". Même nom côté serveur — à passer à true aux DEUX endroits.
+export const BONUS_A_APPELER_ACTIF = false;

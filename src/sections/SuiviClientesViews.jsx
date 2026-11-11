@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { MessageCircle, Check, Undo2, Download } from "lucide-react";
+import { MessageCircle, Check, Undo2, Download, Gift } from "lucide-react";
 import { api } from "../api.js";
 import { fmt, PAYS_INDICATIF } from "../constants.js";
 
@@ -161,10 +161,21 @@ function Explication({ children }) {
 }
 
 // Une ligne cliente : [nombre d'achats] Nom (Nouvelle) · téléphone · détail ... [WhatsApp] [Message envoyé]
+// Message prérempli pour une cliente ayant un bonus : il reste vrai — le bonus se déduit à la caisse,
+// pas sur une livraison, et seulement pour un achat au moins égal à son montant.
+function messageBonus(montant) {
+  return `Bonjour, c'est La Pointure Espagnole. Bonne nouvelle : vous avez un bonus fidélité Cendrillon de ${fmt(montant)} F à utiliser lors de votre prochain achat en boutique (pour un achat d'au moins ${fmt(montant)} F). Nous serons ravies de vous accueillir !`;
+}
+
 function LigneCliente({ ligne, type, details, onMessage }) {
+  const estBonus = type === "BONUS";
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
-  const lien = (() => { const n = numeroWhatsApp(ligne.whatsapp || ligne.telephone, ligne.pays); return n ? `https://wa.me/${n}` : null; })();
+  const lien = (() => {
+    const n = numeroWhatsApp(ligne.whatsapp || ligne.telephone, ligne.pays);
+    if (!n) return null;
+    return estBonus ? `https://wa.me/${n}?text=${encodeURIComponent(messageBonus(ligne.bonusDisponible))}` : `https://wa.me/${n}`;
+  })();
   const tel = ligne.whatsapp || ligne.telephone;
 
   const marquer = async () => {
@@ -185,15 +196,22 @@ function LigneCliente({ ligne, type, details, onMessage }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: C.carte, border: `1px solid ${C.bordure}`, opacity: ligne.dejaEnvoye ? 0.6 : 1 }}>
       <div className="flex items-center gap-3 min-w-0">
-        <span className="flex items-center justify-center rounded-full font-mono font-semibold shrink-0"
-          style={{ width: 34, height: 34, background: ligne.nbAchats === 1 ? C.accent : "#F1E8DA", color: ligne.nbAchats === 1 ? "#FBF3EC" : C.texte }}
-          title={`${ligne.nbAchats} achat${ligne.nbAchats > 1 ? "s" : ""} enregistré${ligne.nbAchats > 1 ? "s" : ""}`}>
-          {ligne.nbAchats}
-        </span>
+        {estBonus ? (
+          <span className="flex items-center justify-center rounded-full shrink-0" style={{ width: 34, height: 34, background: "#E9F0EA", color: C.vert }} title="Bonus Cendrillon disponible">
+            <Gift size={16} />
+          </span>
+        ) : (
+          <span className="flex items-center justify-center rounded-full font-mono font-semibold shrink-0"
+            style={{ width: 34, height: 34, background: ligne.nbAchats === 1 ? C.accent : "#F1E8DA", color: ligne.nbAchats === 1 ? "#FBF3EC" : C.texte }}
+            title={`${ligne.nbAchats} achat${ligne.nbAchats > 1 ? "s" : ""} enregistré${ligne.nbAchats > 1 ? "s" : ""}`}>
+            {ligne.nbAchats}
+          </span>
+        )}
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">
             {ligne.nomPrenoms}
             {ligne.nouvelle && type === "REMERCIEMENT" && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBEAE7", color: C.accent }}>Nouvelle cliente</span>}
+            {estBonus && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: C.vert }}>Bonus {fmt(ligne.bonusDisponible)} F</span>}
             {ligne.soldeDu > 0 && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBF3E3", color: "#7A5F26" }}>Solde dû : {fmt(ligne.soldeDu)} F</span>}
           </p>
           <p className="text-xs" style={{ color: C.doux }}>
@@ -210,12 +228,12 @@ function LigneCliente({ ligne, type, details, onMessage }) {
         )}
         {ligne.dejaEnvoye ? (
           <span className="flex items-center gap-1.5 text-xs" style={{ color: C.vert }}>
-            <Check size={14} /> Envoyé le {fmtDate(ligne.dernierMessage?.createdAt)}
+            <Check size={14} /> {estBonus ? "Appelée le" : "Envoyé le"} {fmtDate(ligne.dernierMessage?.createdAt)}
             <button type="button" onClick={annuler} disabled={enCours} title="Annuler (coché par erreur)" style={{ color: C.doux }}><Undo2 size={13} /></button>
           </span>
         ) : (
           <button type="button" onClick={marquer} disabled={enCours} className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: C.accent, color: "#FBF3EC" }}>
-            {enCours ? "..." : "Message envoyé"}
+            {enCours ? "..." : (estBonus ? "Appelée" : "Message envoyé")}
           </button>
         )}
       </div>
@@ -503,6 +521,115 @@ export function EncartPairesParMarque({ onVoirDetail }) {
                 {donnees.marques.filter((m) => m.paires <= 0).length > 0 ? `${donnees.marques.filter((m) => m.paires <= 0).length} marque(s) sans aucune vente sur la période.` : ""}
               </p>
             )}
+          </>)}
+    </div>
+  );
+}
+
+// ---------- Clientes avec un bonus à appeler ----------
+const TRIS_BONUS = [["bonus", "Bonus le plus élevé"], ["cumul", "Cumul le plus élevé"], ["ancienne", "Dernier achat le plus ancien"]];
+
+function trierBonus(lignes, mode) {
+  const copie = [...lignes];
+  const dernier = (l) => (l.derniereVente ? new Date(l.derniereVente).getTime() : Infinity);
+  if (mode === "cumul") copie.sort((a, b) => b.cumulFideliteCourant - a.cumulFideliteCourant);
+  else if (mode === "ancienne") copie.sort((a, b) => dernier(a) - dernier(b));
+  else copie.sort((a, b) => b.bonusDisponible - a.bonusDisponible || b.cumulFideliteCourant - a.cumulFideliteCourant);
+  return copie;
+}
+
+export function BonusAAppeler() {
+  const [avecTel, setAvecTel] = useState(true);
+  const [masquer, setMasquer] = useState(true);
+  const [tri, setTri] = useState("bonus");
+  const [donnees, setDonnees] = useState(null);
+  const [erreur, setErreur] = useState("");
+  const maj = useMajLigne(setDonnees);
+
+  useEffect(() => {
+    let annule = false;
+    setDonnees(null); setErreur("");
+    api.suiviClientes.bonusAAppeler({ avecTelephone: avecTel ? "1" : "", nonEnvoyes: masquer ? "1" : "" })
+      .then((r) => { if (!annule) setDonnees(r); })
+      .catch((e) => { if (!annule) setErreur(e.message); });
+    return () => { annule = true; };
+  }, [avecTel, masquer]);
+
+  const lignes = donnees ? trierBonus(donnees.lignes, tri) : [];
+  return (
+    <div>
+      <p className="text-sm mb-4" style={{ color: C.doux }}>
+        Les clientes qui ont un bonus Cendrillon prêt à être déduit. Appelez-les ou écrivez-leur pour qu'elles viennent l'utiliser : le bonus se déduit à la caisse, il n'est pas appliqué sur une livraison, et seulement pour un achat au moins égal à son montant.
+      </p>
+      <div className="flex flex-wrap items-end gap-4 mb-4">
+        <Case label="Seulement celles avec un téléphone" checked={avecTel} onChange={setAvecTel} />
+        <Case label="Masquer celles déjà appelées" checked={masquer} onChange={setMasquer} />
+        <SelectTri valeur={tri} options={TRIS_BONUS} onChange={setTri} />
+      </div>
+      {erreur && <p className="text-sm mb-3" style={{ color: C.accent }}>{erreur}</p>}
+      {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement…</p>}
+      {donnees && (
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <p className="text-sm font-medium">{lignes.length} cliente(s) à appeler · {fmt(donnees.totalBonus)} F de bonus à utiliser</p>
+            <BoutonExport nombre={lignes.length} onClick={() => exporterCsv("clientes-bonus-a-appeler",
+              ["Nom et prénoms", "Téléphone", "WhatsApp", "Bonus disponible (F)", "Cumul courant (F)", "Dernier achat", "Appelée le"],
+              lignes.map((l) => [l.nomPrenoms, { __numero: l.telephone }, { __numero: l.whatsapp }, l.bonusDisponible, l.cumulFideliteCourant, l.derniereVente ? fmtDate(l.derniereVente) : "", l.dejaEnvoye ? fmtDate(l.dernierMessage?.createdAt) : ""]))} />
+          </div>
+          <Explication>
+            {donnees.nbAvecBonus} cliente(s) ont un bonus disponible
+            {donnees.diagnostic?.nbMasqueesTelephone > 0 ? `, ${donnees.diagnostic.nbMasqueesTelephone} masquée(s) faute de téléphone` : ""}
+            {donnees.diagnostic?.nbMasqueesDejaAppelees > 0 ? `, ${donnees.diagnostic.nbMasqueesDejaAppelees} masquée(s) car déjà appelée(s)` : ""}.
+            Une cliente appelée revient dans la liste si elle rachète ensuite.
+          </Explication>
+          {lignes.length === 0
+            ? <p className="text-sm" style={{ color: C.doux }}>Aucune cliente à appeler avec ces critères.</p>
+            : <div className="space-y-2">
+                {lignes.map((l) => (
+                  <LigneCliente key={l.clientId} ligne={l} type="BONUS" onMessage={maj}
+                    details={`cumul ${fmt(l.cumulFideliteCourant)} F${l.derniereVente ? ` · dernier achat le ${fmtDate(l.derniereVente)}` : ""}`} />
+                ))}
+              </div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Encart de l'accueil : les premières clientes à appeler, avec WhatsApp et "Appelée" directement.
+export function EncartBonusAAppeler({ onVoirTout }) {
+  const [donnees, setDonnees] = useState(null);
+  const [erreur, setErreur] = useState("");
+  const maj = useMajLigne(setDonnees);
+
+  useEffect(() => {
+    let annule = false;
+    api.suiviClientes.bonusAAppeler({ avecTelephone: "1", nonEnvoyes: "1" })
+      .then((r) => { if (!annule) setDonnees(r); })
+      .catch((e) => { if (!annule) setErreur(e.message); });
+    return () => { annule = true; };
+  }, []);
+
+  const affichees = donnees ? donnees.lignes.slice(0, 5) : [];
+  return (
+    <div className="rounded-2xl p-5 mb-6" style={{ background: C.carte, border: `1px solid ${C.bordure}` }}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <p className="text-xs font-mono uppercase tracking-wide" style={{ color: C.accent }}>Clientes avec un bonus à utiliser</p>
+        {onVoirTout && <button type="button" onClick={onVoirTout} className="text-xs font-medium" style={{ color: C.accent }}>Voir tout →</button>}
+      </div>
+      {erreur && <p className="text-xs" style={{ color: C.accent }}>{erreur}</p>}
+      {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement…</p>}
+      {donnees && (donnees.lignes.length === 0
+        ? <p className="text-sm" style={{ color: C.doux }}>Aucune cliente avec un bonus à appeler pour l'instant.</p>
+        : <>
+            <p className="text-sm font-medium mb-3">{donnees.lignes.length} cliente(s) à appeler · {fmt(donnees.totalBonus)} F de bonus à utiliser</p>
+            <div className="space-y-2">
+              {affichees.map((l) => (
+                <LigneCliente key={l.clientId} ligne={l} type="BONUS" onMessage={maj}
+                  details={`cumul ${fmt(l.cumulFideliteCourant)} F`} />
+              ))}
+            </div>
+            {donnees.lignes.length > affichees.length && <p className="text-xs mt-3" style={{ color: C.doux }}>+ {donnees.lignes.length - affichees.length} autre(s) dans la liste complète.</p>}
           </>)}
     </div>
   );

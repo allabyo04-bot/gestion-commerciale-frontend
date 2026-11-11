@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Gift, Crown, Plus, Trash2, Pencil, Users, Bell, Wallet, List } from "lucide-react";
 import { api } from "../api.js";
-import { fmt } from "../constants.js";
+import { fmt, BONUS_A_APPELER_ACTIF } from "../constants.js";
+import { BonusAAppeler } from "./SuiviClientesViews.jsx";
 import { ErrorBanner } from "../components/Shared.jsx";
 
 const inputStyle = { border: "1px solid #DDD3C4", borderRadius: 8, padding: "8px 10px", fontSize: 14 };
@@ -363,8 +364,12 @@ function ClientesParStatut() {
   );
 }
 
-export default function FideliteSection() {
-  const [vue, setVue] = useState("BONUS");
+export default function FideliteSection({ sousOngletInitial, onSousOngletInitialConsomme } = {}) {
+  const [vue, setVue] = useState(sousOngletInitial || "BONUS");
+  // Arrivée directe depuis l'accueil ("Voir tout" de l'encart des bonus à appeler)
+  useEffect(() => {
+    if (sousOngletInitial) { setVue(sousOngletInitial); if (onSousOngletInitialConsomme) onSousOngletInitialConsomme(); }
+  }, [sousOngletInitial]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold mb-1">Programme de fidélité — Cendrillon</h1>
@@ -372,7 +377,7 @@ export default function FideliteSection() {
       <Onglets vue={vue} setVue={setVue} />
       {vue === "BONUS" && <PaliersBonus />}
       {vue === "STATUT" && <PaliersStatut />}
-      {vue === "CLIENTES" && <ClientesBonusDisponible />}
+      {vue === "CLIENTES" && (BONUS_A_APPELER_ACTIF ? <BonusAAppeler /> : <ClientesBonusDisponible />)}
       {vue === "CHANGEMENTS" && <ChangementsStatut />}
       {vue === "ACCORDES" && <BonusAccordes />}
       {vue === "PARSTATUT" && <ClientesParStatut />}

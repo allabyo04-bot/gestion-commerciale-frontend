@@ -22,6 +22,7 @@ function Shell() {
   const [tab, setTab] = useState("accueil");
   const [ventesSubTabDemande, setVentesSubTabDemande] = useState(null);
   const [etatsSubTabDemande, setEtatsSubTabDemande] = useState(null);
+  const [fideliteSubTabDemande, setFideliteSubTabDemande] = useState(null);
   const [nbRemisesEnAttente, setNbRemisesEnAttente] = useState(0);
   const estAdmin = !!user?.role?.systeme;
   useEffect(() => {
@@ -90,7 +91,7 @@ function Shell() {
       <div className="flex-1 min-w-0 px-6 sm:px-10 py-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {activeTab === "accueil" && (
-            <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} onNaviguerFidelite={() => setTab("fidelite")} onNaviguerEtats={(sousOnglet) => { setEtatsSubTabDemande(sousOnglet); setTab("etats"); }} />
+            <DashboardSection onNaviguerVentes={(sousOnglet) => { setVentesSubTabDemande(sousOnglet); setTab("ventes"); }} onNaviguerFidelite={(sousOnglet) => { setFideliteSubTabDemande(sousOnglet || null); setTab("fidelite"); }} onNaviguerEtats={(sousOnglet) => { setEtatsSubTabDemande(sousOnglet); setTab("etats"); }} />
           )}
           {activeTab === "ventes" && (
             <VentesSection subTabInitial={ventesSubTabDemande} onSubTabInitialConsomme={() => setVentesSubTabDemande(null)} />
@@ -103,7 +104,7 @@ function Shell() {
           {activeTab === "stock" && <StockSection />}
           {activeTab === "roles" && <RolesSection />}
           {activeTab === "journal-audit" && <JournalAuditSection />}
-          {activeTab === "fidelite" && <FideliteSection />}
+          {activeTab === "fidelite" && <FideliteSection sousOngletInitial={fideliteSubTabDemande} onSousOngletInitialConsomme={() => setFideliteSubTabDemande(null)} />}
           {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
         </div>
       </div>
