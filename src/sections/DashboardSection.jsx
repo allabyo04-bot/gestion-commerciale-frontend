@@ -3,7 +3,7 @@ import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, Award, Cake, Percen
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { fmt, MOIS, LIVRAISON_ACTIF, FIDELITE_ACTIF, SUIVI_CLIENTES_ACTIF, BONUS_A_APPELER_ACTIF, MODES_PAIEMENT } from "../constants.js";
-import { EncartPairesParMarque, EncartBonusAAppeler } from "./SuiviClientesViews.jsx";
+import { EncartPairesParMarque, EncartBonusAAppeler, EncartCanauxVente } from "./SuiviClientesViews.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const SEUIL_STOCK_FAIBLE = 3;
@@ -317,6 +317,9 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
 
       {/* Paires vendues par marque — caché tant que SUIVI_CLIENTES_ACTIF est à false, administratrice seulement */}
       {SUIVI_CLIENTES_ACTIF && estAdmin && <EncartPairesParMarque onVoirDetail={onNaviguerEtats ? () => onNaviguerEtats("paires") : undefined} />}
+
+      {/* Part des ventes par livraison dans le chiffre d'affaires, par boutique puis cumulée — administratrice seulement */}
+      {estAdmin && <EncartCanauxVente />}
 
       {detailOuvert && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>

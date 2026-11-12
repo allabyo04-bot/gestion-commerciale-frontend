@@ -336,6 +336,10 @@ etats: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/recap-boutiques${qs ? `?${qs}` : ""}`);
     },
+    ventesParCanal: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/etats/ventes-par-canal${qs ? `?${qs}` : ""}`);
+    },
     parVendeur: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/par-vendeur${qs ? `?${qs}` : ""}`);

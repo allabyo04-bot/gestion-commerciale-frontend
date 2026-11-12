@@ -637,3 +637,75 @@ export function EncartBonusAAppeler({ onVoirTout }) {
     </div>
   );
 }
+
+// ---------- Ventes : boutique et livraison ----------
+const COULEURS_CANAL = { Boutique: "#8C3B2E", Livraison: "#C9A24B", "Expédition": "#6B8F71", Autre: "#B8AFA3" };
+const virgule = (n) => String(n).replace(".", ",");
+
+function BlocCanaux({ bloc }) {
+  // Boutique et Livraison toujours affichés ; Expédition et Autre seulement s'ils ont des ventes
+  const canaux = ["Boutique", "Livraison", "Expédition", "Autre"].filter((c) => c === "Boutique" || c === "Livraison" || bloc.modes[c].montant !== 0 || bloc.modes[c].nombre > 0);
+  return (
+    <div className="mb-5 last:mb-0">
+      <p className="text-sm font-medium mb-1">{bloc.libelle}</p>
+      {!bloc.parts ? (
+        <p className="text-xs" style={{ color: C.doux }}>Aucune vente sur la période.</p>
+      ) : (
+        <>
+          <p className="text-sm mb-2">
+            <span className="font-semibold" style={{ color: "#A8823D" }}>{virgule(bloc.partLivraison)} %</span> du chiffre d'affaires vient des livraisons
+            {bloc.livraisonSurBoutique != null && <span style={{ color: C.doux }}> · soit {virgule(bloc.livraisonSurBoutique)} % des ventes en boutique</span>}
+          </p>
+          <div className="flex h-3 rounded-full overflow-hidden mb-2" style={{ background: "#EFE7D9" }}>
+            {canaux.map((c) => bloc.parts[c] > 0 && <div key={c} title={`${c} : ${virgule(bloc.parts[c])} %`} style={{ width: `${bloc.parts[c]}%`, background: COULEURS_CANAL[c] }} />)}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: C.doux }}>
+            {canaux.map((c) => (
+              <span key={c} className="flex items-center gap-1.5">
+                <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: COULEURS_CANAL[c] }} />
+                {c} : {fmt(bloc.modes[c].montant)} F ({bloc.parts[c] != null ? virgule(bloc.parts[c]) : "0"} %)
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Encart de l'accueil (administratrice) : la part des livraisons dans le chiffre d'affaires, boutique par boutique
+// puis pour les deux boutiques cumulées.
+export function EncartCanauxVente() {
+  const [preset, setPreset] = useState("mois");
+  const [donnees, setDonnees] = useState(null);
+  const [erreur, setErreur] = useState("");
+
+  useEffect(() => {
+    const [debut, fin] = periodePreset(preset);
+    let annule = false;
+    setDonnees(null); setErreur("");
+    api.etats.ventesParCanal({ dateDebut: debut, dateFin: fin })
+      .then((r) => { if (!annule) setDonnees(r); })
+      .catch((e) => { if (!annule) setErreur(e.message); });
+    return () => { annule = true; };
+  }, [preset]);
+
+  return (
+    <div className="rounded-2xl p-5 mb-6" style={{ background: C.carte, border: `1px solid ${C.bordure}` }}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <p className="text-xs font-mono uppercase tracking-wide" style={{ color: C.accent }}>Ventes : boutique et livraison</p>
+        <select value={preset} onChange={(e) => setPreset(e.target.value)} className="px-2 py-1 rounded-lg text-xs" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }}>
+          {["mois", "moisPrecedent", "3mois", "debut"].map((id) => <option key={id} value={id}>{LIBELLES_PERIODE[id]}</option>)}
+        </select>
+      </div>
+      {erreur && <p className="text-xs" style={{ color: C.accent }}>{erreur}</p>}
+      {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement…</p>}
+      {donnees && (
+        <>
+          {[...donnees.parBoutique, donnees.cumul].map((b) => <BlocCanaux key={b.libelle} bloc={b} />)}
+          <p className="text-xs mt-4" style={{ color: C.doux }}>Chiffre d'affaires calculé comme celui de l'accueil (cartes cadeaux utilisées et retours déduits).</p>
+        </>
+      )}
+    </div>
+  );
+}
