@@ -62,7 +62,7 @@ function FiltrePeriode({ dateDebut, setDateDebut, dateFin, setDateFin }) {
   );
 }
 
-function JournalGeneral() {
+export function JournalGeneral() {
   const [entrees, setEntrees] = useState(null);
   const [error, setError] = useState("");
   const [action, setAction] = useState("");
@@ -118,7 +118,7 @@ function JournalGeneral() {
   );
 }
 
-function FichesClients() {
+export function FichesClients() {
   const [clients, setClients] = useState(null);
   const [error, setError] = useState("");
   const [dateDebut, setDateDebut] = useState("");
@@ -184,7 +184,7 @@ const virgulePct = (n) => (n == null ? "—" : `${String(n).replace(".", ",")} %
 const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const libelleMois = (cle) => { const [a, m] = cle.split("-"); return `${NOMS_MOIS[Number(m) - 1]} ${a}`; };
 
-function RemisesParCaissiere() {
+export function RemisesParCaissiere() {
   const [lignes, setLignes] = useState(null);
   const [mois, setMois] = useState(null);
   const [error, setError] = useState("");
@@ -310,7 +310,7 @@ function RemisesParCaissiere() {
 
 // Contrôle des livraisons : une livraison = une cliente. Combien sont saisies sans fiche cliente, combien
 // contiennent beaucoup de paires (signe possible de regroupement), par boutique et par personne.
-function ControleLivraisons() {
+export function ControleLivraisons() {
   const jourIso = (d) => d.toISOString().slice(0, 10);
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));

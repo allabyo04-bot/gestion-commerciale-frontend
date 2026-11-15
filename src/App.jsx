@@ -1,16 +1,14 @@
-import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, ScrollText, Crown } from "lucide-react";
+import { ShoppingCart, Heart, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
-import UtilisateursSection from "./sections/UtilisateursSection.jsx";
 import StockSection from "./sections/StockSection.jsx";
 import ClientsSection from "./sections/ClientsSection.jsx";
 import VentesSection from "./sections/VentesSection.jsx";
-import RolesSection from "./sections/RolesSection.jsx";
 import EtatsSection from "./sections/EtatsSection.jsx";
 import DashboardSection from "./sections/DashboardSection.jsx";
 import DepensesSection from "./sections/DepensesSection.jsx";
 import LivraisonSection from "./sections/LivraisonSection.jsx";
-import JournalAuditSection from "./sections/JournalAuditSection.jsx";
+import AdministrationSection from "./sections/AdministrationSection.jsx";
 import FideliteSection from "./sections/FideliteSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
@@ -50,14 +48,12 @@ function Shell() {
     // Chantier en cours, masqué tant que Djenie n'a pas donné le feu vert (voir constants.js).
     ...(estAdmin && FIDELITE_ACTIF ? [{ id: "fidelite", label: "Fidélité", icon: Crown }] : []),
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
-    // Réservé à l'administrateur (Djenie) — pas une question de permission par rôle, comme côté
-    // serveur qui vérifie directement role.systeme plutôt qu'une permission dédiée.
-    ...(estAdmin ? [{ id: "journal-audit", label: "Journal d'audit", icon: ScrollText }] : []),
-    // Écrans de configuration/sécurité — en fin de liste, pas de l'usage quotidien.
-    { id: "utilisateurs", label: "Utilisateurs", icon: UsersIcon, perm: "utilisateurs" },
-    { id: "roles", label: "Rôles", icon: ShieldCheck, perm: "utilisateurs" },
+    // Réservé à l'administrateur : un seul menu qui regroupe journal, remises, livraisons, listes, accès.
+    ...(estAdmin ? [{ id: "administration", label: "Administration", icon: Settings }] : []),
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
-  const activeTab = NAV.find((n) => n.id === tab) ? tab : NAV[0]?.id;
+  const ANCIENS = { "journal-audit": "administration", utilisateurs: "administration", roles: "administration" };
+  const tabCible = ANCIENS[tab] || tab;
+  const activeTab = NAV.find((n) => n.id === tabCible) ? tabCible : NAV[0]?.id;
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF7F2", minHeight: "100vh", color: "#2B2320", display: "flex" }}>
       <aside className="no-print w-16 md:w-60 shrink-0" style={{ borderRight: "1px solid #DDD3C4", background: "#FFFDF9", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -100,10 +96,8 @@ function Shell() {
           {activeTab === "etats" && <EtatsSection sousOngletInitial={etatsSubTabDemande} onSousOngletInitialConsomme={() => setEtatsSubTabDemande(null)} />}
           {activeTab === "depenses" && <DepensesSection />}
           {activeTab === "clients" && <ClientsSection />}
-          {activeTab === "utilisateurs" && <UtilisateursSection />}
           {activeTab === "stock" && <StockSection />}
-          {activeTab === "roles" && <RolesSection />}
-          {activeTab === "journal-audit" && <JournalAuditSection />}
+          {activeTab === "administration" && <AdministrationSection ongletInitial={tab === "utilisateurs" || tab === "roles" ? "ACCES" : "SUIVI"} peutGererAcces={!!permissions.utilisateurs} />}
           {activeTab === "fidelite" && <FideliteSection sousOngletInitial={fideliteSubTabDemande} onSousOngletInitialConsomme={() => setFideliteSubTabDemande(null)} />}
           {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
         </div>

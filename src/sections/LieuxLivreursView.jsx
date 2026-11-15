@@ -31,7 +31,7 @@ function Tableau({ colonnes, lignes, vide = "Rien à afficher sur cette période
 }
 
 // ── Statistiques ─────────────────────────────────────────────────────────────
-function Statistiques() {
+export function Statistiques() {
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));
   const [boutique, setBoutique] = useState("");
@@ -233,7 +233,7 @@ function ClassementAnciennes({ setError }) {
   );
 }
 
-function Gestion() {
+export function Gestion() {
   const [lieux, setLieux] = useState({ communes: [], pays: [] });
   const [livreurs, setLivreurs] = useState([]);
   const [error, setError] = useState("");
