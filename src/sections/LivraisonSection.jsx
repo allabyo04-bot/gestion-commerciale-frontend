@@ -393,7 +393,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
             )}
 
             <div className="mt-3">
-              <p className="text-xs mb-1 font-medium" style={{ color: "#6B5D52" }}>Lieu de livraison (Abidjan et ses communes)</p>
+              <p className="text-xs mb-1 font-medium" style={{ color: "#6B5D52" }}>Lieu de livraison (Abidjan, ses communes et Grand-Bassam)</p>
               <LieuLivraisonChamps commune={commune} onCommune={setCommune} quartier={quartier} onQuartier={setQuartier} />
               <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Sert aussi aux statistiques : où livrons-nous le plus ?</p>
             </div>
