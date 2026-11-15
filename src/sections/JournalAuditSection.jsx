@@ -178,53 +178,129 @@ function FichesClients() {
   );
 }
 
+const virgulePct = (n) => (n == null ? "—" : `${String(n).replace(".", ",")} %`);
+const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const libelleMois = (cle) => { const [a, m] = cle.split("-"); return `${NOMS_MOIS[Number(m) - 1]} ${a}`; };
+
 function RemisesParCaissiere() {
   const [lignes, setLignes] = useState(null);
+  const [mois, setMois] = useState(null);
   const [error, setError] = useState("");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [boutique, setBoutique] = useState("");
 
   const load = useCallback(async () => {
-    try { setLignes(await api.journalAudit.remisesParCaissiere({ dateDebut, dateFin })); }
-    catch (e) { setError(e.message); }
-  }, [dateDebut, dateFin]);
+    setError("");
+    try {
+      const [l, m] = await Promise.all([
+        api.journalAudit.remisesParCaissiere({ dateDebut, dateFin, boutique }),
+        api.journalAudit.remisesParMois({ dateDebut, dateFin, boutique }),
+      ]);
+      setLignes(l); setMois(m);
+    } catch (e) { setError(e.message); }
+  }, [dateDebut, dateFin, boutique]);
   useEffect(() => { load(); }, [load]);
+
+  const tot = (lignes || []).reduce((t, l) => ({
+    remises: t.remises + l.remisesAppliquees, ventes: t.ventes + l.ventesAvantRemise, demandes: t.demandes + l.montantTotal,
+  }), { remises: 0, ventes: 0, demandes: 0 });
+  const pctTotal = tot.ventes > 0 ? Math.round((tot.remises / tot.ventes) * 1000) / 10 : null;
 
   return (
     <div>
-      <FiltrePeriode dateDebut={dateDebut} setDateDebut={setDateDebut} dateFin={dateFin} setDateFin={setDateFin} />
+      <div className="flex flex-wrap items-end gap-3">
+        <FiltrePeriode dateDebut={dateDebut} setDateDebut={setDateDebut} dateFin={dateFin} setDateFin={setDateFin} />
+        <div className="mb-4">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+          <select value={boutique} onChange={(e) => setBoutique(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={{ border: "1px solid #DDD3C4", background: "#fff" }}>
+            <option value="">Toutes</option>
+            <option value="Angré">Angré</option>
+            <option value="Koumassi">Koumassi</option>
+          </select>
+        </div>
+      </div>
       {error && <ErrorBanner error={error} />}
       {lignes === null ? (
         <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
       ) : lignes.length === 0 ? (
-        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune demande de remise sur cette période.</p>
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune vente ni demande de remise sur cette période.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 600 }}>
-            <thead>
-              <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
-                <th className="text-left py-2">Caissier(ère)</th>
-                <th className="text-right py-2">Demandes</th>
-                <th className="text-right py-2">Montant total</th>
-                <th className="text-right py-2">Approuvées</th>
-                <th className="text-right py-2">Refusées</th>
-                <th className="text-right py-2">En attente</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l, i) => (
-                <tr key={i} style={{ borderTop: "1px solid #EFE7D9" }}>
-                  <td className="py-2">{l.caissier.prenom} {l.caissier.nom}</td>
-                  <td className="text-right py-2">{l.nombre}</td>
-                  <td className="text-right py-2 font-mono">{fmt(l.montantTotal)} F</td>
-                  <td className="text-right py-2" style={{ color: "#3F6B4A" }}>{l.approuvees}</td>
-                  <td className="text-right py-2" style={{ color: "#B04A3B" }}>{l.refusees}</td>
-                  <td className="text-right py-2" style={{ color: "#A8823D" }}>{l.enAttente}</td>
+        <>
+          <p className="text-sm mb-3">
+            <span className="font-semibold">{fmt(tot.remises)} F</span> de remises réellement accordées sur <span className="font-semibold">{fmt(tot.ventes)} F</span> de ventes avant remise
+            {pctTotal != null && <> : <span className="font-semibold" style={{ color: "#8C3B2E" }}>{virgulePct(pctTotal)}</span></>}.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: 860 }}>
+              <thead>
+                <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+                  <th className="text-left py-2">Caissier(ère)</th>
+                  <th className="text-right py-2">Ventes avant remise</th>
+                  <th className="text-right py-2">Remises accordées</th>
+                  <th className="text-right py-2">% des ventes</th>
+                  <th className="text-right py-2" title="Quand elle accorde une remise, de combien en moyenne (en % du panier)">Taux moyen</th>
+                  <th className="text-right py-2">Demandes</th>
+                  <th className="text-right py-2" title="Somme de toutes les demandes, même refusées, en attente ou jamais utilisées">Montant demandé</th>
+                  <th className="text-right py-2">Approuvées</th>
+                  <th className="text-right py-2">Refusées</th>
+                  <th className="text-right py-2">En attente</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {lignes.map((l, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #EFE7D9" }}>
+                    <td className="py-2">{l.caissier.prenom} {l.caissier.nom}</td>
+                    <td className="text-right py-2 font-mono">{fmt(l.ventesAvantRemise)} F</td>
+                    <td className="text-right py-2 font-mono font-semibold">{fmt(l.remisesAppliquees)} F</td>
+                    <td className="text-right py-2 font-semibold" style={{ color: "#8C3B2E" }}>{virgulePct(l.pctDesVentes)}</td>
+                    <td className="text-right py-2">{virgulePct(l.tauxMoyenSurRemises)}</td>
+                    <td className="text-right py-2">{l.nombre}</td>
+                    <td className="text-right py-2 font-mono" style={{ color: "#6B5D52" }}>{fmt(l.montantTotal)} F</td>
+                    <td className="text-right py-2" style={{ color: "#3F6B4A" }}>{l.approuvees}</td>
+                    <td className="text-right py-2" style={{ color: "#B04A3B" }}>{l.refusees}</td>
+                    <td className="text-right py-2" style={{ color: "#A8823D" }}>{l.enAttente}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs mt-3 px-3 py-2 rounded-lg" style={{ background: "#FBF3E3", color: "#7A5F26" }}>
+            <strong>Remises accordées</strong> : ce qui a réellement été retiré du prix sur les ventes validées. <strong>Montant demandé</strong> : la somme de toutes les demandes,
+            y compris celles refusées, en attente ou qui n'ont jamais servi à une vente : il est donc plus élevé. Le <strong>pourcentage</strong> compare les remises accordées aux ventes
+            de la même caissière avant remise (retours non déduits).
+          </p>
+
+          {mois && mois.length > 0 && (
+            <div className="mt-6">
+              <p className="text-xs font-mono uppercase tracking-wide mb-2" style={{ color: "#8C3B2E" }}>Mois par mois (toutes caissières)</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: 520 }}>
+                  <thead>
+                    <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+                      <th className="text-left py-2">Mois</th>
+                      <th className="text-right py-2">Ventes avant remise</th>
+                      <th className="text-right py-2">Remises accordées</th>
+                      <th className="text-right py-2">% des ventes</th>
+                      <th className="text-right py-2">Ventes avec remise</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...mois].reverse().map((m) => (
+                      <tr key={m.mois} style={{ borderTop: "1px solid #EFE7D9" }}>
+                        <td className="py-2 capitalize">{libelleMois(m.mois)}</td>
+                        <td className="text-right py-2 font-mono">{fmt(m.ventesAvantRemise)} F</td>
+                        <td className="text-right py-2 font-mono">{fmt(m.remisesAppliquees)} F</td>
+                        <td className="text-right py-2 font-semibold" style={{ color: "#8C3B2E" }}>{virgulePct(m.pctDesVentes)}</td>
+                        <td className="text-right py-2">{m.nbVentesAvecRemise} / {m.nbVentes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -119,6 +119,10 @@ export const api = {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
       return request(`/api/journal-audit/remises-par-caissiere${qs ? `?${qs}` : ""}`);
     },
+    remisesParMois: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/journal-audit/remises-par-mois${qs ? `?${qs}` : ""}`);
+    },
   },
   apiPublique: {
     listerCles: () => request("/api/api-publique/cles"),

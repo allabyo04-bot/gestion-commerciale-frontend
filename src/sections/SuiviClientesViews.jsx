@@ -170,7 +170,7 @@ function messageBonus(montant) {
   return `Bonjour, c'est La Pointure Espagnole. Bonne nouvelle : vous avez un bonus fidélité Cendrillon de ${fmt(montant)} F à utiliser lors de votre prochain achat en boutique (pour un achat d'au moins ${fmt(montant)} F). Nous serons ravies de vous accueillir !`;
 }
 
-function LigneCliente({ ligne, type, details, onMessage }) {
+function LigneCliente({ ligne, type, details, onMessage, etiquette = null }) {
   const estBonus = type === "BONUS";
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
@@ -215,6 +215,7 @@ function LigneCliente({ ligne, type, details, onMessage }) {
             {ligne.nomPrenoms}
             {ligne.nouvelle && type === "REMERCIEMENT" && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBEAE7", color: C.accent }}>Nouvelle cliente</span>}
             {estBonus && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: C.vert }}>Bonus {fmt(ligne.bonusDisponible)} F</span>}
+            {etiquette && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: etiquette.bg, color: etiquette.fg }}>{etiquette.texte}</span>}
             {ligne.soldeDu > 0 && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBF3E3", color: "#7A5F26" }}>Solde dû : {fmt(ligne.soldeDu)} F</span>}
           </p>
           <p className="text-xs" style={{ color: C.doux }}>
@@ -541,9 +542,22 @@ function trierBonus(lignes, mode) {
   return copie;
 }
 
+// Canal d'achat des clientes avec bonus. "Livraison" = jamais venue en boutique (une expédition compte comme une livraison).
+const CANAUX_BONUS = [["", "Toutes"], ["Livraison", "Livraison seulement"], ["Les deux", "Boutique et livraison"], ["Boutique", "Boutique seulement"]];
+const COULEUR_CANAL_BONUS = { Livraison: { bg: "#FBF3E3", fg: "#7A5F26" }, "Les deux": { bg: "#EFE7F4", fg: "#5B4577" }, Boutique: { bg: "#F1E9DC", fg: "#6B5D52" } };
+
+function detailCanal(l) {
+  if (!l.canal) return "";
+  const morceaux = [];
+  if (l.nbLivraisons > 0) morceaux.push(`${l.nbLivraisons} livraison${l.nbLivraisons > 1 ? "s" : ""}`);
+  if (l.nbBoutique > 0) morceaux.push(`${l.nbBoutique} achat${l.nbBoutique > 1 ? "s" : ""} en boutique`);
+  return ` · ${morceaux.join(", ")}${l.derniereLivraison ? ` · dernière livraison le ${fmtDate(l.derniereLivraison)}` : ""}`;
+}
+
 export function BonusAAppeler() {
   const [avecTel, setAvecTel] = useState(true);
   const [masquer, setMasquer] = useState(true);
+  const [canal, setCanal] = useState("");
   const [tri, setTri] = useState("bonus");
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState("");
@@ -558,12 +572,27 @@ export function BonusAAppeler() {
     return () => { annule = true; };
   }, [avecTel, masquer]);
 
-  const lignes = donnees ? trierBonus(donnees.lignes, tri) : [];
+  const toutes = donnees ? donnees.lignes : [];
+  const compte = (c) => toutes.filter((l) => l.canal === c).length;
+  const lignes = donnees ? trierBonus(canal ? toutes.filter((l) => l.canal === canal) : toutes, tri) : [];
+  const totalBonusAffiche = lignes.reduce((t, l) => t + l.bonusDisponible, 0);
   return (
     <div>
       <p className="text-sm mb-4" style={{ color: C.doux }}>
         Les clientes qui ont un bonus Cendrillon prêt à être déduit. Appelez-les ou écrivez-leur pour qu'elles viennent l'utiliser : le bonus se déduit à la caisse, il n'est pas appliqué sur une livraison, et seulement pour un achat au moins égal à son montant.
+        Celles qui n'achètent que par livraison sont à appeler en priorité : elles ne passent jamais en boutique.
       </p>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {CANAUX_BONUS.map(([id, label]) => {
+          const n = id ? compte(id) : toutes.length;
+          return (
+            <button key={id || "toutes"} type="button" onClick={() => setCanal(id)} className="px-3 py-1.5 rounded-full text-sm font-medium"
+              style={canal === id ? { background: C.texte, color: "#FBF3EC" } : { border: `1px solid ${C.bordure}`, color: C.doux }}>
+              {label} ({n})
+            </button>
+          );
+        })}
+      </div>
       <div className="flex flex-wrap items-end gap-4 mb-4">
         <Case label="Seulement celles avec un téléphone" checked={avecTel} onChange={setAvecTel} />
         <Case label="Masquer celles déjà appelées" checked={masquer} onChange={setMasquer} />
@@ -574,23 +603,24 @@ export function BonusAAppeler() {
       {donnees && (
         <>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <p className="text-sm font-medium">{lignes.length} cliente(s) à appeler · {fmt(donnees.totalBonus)} F de bonus à utiliser</p>
+            <p className="text-sm font-medium">{lignes.length} cliente(s) à appeler · {fmt(totalBonusAffiche)} F de bonus à utiliser</p>
             <BoutonExport nombre={lignes.length} onClick={() => exporterCsv("clientes-bonus-a-appeler",
-              ["Nom et prénoms", "Téléphone", "WhatsApp", "Bonus disponible (F)", "Cumul courant (F)", "Dernier achat", "Appelée le"],
-              lignes.map((l) => [l.nomPrenoms, { __numero: l.telephone }, { __numero: l.whatsapp }, l.bonusDisponible, l.cumulFideliteCourant, l.derniereVente ? fmtDate(l.derniereVente) : "", l.dejaEnvoye ? fmtDate(l.dernierMessage?.createdAt) : ""]))} />
+              ["Nom et prénoms", "Téléphone", "WhatsApp", "Canal", "Livraisons", "Achats en boutique", "Dernière livraison", "Bonus disponible (F)", "Cumul courant (F)", "Dernier achat", "Appelée le"],
+              lignes.map((l) => [l.nomPrenoms, { __numero: l.telephone }, { __numero: l.whatsapp }, l.canal || "", l.nbLivraisons ?? 0, l.nbBoutique ?? 0, l.derniereLivraison ? fmtDate(l.derniereLivraison) : "", l.bonusDisponible, l.cumulFideliteCourant, l.derniereVente ? fmtDate(l.derniereVente) : "", l.dejaEnvoye ? fmtDate(l.dernierMessage?.createdAt) : ""]))} />
           </div>
           <Explication>
             {donnees.nbAvecBonus} cliente(s) ont un bonus disponible
             {donnees.diagnostic?.nbMasqueesTelephone > 0 ? `, ${donnees.diagnostic.nbMasqueesTelephone} masquée(s) faute de téléphone` : ""}
             {donnees.diagnostic?.nbMasqueesDejaAppelees > 0 ? `, ${donnees.diagnostic.nbMasqueesDejaAppelees} masquée(s) car déjà appelée(s)` : ""}.
             Une cliente appelée revient dans la liste si elle rachète ensuite.
+            Le canal est calculé d'après les ventes au comptant, sans remise, depuis le 13/07/2026 (une expédition compte comme une livraison) : c'est un nombre de ventes, pas la part exacte du cumul.
           </Explication>
           {lignes.length === 0
             ? <p className="text-sm" style={{ color: C.doux }}>Aucune cliente à appeler avec ces critères.</p>
             : <div className="space-y-2">
                 {lignes.map((l) => (
-                  <LigneCliente key={l.clientId} ligne={l} type="BONUS" onMessage={maj}
-                    details={`cumul ${fmt(l.cumulFideliteCourant)} F${l.derniereVente ? ` · dernier achat le ${fmtDate(l.derniereVente)}` : ""}`} />
+                  <LigneCliente key={l.clientId} ligne={l} type="BONUS" onMessage={maj} etiquette={l.canal ? { texte: l.canal === "Livraison" ? "Livraison seulement" : l.canal === "Les deux" ? "Boutique et livraison" : "Boutique seulement", ...COULEUR_CANAL_BONUS[l.canal] } : null}
+                    details={`cumul ${fmt(l.cumulFideliteCourant)} F${l.derniereVente ? ` · dernier achat le ${fmtDate(l.derniereVente)}` : ""}${detailCanal(l)}`} />
                 ))}
               </div>}
         </>
@@ -625,7 +655,13 @@ export function EncartBonusAAppeler({ onVoirTout }) {
       {donnees && (donnees.lignes.length === 0
         ? <p className="text-sm" style={{ color: C.doux }}>Aucune cliente avec un bonus à appeler pour l'instant.</p>
         : <>
-            <p className="text-sm font-medium mb-3">{donnees.lignes.length} cliente(s) à appeler · {fmt(donnees.totalBonus)} F de bonus à utiliser</p>
+            <p className="text-sm font-medium mb-1">{donnees.lignes.length} cliente(s) à appeler · {fmt(donnees.totalBonus)} F de bonus à utiliser</p>
+            {donnees.parCanal && (donnees.parCanal.Livraison > 0 || donnees.parCanal["Les deux"] > 0) && (
+              <p className="text-xs mb-3" style={{ color: C.doux }}>
+                dont {donnees.parCanal.Livraison} par livraison seulement et {donnees.parCanal["Les deux"]} par boutique et livraison
+              </p>
+            )}
+            {!(donnees.parCanal && (donnees.parCanal.Livraison > 0 || donnees.parCanal["Les deux"] > 0)) && <div className="mb-2" />}
             <div className="space-y-2">
               {affichees.map((l) => (
                 <LigneCliente key={l.clientId} ligne={l} type="BONUS" onMessage={maj}
@@ -677,29 +713,54 @@ function BlocCanaux({ bloc }) {
 // puis pour les deux boutiques cumulées.
 export function EncartCanauxVente() {
   const [preset, setPreset] = useState("mois");
+  // Période choisie à la main (en plus des périodes proposées) : au moment de la choisir, elle part de la période affichée
+  const [perso, setPerso] = useState(() => { const [d, f] = periodePreset("mois"); return { debut: d, fin: f }; });
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState("");
 
+  const choisirPreset = (id) => {
+    if (id === "perso" && preset !== "perso") { const [d, f] = periodePreset(preset); setPerso({ debut: d, fin: f }); }
+    setPreset(id);
+  };
+  const periodeInvalide = preset === "perso" && (!perso.debut || !perso.fin || perso.debut > perso.fin);
+
   useEffect(() => {
-    const [debut, fin] = periodePreset(preset);
+    if (periodeInvalide) { setDonnees(null); return undefined; }
+    const [debut, fin] = preset === "perso" ? [perso.debut, perso.fin] : periodePreset(preset);
     let annule = false;
     setDonnees(null); setErreur("");
     api.etats.ventesParCanal({ dateDebut: debut, dateFin: fin })
       .then((r) => { if (!annule) setDonnees(r); })
       .catch((e) => { if (!annule) setErreur(e.message); });
     return () => { annule = true; };
-  }, [preset]);
+  }, [preset, perso.debut, perso.fin, periodeInvalide]);
 
   return (
     <div className="rounded-2xl p-5 mb-6" style={{ background: C.carte, border: `1px solid ${C.bordure}` }}>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <p className="text-xs font-mono uppercase tracking-wide" style={{ color: C.accent }}>Ventes : boutique et livraison</p>
-        <select value={preset} onChange={(e) => setPreset(e.target.value)} className="px-2 py-1 rounded-lg text-xs" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }}>
+        <select value={preset} onChange={(e) => choisirPreset(e.target.value)} className="px-2 py-1 rounded-lg text-xs" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }}>
           {["mois", "moisPrecedent", "3mois", "debut"].map((id) => <option key={id} value={id}>{LIBELLES_PERIODE[id]}</option>)}
+          <option value="perso">Choisir les dates…</option>
         </select>
       </div>
+      {preset === "perso" && (
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: C.doux }}>Du</label>
+            <input type="date" value={perso.debut} onChange={(e) => setPerso((p) => ({ ...p, debut: e.target.value }))}
+              className="px-3 py-1.5 rounded-lg text-sm" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }} />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: C.doux }}>Au</label>
+            <input type="date" value={perso.fin} onChange={(e) => setPerso((p) => ({ ...p, fin: e.target.value }))}
+              className="px-3 py-1.5 rounded-lg text-sm" style={{ border: `1px solid ${C.bordure}`, background: "#fff" }} />
+          </div>
+        </div>
+      )}
+      {periodeInvalide && <p className="text-xs" style={{ color: C.accent }}>Choisis deux dates, la première avant la seconde (ou le même jour).</p>}
       {erreur && <p className="text-xs" style={{ color: C.accent }}>{erreur}</p>}
-      {donnees === null && !erreur && <p className="text-sm" style={{ color: C.doux }}>Chargement…</p>}
+      {donnees === null && !erreur && !periodeInvalide && <p className="text-sm" style={{ color: C.doux }}>Chargement…</p>}
       {donnees && (
         <>
           {[...donnees.parBoutique, donnees.cumul].map((b) => <BlocCanaux key={b.libelle} bloc={b} />)}
