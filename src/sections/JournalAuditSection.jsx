@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { ScrollText, Users as UsersIcon, Percent, Truck } from "lucide-react";
+import { ScrollText, Users as UsersIcon, Percent, Truck, MapPin } from "lucide-react";
+import LieuxEtLivreurs from "./LieuxLivreursView.jsx";
 import { api } from "../api.js";
 import { fmt, FICHES_LIVRAISON_ACTIF } from "../constants.js";
 import { ErrorBanner } from "../components/Shared.jsx";
@@ -29,6 +30,7 @@ function Onglets({ vue, setVue }) {
     ["CLIENTS", "Fiches clients", UsersIcon],
     ["REMISES", "Remises par caissière", Percent],
     ...(FICHES_LIVRAISON_ACTIF ? [["LIVRAISONS", "Livraisons", Truck]] : []),
+    ["LIEUX", "Lieux et livreurs", MapPin],
   ];
   return (
     <div className="flex gap-2 mb-5 flex-wrap">
@@ -450,6 +452,7 @@ export default function JournalAuditSection() {
       {vue === "CLIENTS" && <FichesClients />}
       {vue === "REMISES" && <RemisesParCaissiere />}
       {vue === "LIVRAISONS" && FICHES_LIVRAISON_ACTIF && <ControleLivraisons />}
+      {vue === "LIEUX" && <LieuxEtLivreurs />}
     </div>
   );
 }

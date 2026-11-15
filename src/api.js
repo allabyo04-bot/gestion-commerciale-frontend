@@ -63,6 +63,22 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  referentiels: {
+    lieux: () => request("/api/referentiels/lieux"),
+    quartiers: (commune) => request(`/api/referentiels/quartiers?commune=${encodeURIComponent(commune || "")}`),
+    villesExpedition: () => request("/api/referentiels/villes-expedition"),
+    clientParTelephone: (tel) => request(`/api/referentiels/client-par-telephone?tel=${encodeURIComponent(tel || "")}`),
+    livreurs: () => request("/api/referentiels/livreurs"),
+    creerLivreur: (nom) => request("/api/referentiels/livreurs", { method: "POST", body: { nom } }),
+    modifierLivreur: (id, data) => request(`/api/referentiels/livreurs/${id}`, { method: "PATCH", body: data }),
+    fusionnerLivreurs: (sourceId, cibleId) => request("/api/referentiels/livreurs/fusion", { method: "POST", body: { sourceId, cibleId } }),
+    ajouterLieu: (type, nom) => request("/api/referentiels/lieux", { method: "POST", body: { type, nom } }),
+    modifierLieu: (id, actif) => request(`/api/referentiels/lieux/${id}`, { method: "PATCH", body: { actif } }),
+    statistiques: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+      return request(`/api/referentiels/statistiques${qs ? `?${qs}` : ""}`);
+    },
+  },
   controleLivraisons: (params = {}) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
     return request(`/api/controle-livraisons${qs ? `?${qs}` : ""}`);

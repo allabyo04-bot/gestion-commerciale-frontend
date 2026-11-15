@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
+import { DestinationExpedition } from "../components/LieuxChamps.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
@@ -47,6 +48,11 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [fideliteClient, setFideliteClient] = useState(null);
+  // Cliente dont le numéro n'a pas de fiche : la caissière peut la créer sans quitter la vente. La fiche n'est créée
+  // qu'à la validation de la vente (jamais pendant la saisie), et ne bloque jamais la vente.
+  const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
+  const [expeditionZone, setExpeditionZone] = useState("");
+  const [expeditionLieu, setExpeditionLieu] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
   const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
@@ -126,6 +132,16 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const total = lignes.reduce((s, l) => s + l.sousTotal, 0);
 
+  // Recherche de cliente : nom, carte ou téléphone (quel que soit le format : « 07 05 06 07 08 », « +225… »).
+  const cleTel = (t) => { const d = String(t || "").replace(/\D/g, ""); return d.length >= 8 ? d.slice(-10) : null; };
+  const rechercheClient = clientSearch.trim().toLowerCase();
+  const cleSaisie = cleTel(clientSearch);
+  const resultatsClient = rechercheClient ? clients.filter((c) =>
+    c.nomPrenoms.toLowerCase().includes(rechercheClient) || (c.carteFidelite || "").toLowerCase().includes(rechercheClient)
+    || (c.telephone || "").includes(clientSearch.trim()) || (cleSaisie && (cleTel(c.telephone) === cleSaisie || cleTel(c.whatsapp) === cleSaisie))).slice(0, 6) : [];
+  // Un numéro complet que personne n'a : on propose de créer la fiche juste ici.
+  const numeroSaisiInconnu = !!cleSaisie && !clients.some((c) => cleTel(c.telephone) === cleSaisie || cleTel(c.whatsapp) === cleSaisie);
+
   useEffect(() => {
     if (!FIDELITE_ACTIF || !clientId || typeVente !== "Comptant") { setFideliteClient(null); return; }
     api.fidelite.client(clientId).then(setFideliteClient).catch(() => setFideliteClient(null));
@@ -198,6 +214,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
+    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -233,11 +250,15 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const validerVente = async () => {
     if (lignes.length === 0 && cartesCadeauxPanier.length === 0) { setError("Ajoute au moins un article ou une carte cadeau a la vente."); return; }
     if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
-    if (typeVente === "Credit" && !clientId) { setError("Un client est obligatoire pour une vente a credit."); return; }
+    if (typeVente === "Credit" && !clientId && !nouvelleCliente) { setError("Un client est obligatoire pour une vente a credit."); return; }
+    if (modeVente === "Expédition" && (!expeditionZone || !expeditionLieu.trim())) { setError("Précise la destination de l'expédition (en Côte d'Ivoire : la ville ; hors Côte d'Ivoire : le pays)."); return; }
     if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
+        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined } : undefined,
+        expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
+        expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         cartesCadeauxAEmettre: cartesCadeauxPanier.map(({ numero }) => ({ numero })),
@@ -346,7 +367,8 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                 )}
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => setModeVente(e.target.value)} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select></Field>
+                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => { setModeVente(e.target.value); setExpeditionZone(""); setExpeditionLieu(""); }} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select>
+                </Field>
 <Field label="Type de vente">
                   <div className="flex gap-2 mt-1">
                     <button type="button" onClick={() => setTypeVente("Comptant")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Comptant" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Comptant</button>
@@ -359,23 +381,44 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                       <span className="text-sm">{clients.find((c) => c.id === clientId)?.nomPrenoms}</span>
                       <button onClick={() => { setClientId(""); setClientSearch(""); }} style={{ color: "#B04A3B" }}><X size={14} /></button>
                     </div>
+                  ) : nouvelleCliente ? (
+                    <div className="mt-1 rounded-lg p-3" style={{ background: "#FBF3E3", border: "1px solid #EBD9A8" }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Nouvelle cliente · {nouvelleCliente.telephone}</span>
+                        <button onClick={() => setNouvelleCliente(null)} style={{ color: "#B04A3B" }} title="Ne pas créer de fiche"><X size={14} /></button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <input value={nouvelleCliente.nom} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, nom: e.target.value })} placeholder="Nom (si connu)" style={{ ...inputStyle, marginTop: 0 }} />
+                        <select value={nouvelleCliente.pointure} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, pointure: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
+                          <option value="">Pointure (facultative)</option>
+                          {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                        </select>
+                      </div>
+                      <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente{nouvelleCliente.nom.trim() ? "" : " (sans nom : « CLIENTE 000n »)"}. Cela ne retarde jamais la vente.</p>
+                    </div>
                   ) : (
                     <div className="relative mt-1">
                       <input value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} style={{ ...inputStyle, marginTop: 0, paddingLeft: "30px" }} placeholder="Rechercher…" />
                       <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
                       {clientSearch.trim() && (
                         <div className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden max-h-40 overflow-y-auto" style={{ background: "#FFFFFF", border: "1px solid #DDD3C4" }}>
-                          {clients.filter((c) => c.nomPrenoms.toLowerCase().includes(clientSearch.toLowerCase()) || (c.carteFidelite || "").toLowerCase().includes(clientSearch.toLowerCase()) || (c.telephone || "").includes(clientSearch.trim())).slice(0, 6).map((c) => (
+                          {resultatsClient.map((c) => (
                             <button key={c.id} onClick={() => { setClientId(c.id); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm" style={{ background: "#FFFFFF" }}>
                               {c.nomPrenoms} {c.carteFidelite ? <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {c.carteFidelite}</span> : null} {c.telephone ? <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {c.telephone}</span> : null}
                             </button>
                           ))}
+                          {numeroSaisiInconnu && (
+                            <button onClick={() => { setNouvelleCliente({ telephone: clientSearch.trim(), nom: "", pointure: "" }); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm font-medium" style={{ background: "#FBF3E3", color: "#8A6A22", borderTop: "1px solid #EFE7D9" }}>
+                              + Numéro inconnu : créer la fiche de cette cliente ({clientSearch.trim()})
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
                 </Field>
               </div>
+              {modeVente === "Expédition" && <DestinationExpedition zone={expeditionZone} onZone={setExpeditionZone} lieu={expeditionLieu} onLieu={setExpeditionLieu} />}
               {FIDELITE_ACTIF && fideliteClient && (fideliteClient.bonusDisponible > 0 || (fideliteClient.prochainPalierDistance != null && fideliteClient.prochainPalierDistance <= 50000)) && (
                 <div className="mt-3 px-3 py-2 rounded-lg text-sm" style={bonusApplicable ? { background: "#E9F0EA", color: "#3F6B4A" } : { background: "#FBF3E3", color: "#A8823D" }}>
                   {bonusApplicable ? (

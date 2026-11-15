@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON, BONUS_A_APPELER_ACTIF } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
+import { ClienteParTelephone, ChoixLivreur, LieuLivraisonChamps } from "../components/LieuxChamps.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -206,8 +207,11 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [clientId, setClientId] = useState("");
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
-  const [lieuLivraison, setLieuLivraison] = useState("");
-  const [livreurNom, setLivreurNom] = useState("");
+  const [clientPointure, setClientPointure] = useState("");
+  const [rechercheTel, setRechercheTel] = useState(null); // résultat de la recherche de fiche par téléphone
+  const [commune, setCommune] = useState("");
+  const [quartier, setQuartier] = useState("");
+  const [livreurId, setLivreurId] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rechercheClient, setRechercheClient] = useState("");
@@ -229,7 +233,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   // Mention du bonus Cendrillon : le bonus ne se déduit PAS sur une livraison. Quand la cliente est identifiée
   // (fiche choisie, ou numéro déjà connu), on prévient la vendeuse pour qu'elle lui rappelle de l'utiliser en boutique.
   const cleTel = (t) => { const d = String(t || "").replace(/\D/g, ""); return d.length >= 8 ? d.slice(-10) : null; };
-  const ficheIdentifiee = clientId || (() => {
+  const ficheIdentifiee = clientId || (rechercheTel?.trouve && rechercheTel.client ? rechercheTel.client.id : "") || (() => {
     const k = cleTel(clientTelephone);
     if (!k) return "";
     const c = (clients || []).find((x) => cleTel(x.telephone) === k || cleTel(x.whatsapp) === k);
@@ -248,8 +252,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const resultatsClients = rechercheClient.trim()
     ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
     : [];
-  const choisirClient = (c) => { setClientId(c.id); setClientNom(c.nomPrenoms); setClientTelephone(c.telephone || ""); setRechercheClient(""); };
-  const retirerClient = () => { setClientId(""); setClientNom(""); setClientTelephone(""); };
+  const choisirClient = (c) => { setClientId(c.id); setClientNom(c.nomPrenoms); setClientTelephone(c.telephone || ""); setClientPointure(c.pointure || ""); setRechercheClient(""); };
+  const retirerClient = () => { setClientId(""); setClientNom(""); setClientTelephone(""); setClientPointure(""); setRechercheTel(null); };
 
   const resultatsRecherche = rechercheArticle.trim()
     ? (articles || []).filter((a) => a.actif !== false && (a.designation.toLowerCase().includes(rechercheArticle.trim().toLowerCase()) || a.reference.toLowerCase().includes(rechercheArticle.trim().toLowerCase()))).slice(0, 8)
@@ -284,7 +288,11 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const valider = async () => {
     if (!boutique) { onError("Choisis la boutique concernée."); return; }
     if (!clientTelephone.trim()) { onError("Le numéro de téléphone de la cliente est obligatoire."); return; }
-    if (!livreurNom.trim()) { onError("Le nom du livreur est obligatoire."); return; }
+    if (!commune) { onError("Choisis la commune de livraison (les livraisons se font à Abidjan et dans ses communes)."); return; }
+    if (!livreurId) { onError("Choisis le livreur dans la liste (ou crée-le avec « + Nouveau »)."); return; }
+    if (!clientId && rechercheTel?.valide && !rechercheTel.trouve && !rechercheTel.boutiqueGenerique && !clientPointure) {
+      onError("C'est une nouvelle cliente : choisis sa pointure pour créer sa fiche."); return;
+    }
     if (lignes.length === 0 && cartesCadeaux.length === 0) { onError("Ajoute au moins un article ou une carte cadeau au bon de livraison."); return; }
     const avanceNum = Number(avance) || 0;
     if (avanceNum > 0 && !avanceModePaiement) { onError("Choisis le mode de paiement de l'avance."); return; }
@@ -299,14 +307,14 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     try {
       const bon = await api.bonsLivraison.creer({
         boutique, clientNom: clientNom.trim() || "Cliente", clientTelephone: clientTelephone.trim(), clientId: clientId || undefined,
-        lieuLivraison: lieuLivraison.trim() || undefined, livreurNom: livreurNom.trim(), notes: notes || undefined,
+        clientPointure: clientPointure || undefined, commune, quartier: quartier.trim() || undefined, livreurId, notes: notes || undefined,
         avance: avanceNum, avanceModePaiement: avanceNum > 0 ? avanceModePaiement : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         cartesCadeaux: cartesCadeaux.map(({ numero }) => ({ numero })),
       });
       if (bon.ficheCliente && bon.ficheCliente.creee && bon.ficheCliente.fiche) onClientCree(bon.ficheCliente.fiche);
       onCree(bon);
-      retirerClient(); setLieuLivraison(""); setLivreurNom(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes"); setAvanceOuvert(false); setNotesOuvert(false);
+      retirerClient(); setCommune(""); setQuartier(""); setLivreurId(""); setNotes(""); setLignes([]); setCartesCadeaux([]); setAvance(""); setAvanceModePaiement("especes"); setAvanceOuvert(false); setNotesOuvert(false);
     } catch (e) { onError(e.message); } finally { setEnvoiEnCours(false); }
   };
 
@@ -335,13 +343,21 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
             </div>
             <div>
               <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur</label>
-              <input value={livreurNom} onChange={(e) => setLivreurNom(e.target.value)} style={champ} placeholder="Nom du livreur" />
+              <ChoixLivreur livreurId={livreurId} onChange={setLivreurId} onError={onError} />
             </div>
           </div>
 
           <div className="rounded-xl p-4" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
             <p className="text-sm font-medium mb-3">Cliente</p>
 
+            <ClienteParTelephone
+              telephone={clientTelephone} onTelephone={(v) => { setClientTelephone(v); if (clientId) setClientId(""); }}
+              nom={clientNom} onNom={setClientNom} pointure={clientPointure} onPointure={setClientPointure}
+              pointureObligatoire autoFocus onResolution={setRechercheTel} />
+
+            <details className="mt-3">
+              <summary className="text-xs cursor-pointer" style={{ color: "#8C3B2E" }}>Chercher la cliente par son nom</summary>
+              <div className="mt-2">
             <div className="relative">
               <input value={rechercheClient} onChange={(e) => setRechercheClient(e.target.value)} placeholder="Rechercher une fiche existante pour remplir automatiquement…" style={{ ...champ, paddingLeft: "32px" }} />
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color="#6B5D52" />
@@ -363,16 +379,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
               </p>
             )}
 
-            <div className="grid sm:grid-cols-2 gap-3 mt-3">
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Téléphone</label>
-                <input value={clientTelephone} onChange={(e) => setClientTelephone(e.target.value)} style={champ} placeholder="Ex : 0708735901" />
               </div>
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom (optionnel)</label>
-                <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} style={champ} placeholder="Si connu" />
-              </div>
-            </div>
+            </details>
             {BONUS_A_APPELER_ACTIF && bonusClient && (
               <p className="text-xs mt-2 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
                 🎁 Cette cliente a un bonus Cendrillon de {fmt(bonusClient.montant)} F disponible. Il ne s'applique pas aux livraisons : dites-lui de l'utiliser lors d'un achat en boutique (achat d'au moins {fmt(bonusClient.montant)} F).
@@ -380,14 +388,14 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
             )}
             {FICHES_LIVRAISON_ACTIF && !clientId && (
               <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>
-                Le numéro suffit : la fiche de la cliente est retrouvée, ou créée automatiquement. Nom inconnu ? Laissez-le vide, elle s'appellera « CLIENTE 0001 », « CLIENTE 0002 »… Une livraison = une cliente.
+                Le numéro suffit : la fiche de la cliente est retrouvée, ou créée à l'enregistrement. Nom inconnu ? Laissez-le vide, elle s'appellera « CLIENTE 0001 », « CLIENTE 0002 »… Une livraison = une cliente.
               </p>
             )}
 
             <div className="mt-3">
-              <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Lieu de livraison (quartier, adresse…)</label>
-              <input value={lieuLivraison} onChange={(e) => setLieuLivraison(e.target.value)} style={champ} placeholder="Ex : Angré 8e Tranche, Cocody Riviera…" />
-              <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Aide à retrouver la bonne livraison au retour du livreur.</p>
+              <p className="text-xs mb-1 font-medium" style={{ color: "#6B5D52" }}>Lieu de livraison (Abidjan et ses communes)</p>
+              <LieuLivraisonChamps commune={commune} onCommune={setCommune} quartier={quartier} onQuartier={setQuartier} />
+              <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>Sert aussi aux statistiques : où livrons-nous le plus ?</p>
             </div>
           </div>
         </div>
