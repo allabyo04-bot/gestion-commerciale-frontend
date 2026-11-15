@@ -74,6 +74,8 @@ export const api = {
     fusionnerLivreurs: (sourceId, cibleId) => request("/api/referentiels/livreurs/fusion", { method: "POST", body: { sourceId, cibleId } }),
     ajouterLieu: (type, nom) => request("/api/referentiels/lieux", { method: "POST", body: { type, nom } }),
     modifierLieu: (id, actif) => request(`/api/referentiels/lieux/${id}`, { method: "PATCH", body: { actif } }),
+    simulerClassement: () => request("/api/referentiels/classement-anciennes-livraisons"),
+    appliquerClassement: () => request("/api/referentiels/classement-anciennes-livraisons", { method: "POST" }),
     statistiques: (params = {}) => {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
       return request(`/api/referentiels/statistiques${qs ? `?${qs}` : ""}`);

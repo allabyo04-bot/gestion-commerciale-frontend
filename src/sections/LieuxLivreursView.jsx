@@ -202,6 +202,36 @@ function GestionLivreurs({ livreurs, onChange, setError }) {
   );
 }
 
+function ClassementAnciennes({ setError }) {
+  const [r, setR] = useState(null);
+  const [encours, setEncours] = useState(false);
+  const lancer = async (appliquer) => {
+    if (appliquer && !window.confirm("Écrire la commune sur les anciennes livraisons reconnues ?\n\nLe texte d'origine n'est pas modifié, et seules les livraisons sans commune sont touchées.")) return;
+    setEncours(true);
+    try { setR(appliquer ? await api.referentiels.appliquerClassement() : await api.referentiels.simulerClassement()); } catch (e) { setError(e.message); } finally { setEncours(false); }
+  };
+  return (
+    <div className="rounded-xl p-4 lg:col-span-2" style={carte}>
+      <p className="text-sm font-medium mb-1">Classer les anciennes livraisons par commune</p>
+      <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Les livraisons d'avant les communes n'en ont pas. Le logiciel peut en deviner beaucoup d'après le lieu déjà écrit (Angré, Riviera… = Cocody). « Voir ce qui serait fait » n'écrit rien.</p>
+      <div className="flex gap-2 flex-wrap">
+        <button type="button" disabled={encours} onClick={() => lancer(false)} className="px-3 py-2 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4", color: "#8C3B2E" }}>Voir ce qui serait fait</button>
+        {r && !r.appliquee && r.reconnues > 0 && <button type="button" disabled={encours} onClick={() => lancer(true)} className="px-3 py-2 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Appliquer ({r.reconnues} livraisons)</button>}
+      </div>
+      {r && (
+        <div className="mt-3 text-sm">
+          <p>{r.appliquee ? "Fait : " : "Simulation : "}{r.sansCommune} livraisons sans commune — <b>{r.reconnues}</b> reconnues, {r.ambigues} ambiguës, {r.nonReconnues} non reconnues.</p>
+          {r.parCommune.length > 0 && <p className="text-xs mt-1" style={{ color: "#6B5D52" }}>{r.parCommune.map((c) => `${c.commune} ${c.nb}`).join(" · ")}</p>}
+          {r.textesNonReconnus.length > 0 && !r.appliquee && (
+            <details className="mt-2"><summary className="text-xs cursor-pointer" style={{ color: "#8C3B2E" }}>Textes non reconnus les plus fréquents</summary>
+              <div className="text-xs mt-1" style={{ color: "#6B5D52" }}>{r.textesNonReconnus.map((t) => <div key={t.texte}>{t.nb} × {t.texte}</div>)}</div></details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Gestion() {
   const [lieux, setLieux] = useState({ communes: [], pays: [] });
   const [livreurs, setLivreurs] = useState([]);
@@ -216,6 +246,7 @@ function Gestion() {
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <ListeLieux titre="Communes de livraison (Abidjan)" type="COMMUNE" lieux={lieux.communes} onChange={load} setError={setError} />
         <ListeLieux titre="Pays d'expédition (hors Côte d'Ivoire)" type="PAYS" lieux={lieux.pays} onChange={load} setError={setError} avecRecherche />
+        <ClassementAnciennes setError={setError} />
         <div className="lg:col-span-2"><GestionLivreurs livreurs={livreurs} onChange={load} setError={setError} /></div>
       </div>
     </div>
