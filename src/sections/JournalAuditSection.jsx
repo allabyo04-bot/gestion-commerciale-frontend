@@ -335,6 +335,15 @@ export function ControleLivraisons() {
   useEffect(() => { load(); }, [load]);
 
   const dateCourte = (d) => new Date(d).toLocaleDateString("fr-FR");
+  const [correction, setCorrection] = useState(null);
+  const [enCorrection, setEnCorrection] = useState(false);
+  const chiffresDe = (t) => String(t || "").replace(/\D/g, "");
+  const inversee = (b) => chiffresDe(b.clientNom).length >= 8 && !/[A-Za-zÀ-ÿ]/.test(b.clientNom || "") && chiffresDe(b.clientTelephone).length < 8;
+  const corriger = async () => {
+    setEnCorrection(true);
+    try { setError(""); setCorrection(await api.corrigerInversionsLivraisons()); await load(); }
+    catch (e) { setError(e.message); } finally { setEnCorrection(false); }
+  };
   const carte = (titre, valeur, detail, alerte) => (
     <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: `1px solid ${alerte ? "#E3B9B0" : "#EAE1D2"}` }}>
       <p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{titre}</p>
@@ -403,9 +412,22 @@ export function ControleLivraisons() {
           </p>
           {tableau("Par boutique", donnees.parBoutique, (l) => l.boutique, "Boutique")}
           {tableau("Par personne qui a enregistré", donnees.parPersonne, (l) => `${l.nom}|${l.boutique}`, "Personne")}
-          {donnees.sansFiche && donnees.sansFiche.length > 0 && (
+          {donnees.sansFiche && (donnees.sansFiche.length > 0 || correction) && (
             <div className="mb-6">
               <p className="text-sm font-medium mb-2">Livraisons sans fiche cliente {donnees.sansFiche.length === 100 ? "(100 plus récentes)" : `(${donnees.sansFiche.length})`}</p>
+              {donnees.sansFiche.some(inversee) && (
+                <div className="mb-3 rounded-lg p-3 text-sm flex items-center gap-3 flex-wrap" style={{ background: "#FBF3E3", color: "#8A6A22" }}>
+                  <span>{donnees.sansFiche.filter(inversee).length} livraison(s) ont le nom et le téléphone inversés.</span>
+                  <button type="button" onClick={corriger} disabled={enCorrection} className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>
+                    {enCorrection ? "Correction…" : "Corriger et créer les fiches"}
+                  </button>
+                </div>
+              )}
+              {correction && (
+                <p className="mb-3 text-sm" style={{ color: correction.echecs.length ? "#B04A3B" : "#3F6B4A" }}>
+                  {correction.corriges.length} livraison(s) corrigée(s), fiches rattachées.{correction.echecs.length ? ` ${correction.echecs.length} échec(s) : ${correction.echecs.map((x) => x.numero).join(", ")}.` : ""}
+                </p>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" style={{ minWidth: 640 }}>
                   <thead>

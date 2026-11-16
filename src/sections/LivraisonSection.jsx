@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON, BONUS_A_APPELER_ACTIF } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
-import { ClienteParTelephone, ChoixLivreur, LieuLivraisonChamps } from "../components/LieuxChamps.jsx";
+import { ClienteParTelephone, ChoixLivreur, LieuLivraisonChamps, nomEstUnNumero, telephoneValide } from "../components/LieuxChamps.jsx";
 
 function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -288,6 +288,8 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const valider = async () => {
     if (!boutique) { onError("Choisis la boutique concernée."); return; }
     if (!clientTelephone.trim()) { onError("Le numéro de téléphone de la cliente est obligatoire."); return; }
+    if (!telephoneValide(clientTelephone)) { onError("Le numéro de téléphone n'est pas valide : il faut des chiffres uniquement, 8 au minimum."); return; }
+    if (nomEstUnNumero(clientNom)) { onError("La case Nom contient un numéro : le numéro va dans la case Téléphone, le nom dans la case Nom."); return; }
     if (!commune) { onError("Choisis la commune de livraison (les livraisons se font à Abidjan et dans ses communes)."); return; }
     if (!livreurId) { onError("Choisis le livreur dans la liste (ou crée-le avec « + Nouveau »)."); return; }
     if (!clientId && rechercheTel?.valide && !rechercheTel.trouve && !rechercheTel.boutiqueGenerique && !clientPointure) {

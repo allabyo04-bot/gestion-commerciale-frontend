@@ -250,6 +250,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const validerVente = async () => {
     if (lignes.length === 0 && cartesCadeauxPanier.length === 0) { setError("Ajoute au moins un article ou une carte cadeau a la vente."); return; }
     if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
+    if (nouvelleCliente && /^[\d\s+().-]+$/.test((nouvelleCliente.nom || "").trim()) && (nouvelleCliente.nom || "").replace(/\D/g, "").length >= 7) { setError("La case Nom contient un numéro : écris le nom de la cliente (ou laisse vide)."); return; }
     if (typeVente === "Credit" && !clientId && !nouvelleCliente) { setError("Un client est obligatoire pour une vente a credit."); return; }
     if (modeVente === "Expédition" && (!expeditionZone || !expeditionLieu.trim())) { setError("Précise la destination de l'expédition (en Côte d'Ivoire : la ville ; hors Côte d'Ivoire : le pays)."); return; }
     if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }

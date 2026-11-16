@@ -81,6 +81,7 @@ export const api = {
       return request(`/api/referentiels/statistiques${qs ? `?${qs}` : ""}`);
     },
   },
+  corrigerInversionsLivraisons: () => request(`/api/controle-livraisons/corriger-inversions`, { method: "POST" }),
   controleLivraisons: (params = {}) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
     return request(`/api/controle-livraisons${qs ? `?${qs}` : ""}`);

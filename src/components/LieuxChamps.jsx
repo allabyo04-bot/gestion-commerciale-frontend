@@ -78,6 +78,11 @@ export function ChampPropositions({ value, onChange, options, placeholder, stric
  *  - `pointureObligatoire` : exigée pour une nouvelle cliente (livraison), facultative en caisse.
  *  - `onResolution({ valide, trouve, client })` : le formulaire sait où en est la recherche.
  */
+/** Un « nom » fait uniquement de chiffres : nom et téléphone ont été inversés. */
+export const nomEstUnNumero = (t) => String(t || "").replace(/\D/g, "").length >= 7 && !/[A-Za-zÀ-ÿ]/.test(String(t || ""));
+/** Numéro correct : 8 chiffres minimum. */
+export const telephoneValide = (t) => String(t || "").replace(/\D/g, "").length >= 8;
+
 export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointure, onPointure, pointureObligatoire = false, autoFocus = false, onResolution, titre = "Téléphone" }) {
   const [res, setRes] = useState(null);
   const [cherche, setCherche] = useState(false);
@@ -114,14 +119,18 @@ export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointu
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>{titre}</label>
-          <input ref={refTel} value={telephone} onChange={(e) => onTelephone(e.target.value)} style={champ} inputMode="tel" placeholder="Ex : 0708735901" autoComplete="off" />
+          <input ref={refTel} value={telephone} onChange={(e) => onTelephone(e.target.value.replace(/[^\d\s+]/g, ""))} style={champ} type="tel" inputMode="numeric" maxLength={20} placeholder="Chiffres seulement, ex : 0708735901" autoComplete="off" />
+          {telephone && chiffres.length < 8 && <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>Numéro incomplet : 8 chiffres minimum.</p>}
         </div>
         <div>
           <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom {trouvee ? "" : "(optionnel)"}</label>
           {trouvee ? (
             <div style={{ ...champ, background: "#E9F0EA", color: "#3F6B4A", display: "flex", alignItems: "center", gap: "6px" }}><Check size={14} /> {trouvee.nomPrenoms}</div>
           ) : (
-            <input value={nom} onChange={(e) => onNom(e.target.value)} style={champ} placeholder="Si connu" />
+            <>
+              <input value={nom} onChange={(e) => onNom(e.target.value)} style={champ} placeholder="Si connu" />
+              {nomEstUnNumero(nom) && <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>Ceci est un numéro : mets-le dans la case Téléphone.</p>}
+            </>
           )}
         </div>
       </div>
