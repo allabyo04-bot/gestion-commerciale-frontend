@@ -403,6 +403,35 @@ export function ControleLivraisons() {
           </p>
           {tableau("Par boutique", donnees.parBoutique, (l) => l.boutique, "Boutique")}
           {tableau("Par personne qui a enregistré", donnees.parPersonne, (l) => `${l.nom}|${l.boutique}`, "Personne")}
+          {donnees.sansFiche && donnees.sansFiche.length > 0 && (
+            <div className="mb-6">
+              <p className="text-sm font-medium mb-2">Livraisons sans fiche cliente {donnees.sansFiche.length === 100 ? "(100 plus récentes)" : `(${donnees.sansFiche.length})`}</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ color: "#6B5D52", borderBottom: "1px solid #EAE1D2" }}>
+                      <th className="text-left py-2">Bon</th><th className="text-left py-2">Date</th><th className="text-left py-2">Boutique</th>
+                      <th className="text-left py-2">Enregistré par</th><th className="text-left py-2">Cliente</th>
+                      <th className="text-left py-2">Téléphone saisi</th><th className="text-right py-2">Paires</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {donnees.sansFiche.map((b) => (
+                      <tr key={b.numero} style={{ borderTop: "1px solid #EFE7D9" }}>
+                        <td className="py-2 font-mono">{b.numero}</td>
+                        <td className="py-2">{dateCourte(b.dateCreation)}</td>
+                        <td className="py-2">{b.boutique}</td>
+                        <td className="py-2">{b.creePar}</td>
+                        <td className="py-2">{b.clientNom}</td>
+                        <td className="py-2">{b.clientTelephone || <span style={{ color: "#B04A3B" }}>aucun</span>}</td>
+                        <td className="text-right py-2">{b.nbPaires}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {donnees.grosBons.length > 0 && (
             <div>
               <p className="text-sm font-medium mb-2">Livraisons de {donnees.seuil + 1} paires ou plus {donnees.grosBons.length === 100 ? "(100 premières)" : ""}</p>
