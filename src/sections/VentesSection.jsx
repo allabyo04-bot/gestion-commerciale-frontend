@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, fmt } from "../constants.js";
+import { BOUTIQUES, POINTURES, CIVILITES, MOIS, JOURS, COMMUNES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
 import { DestinationExpedition } from "../components/LieuxChamps.jsx";
 
@@ -251,13 +251,15 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
     if (lignes.length === 0 && cartesCadeauxPanier.length === 0) { setError("Ajoute au moins un article ou une carte cadeau a la vente."); return; }
     if (modeVente === "Boutique" && !vendeurId) { setError("Choisis le vendeur qui a realise cette vente."); return; }
     if (nouvelleCliente && /^[\d\s+().-]+$/.test((nouvelleCliente.nom || "").trim()) && (nouvelleCliente.nom || "").replace(/\D/g, "").length >= 7) { setError("La case Nom contient un numéro : écris le nom de la cliente (ou laisse vide)."); return; }
+    if (!clientId && nouvelleCliente && !nouvelleCliente.nom.trim()) { setError("Le nom et prénoms de la cliente sont obligatoires pour créer sa fiche."); return; }
+    if (!clientId && nouvelleCliente && ((nouvelleCliente.jourAnniv && !nouvelleCliente.moisAnniv) || (!nouvelleCliente.jourAnniv && nouvelleCliente.moisAnniv))) { setError("Anniversaire : choisis le jour ET le mois (ou laisse les deux vides)."); return; }
     if (typeVente === "Credit" && !clientId && !nouvelleCliente) { setError("Un client est obligatoire pour une vente a credit."); return; }
     if (modeVente === "Expédition" && (!expeditionZone || !expeditionLieu.trim())) { setError("Précise la destination de l'expédition (en Côte d'Ivoire : la ville ; hors Côte d'Ivoire : le pays)."); return; }
     if (typeVente === "Comptant" && totalPaye < totalNet) { setError("Le total paye est inferieur au total de la vente."); return; }
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
-        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined } : undefined,
+        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined } : undefined,
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
         expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
@@ -389,13 +391,31 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                         <button onClick={() => setNouvelleCliente(null)} style={{ color: "#B04A3B" }} title="Ne pas créer de fiche"><X size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        <input value={nouvelleCliente.nom} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, nom: e.target.value })} placeholder="Nom (si connu)" style={{ ...inputStyle, marginTop: 0 }} />
+                        <input value={nouvelleCliente.nom} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, nom: e.target.value })} placeholder="Nom et prénoms (obligatoire)" style={{ ...inputStyle, marginTop: 0 }} />
+                        <select value={nouvelleCliente.civilite} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, civilite: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
+                          {CIVILITES.map((c) => <option key={c}>{c}</option>)}
+                        </select>
                         <select value={nouvelleCliente.pointure} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, pointure: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
                           <option value="">Pointure (facultative)</option>
                           {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
                         </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <select value={nouvelleCliente.jourAnniv} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, jourAnniv: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
+                            <option value="">Jour anniv.</option>
+                            {JOURS.map((j) => <option key={j}>{j}</option>)}
+                          </select>
+                          <select value={nouvelleCliente.moisAnniv} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, moisAnniv: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
+                            <option value="">Mois</option>
+                            {MOIS.map((m) => <option key={m}>{m}</option>)}
+                          </select>
+                        </div>
+                        <select value={nouvelleCliente.commune} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, commune: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
+                          <option value="">Commune (facultative)</option>
+                          {COMMUNES.map((c) => <option key={c}>{c}</option>)}
+                        </select>
+                        <input value={nouvelleCliente.quartier} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, quartier: e.target.value })} placeholder="Quartier (facultatif)" style={{ ...inputStyle, marginTop: 0 }} />
                       </div>
-                      <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente{nouvelleCliente.nom.trim() ? "" : " (sans nom : « CLIENTE 000n »)"}. Cela ne retarde jamais la vente.</p>
+                      <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente. Seuls le nom et le téléphone sont obligatoires.</p>
                     </div>
                   ) : (
                     <div className="relative mt-1">
@@ -409,7 +429,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                             </button>
                           ))}
                           {numeroSaisiInconnu && (
-                            <button onClick={() => { setNouvelleCliente({ telephone: clientSearch.trim(), nom: "", pointure: "" }); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm font-medium" style={{ background: "#FBF3E3", color: "#8A6A22", borderTop: "1px solid #EFE7D9" }}>
+                            <button onClick={() => { setNouvelleCliente({ telephone: clientSearch.trim(), nom: "", pointure: "", civilite: "Madame", jourAnniv: "", moisAnniv: "", commune: "", quartier: "" }); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm font-medium" style={{ background: "#FBF3E3", color: "#8A6A22", borderTop: "1px solid #EFE7D9" }}>
                               + Numéro inconnu : créer la fiche de cette cliente ({clientSearch.trim()})
                             </button>
                           )}
