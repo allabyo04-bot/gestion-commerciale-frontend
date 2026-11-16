@@ -8,7 +8,7 @@ import { ErrorBanner } from "../components/Shared.jsx";
 const inputStyle = { border: "1px solid #DDD3C4", borderRadius: 8, padding: "8px 10px", fontSize: 14 };
 
 function Onglets({ vue, setVue }) {
-  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users], ["CHANGEMENTS", "Changements de statut", Bell], ["ACCORDES", "Bonus accordés", Wallet], ["PARSTATUT", "Clientes par statut", List]];
+  const items = [["BONUS", "Paliers de bonus", Gift], ["STATUT", "Paliers de statut", Crown], ["CLIENTES", "Clientes avec bonus disponible", Users], ["CHANGEMENTS", "Clientes à informer", Bell], ["ACCORDES", "Bonus accordés", Wallet], ["PARSTATUT", "Clientes par statut", List]];
   return (
     <div className="flex gap-2 mb-5">
       {items.map(([id, label, Icon]) => (
@@ -232,13 +232,13 @@ function ChangementsStatut() {
   return (
     <div>
       <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>
-        Toutes les clientes ayant changé de statut Cendrillon, pas encore marquées vues. Une occasion de les reconnaître — à toi de voir s'il y a un geste commercial à faire.
+        Clientes dont le statut Cendrillon a changé et qui n'ont pas encore été informées. Quand une cliente a été informée, clique sur « Informer » : elle disparaît de cette liste et garde son nouveau statut dans la base.
       </p>
       {error && <ErrorBanner error={error} />}
       {liste === null ? (
         <p className="text-sm" style={{ color: "#6B5D52" }}>Chargement...</p>
       ) : liste.length === 0 ? (
-        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucun changement de statut en attente.</p>
+        <p className="text-sm" style={{ color: "#6B5D52" }}>Aucune cliente à informer.</p>
       ) : (
         <div className="space-y-2">
           {liste.map((c) => (
@@ -251,7 +251,7 @@ function ChangementsStatut() {
                 </p>
               </div>
               <button onClick={() => marquerVu(c)} disabled={enCours === c.id} className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap" style={{ background: "#A8823D", color: "#2B2320" }}>
-                Vu
+                Informer
               </button>
             </div>
           ))}
