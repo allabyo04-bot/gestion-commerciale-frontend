@@ -765,13 +765,13 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
                     <input type="number" min="0" value={remiseValeur} onChange={(e) => setRemiseValeur(e.target.value)} placeholder={remiseType === "MONTANT" ? "Ex : 5000" : "Ex : 10"} style={{ ...selectStyle, width: "100%" }} />
                     <div className="flex gap-2 mt-2">
                       <button type="button" onClick={() => { setRemiseFormOuvert(false); setRemiseValeur(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
-                      <button type="button" onClick={demanderRemise} disabled={remiseChargement} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{remiseChargement ? "Envoi..." : "Envoyer à Djenie"}</button>
+                      <button type="button" onClick={demanderRemise} disabled={remiseChargement} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{remiseChargement ? "Envoi..." : "Envoyer à la direction"}</button>
                     </div>
                   </div>
                 )}
                 {demandeRemise?.statut === "EN_ATTENTE" && (
                   <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#FFFFFF", color: "#6B5D52" }}>
-                    <span className="flex items-center gap-1.5"><Clock size={13} /> Remise en attente de validation par Djenie ({demandeRemise.numero}) — tu peux déjà encaisser au tarif réduit, elle validera après coup</span>
+                    <span className="flex items-center gap-1.5"><Clock size={13} /> Remise en attente de validation par la direction ({demandeRemise.numero}) — tu peux déjà encaisser au tarif réduit, elle validera après coup</span>
                     <button type="button" onClick={() => setDemandeRemise(null)} style={{ color: "#B04A3B" }} title="Annuler la demande"><X size={13} /></button>
                   </div>
                 )}
@@ -783,7 +783,7 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
                 )}
                 {demandeRemise?.statut === "REFUSEE" && (
                   <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>
-                    <span className="flex items-center gap-1.5"><XCircle size={13} /> Remise refusée par Djenie</span>
+                    <span className="flex items-center gap-1.5"><XCircle size={13} /> Remise refusée par la direction</span>
                     <button type="button" onClick={() => setDemandeRemise(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
                   </div>
                 )}
