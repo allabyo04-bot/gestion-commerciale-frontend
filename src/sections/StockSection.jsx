@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X, Search, PauseCircle } from "lucide-react";
 import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
@@ -671,6 +671,7 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
   const [filtreQuantite, setFiltreQuantite] = useState("tous");
   const [filtreActif, setFiltreActif] = useState("tous");
   const [parametresStock, setParametresStock] = useState(null);
+  const [marqueOuverte, setMarqueOuverte] = useState(null);
 
   useEffect(() => { api.articles.parametresStock().then(setParametresStock).catch(() => {}); }, []);
 
@@ -704,10 +705,13 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
     const parMarque = new Map();
     for (const a of articlesPourEncarts) {
       if (filtreFamille !== "Tous" && a.famille !== filtreFamille) continue;
-      const ligne = parMarque.get(a.marqueId) || { nom: brands.find((b) => b.id === a.marqueId)?.nom || "Sans marque", articles: 0, parBoutique: {}, total: 0 };
+      const ligne = parMarque.get(a.marqueId) || { nom: brands.find((b) => b.id === a.marqueId)?.nom || "Sans marque", articles: 0, parBoutique: {}, parPointure: {}, total: 0 };
       ligne.articles += 1;
       for (const si of a.stocks || []) {
         ligne.parBoutique[si.boutique] = (ligne.parBoutique[si.boutique] || 0) + si.quantite;
+        const cle = si.pointure || "—";
+        const pt = ligne.parPointure[cle] || (ligne.parPointure[cle] = {});
+        pt[si.boutique] = (pt[si.boutique] || 0) + si.quantite;
         ligne.total += si.quantite;
       }
       parMarque.set(a.marqueId, ligne);
@@ -770,7 +774,7 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
 
       <div className="rounded-2xl overflow-hidden mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <p className="text-xs font-mono uppercase tracking-wide px-4 pt-3 pb-2" style={{ color: "#8C3B2E" }}>
-          Stock par marque{filtreFamille !== "Tous" ? ` — ${filtreFamille}s` : ""}{filtreActif === "actifs" ? " (actifs)" : filtreActif === "veille" ? " (en veille)" : ""}
+          Stock par marque (clique sur une marque pour voir les pointures){filtreFamille !== "Tous" ? ` — ${filtreFamille}s` : ""}{filtreActif === "actifs" ? " (actifs)" : filtreActif === "veille" ? " (en veille)" : ""}
         </p>
         <table className="w-full text-sm">
           <thead>
@@ -782,14 +786,48 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
             </tr>
           </thead>
           <tbody>
-            {lignesParMarque.map((l) => (
-              <tr key={l.nom} style={{ borderTop: "1px solid #EFE7D9" }}>
-                <td className="px-4 py-2">{l.nom}</td>
-                <td className="text-right px-4 py-2" style={{ color: "#6B5D52" }}>{l.articles}</td>
-                {BOUTIQUES.map((b) => <td key={b} className="text-right px-4 py-2">{l.parBoutique[b] || 0}</td>)}
-                <td className="text-right px-4 py-2 font-semibold">{l.total}</td>
-              </tr>
-            ))}
+            {lignesParMarque.map((l) => {
+              const ouverte = marqueOuverte === l.nom;
+              const pointures = Object.keys(l.parPointure)
+                .filter((k) => BOUTIQUES.some((b) => l.parPointure[k][b] > 0))
+                .sort((x, y) => (parseFloat(x) || 999) - (parseFloat(y) || 999));
+              return (
+                <Fragment key={l.nom}>
+                  <tr onClick={() => setMarqueOuverte(ouverte ? null : l.nom)} className="cursor-pointer" style={{ borderTop: "1px solid #EFE7D9", background: ouverte ? "#FAF6EE" : undefined }}>
+                    <td className="px-4 py-2">{ouverte ? "▾" : "▸"} {l.nom}</td>
+                    <td className="text-right px-4 py-2" style={{ color: "#6B5D52" }}>{l.articles}</td>
+                    {BOUTIQUES.map((b) => <td key={b} className="text-right px-4 py-2">{l.parBoutique[b] || 0}</td>)}
+                    <td className="text-right px-4 py-2 font-semibold">{l.total}</td>
+                  </tr>
+                  {ouverte && (
+                    <tr style={{ background: "#FAF6EE" }}>
+                      <td colSpan={3 + BOUTIQUES.length} className="px-4 pb-3 pt-1">
+                        {pointures.length === 0 ? <p className="text-xs" style={{ color: "#6B5D52" }}>Aucune paire en stock.</p> : (
+                          <table className="text-xs" style={{ minWidth: 280 }}>
+                            <thead>
+                              <tr style={{ color: "#6B5D52" }}>
+                                <th className="text-left pr-6 py-1">Pointure</th>
+                                {BOUTIQUES.map((b) => <th key={b} className="text-right px-4 py-1">{b}</th>)}
+                                <th className="text-right pl-4 py-1">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pointures.map((pt) => (
+                                <tr key={pt} style={{ borderTop: "1px solid #EFE7D9" }}>
+                                  <td className="pr-6 py-1 font-medium">{pt === "—" ? "Sans pointure" : `T${pt}`}</td>
+                                  {BOUTIQUES.map((b) => <td key={b} className="text-right px-4 py-1">{l.parPointure[pt][b] || 0}</td>)}
+                                  <td className="text-right pl-4 py-1 font-semibold">{BOUTIQUES.reduce((t, b) => t + (l.parPointure[pt][b] || 0), 0)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
             {lignesParMarque.length === 0 && (
               <tr><td colSpan={3 + BOUTIQUES.length} className="px-4 py-4 text-center" style={{ color: "#6B5D52" }}>Aucune marque.</td></tr>
             )}
