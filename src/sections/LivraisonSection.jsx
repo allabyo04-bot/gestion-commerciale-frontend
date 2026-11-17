@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle } from "lucide-react";
+import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle, Percent, Clock, XCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON, BONUS_A_APPELER_ACTIF } from "../constants.js";
@@ -632,13 +632,48 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
   const [typeVente, setTypeVente] = useState("Comptant");
   const [paiements, setPaiements] = useState([{ id: uid(), mode: "especes", montant: "" }]);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  // Demande de remise (validée par Djenie, comme dans Ventes) — porte sur les articles vendus, pas sur les cartes cadeaux.
+  const [demandeRemise, setDemandeRemise] = useState(null);
+  const [remiseFormOuvert, setRemiseFormOuvert] = useState(false);
+  const [remiseType, setRemiseType] = useState("MONTANT");
+  const [remiseValeur, setRemiseValeur] = useState("");
+  const [remiseChargement, setRemiseChargement] = useState(false);
 
   const lignesVendues = bon.lignes.filter((l) => statuts[l.id] === "VENDU");
   const cartesVendues = (bon.cartesLignes || []).filter((c) => statutsCartes[c.id] === "VENDU");
   const totalVendu = lignesVendues.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0) + cartesVendues.reduce((s, c) => s + c.bonValeur.montant, 0);
+  const totalArticlesVendus = lignesVendues.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
+  const remiseAppliquee = demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.montantRemise : 0;
+  const totalAEncaisser = totalVendu - remiseAppliquee; // ce que la cliente doit réellement payer
   const totalPayeSaisi = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0);
   const totalPaye = totalPayeSaisi + (bon.avance || 0);
-  const resteAPercevoir = Math.max(0, totalVendu - (bon.avance || 0));
+  const resteAPercevoir = Math.max(0, totalAEncaisser - (bon.avance || 0));
+
+  // Si les articles vendus changent après la demande (un article rendu ou perdu), la demande n'est plus valable.
+  useEffect(() => {
+    if (demandeRemise && demandeRemise.totalVente !== totalArticlesVendus) {
+      setDemandeRemise(null);
+      onError("Le total des articles vendus a changé depuis la demande de remise : elle a été annulée. Refais une demande si besoin.");
+    }
+  }, [totalArticlesVendus]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tant que Djenie n'a pas tranché, on interroge le serveur toutes les 4 secondes.
+  useEffect(() => {
+    if (!demandeRemise || demandeRemise.statut !== "EN_ATTENTE") return;
+    const interval = setInterval(async () => {
+      try { const maj = await api.remises.get(demandeRemise.id); if (maj.statut !== "EN_ATTENTE") setDemandeRemise(maj); } catch { /* erreur réseau ponctuelle */ }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [demandeRemise]);
+  const demanderRemise = async () => {
+    if (!remiseValeur || Number(remiseValeur) <= 0) { onError("Indique une valeur de remise valide."); return; }
+    if (remiseType === "POURCENTAGE" && Number(remiseValeur) > 100) { onError("Un pourcentage ne peut pas dépasser 100."); return; }
+    if (totalArticlesVendus <= 0) { onError("Il n'y a aucun article vendu sur lequel faire une remise."); return; }
+    setRemiseChargement(true);
+    try {
+      const demande = await api.remises.create({ totalVente: totalArticlesVendus, type: remiseType, valeur: Number(remiseValeur), clientNom: bon.clientNom || undefined });
+      setDemandeRemise(demande); setRemiseFormOuvert(false); setRemiseValeur(""); onError("");
+    } catch (e) { onError(e.message); } finally { setRemiseChargement(false); }
+  };
 
   const ajouterPaiement = () => setPaiements([...paiements, { id: uid(), mode: "especes", montant: "" }]);
   const majPaiement = (id, champ, val) => setPaiements(paiements.map((p) => (p.id === id ? { ...p, [champ]: val } : p)));
@@ -646,13 +681,14 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
 
   const cloturer = async () => {
     if (lignesVendues.length > 0 || cartesVendues.length > 0) {
-      if (typeVente === "Comptant" && totalPaye < totalVendu) { onError(`Le total payé (avance comprise) est inférieur au total des articles et cartes vendus. Il manque ${fmt(totalVendu - totalPaye)} F.`); return; }
-      if (typeVente === "Credit" && totalPaye > totalVendu) { onError("Le montant payé (avance comprise) ne peut pas dépasser le total pour une vente à crédit."); return; }
+      if (typeVente === "Comptant" && totalPaye < totalAEncaisser) { onError(`Le total payé (avance comprise) est inférieur au total des articles et cartes vendus. Il manque ${fmt(totalAEncaisser - totalPaye)} F.`); return; }
+      if (typeVente === "Credit" && totalPaye > totalAEncaisser) { onError("Le montant payé (avance comprise) ne peut pas dépasser le total pour une vente à crédit."); return; }
     }
     setEnvoiEnCours(true);
     try {
       const res = await api.bonsLivraison.cloturer(bon.id, {
         clientId: clientId || undefined, typeVente,
+        demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" && lignesVendues.length > 0 ? demandeRemise.id : undefined,
         paiements: (lignesVendues.length > 0 || cartesVendues.length > 0) ? paiements.filter((p) => Number(p.montant) > 0).map((p) => ({ mode: p.mode, montant: Number(p.montant) })) : [],
         lignes: bon.lignes.map((l) => ({ ligneId: l.id, statut: statuts[l.id] })),
         cartes: (bon.cartesLignes || []).map((c) => ({ ligneCarteId: c.id, statut: statutsCartes[c.id] })),
@@ -711,7 +747,48 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
 
         {(lignesVendues.length > 0 || cartesVendues.length > 0) && (
           <div className="rounded-xl p-4 mb-4" style={{ background: "#F1E9DC" }}>
-            <p className="text-sm font-semibold mb-1">Encaissement — {fmt(totalVendu)} F au total</p>
+            <p className="text-sm font-semibold mb-1">Encaissement — {fmt(totalAEncaisser)} F à payer{remiseAppliquee > 0 ? ` (${fmt(totalVendu)} F − remise ${fmt(remiseAppliquee)} F)` : " au total"}</p>
+            {lignesVendues.length > 0 && (
+              <div className="mb-3">
+                {!demandeRemise && !remiseFormOuvert && (
+                  <button type="button" onClick={() => setRemiseFormOuvert(true)} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#8C3B2E" }}>
+                    <Percent size={13} /> Demander une remise
+                  </button>
+                )}
+                {!demandeRemise && remiseFormOuvert && (
+                  <div className="rounded-lg p-3" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+                    <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Remise sur les articles vendus ({fmt(totalArticlesVendus)} F)</p>
+                    <div className="flex gap-2 mb-2">
+                      <button type="button" onClick={() => setRemiseType("MONTANT")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "MONTANT" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Montant (F)</button>
+                      <button type="button" onClick={() => setRemiseType("POURCENTAGE")} className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium" style={remiseType === "POURCENTAGE" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Pourcentage (%)</button>
+                    </div>
+                    <input type="number" min="0" value={remiseValeur} onChange={(e) => setRemiseValeur(e.target.value)} placeholder={remiseType === "MONTANT" ? "Ex : 5000" : "Ex : 10"} style={{ ...selectStyle, width: "100%" }} />
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" onClick={() => { setRemiseFormOuvert(false); setRemiseValeur(""); }} className="flex-1 px-3 py-1.5 rounded-lg text-xs" style={{ color: "#6B5D52" }}>Annuler</button>
+                      <button type="button" onClick={demanderRemise} disabled={remiseChargement} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{remiseChargement ? "Envoi..." : "Envoyer à Djenie"}</button>
+                    </div>
+                  </div>
+                )}
+                {demandeRemise?.statut === "EN_ATTENTE" && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#FFFFFF", color: "#6B5D52" }}>
+                    <span className="flex items-center gap-1.5"><Clock size={13} /> Remise en attente de validation par Djenie ({demandeRemise.numero}) — tu peux déjà encaisser au tarif réduit, elle validera après coup</span>
+                    <button type="button" onClick={() => setDemandeRemise(null)} style={{ color: "#B04A3B" }} title="Annuler la demande"><X size={13} /></button>
+                  </div>
+                )}
+                {demandeRemise?.statut === "APPROUVEE" && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={13} /> Remise approuvée : − {fmt(demandeRemise.montantRemise)} F</span>
+                    <button type="button" onClick={() => setDemandeRemise(null)} style={{ color: "#B04A3B" }}><X size={13} /></button>
+                  </div>
+                )}
+                {demandeRemise?.statut === "REFUSEE" && (
+                  <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: "#FBEAE7", color: "#8C3B2E" }}>
+                    <span className="flex items-center gap-1.5"><XCircle size={13} /> Remise refusée par Djenie</span>
+                    <button type="button" onClick={() => setDemandeRemise(null)} style={{ color: "#8C3B2E" }}><X size={13} /></button>
+                  </div>
+                )}
+              </div>
+            )}
             {bon.avance > 0 && (
               <p className="text-xs mb-3 px-2 py-1.5 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
                 Avance déjà perçue au départ : {fmt(bon.avance)} F ({bon.avanceModePaiement}) — déjà comptée automatiquement. Il reste à percevoir aujourd'hui : <strong>{fmt(resteAPercevoir)} F</strong>.
@@ -743,8 +820,8 @@ function ReconciliationModal({ bon, clients, onClose, onCloture, onError }) {
               </div>
             ))}
             <button onClick={ajouterPaiement} className="text-xs" style={{ color: "#8C3B2E" }}>+ Ajouter un mode de paiement</button>
-            <p className="text-xs mt-2" style={{ color: totalPaye < totalVendu ? "#B04A3B" : "#3F6B4A" }}>
-              Payé : {fmt(totalPaye)} F {typeVente === "Comptant" && totalPaye < totalVendu ? `— reste ${fmt(totalVendu - totalPaye)} F` : ""}
+            <p className="text-xs mt-2" style={{ color: totalPaye < totalAEncaisser ? "#B04A3B" : "#3F6B4A" }}>
+              Payé : {fmt(totalPaye)} F {typeVente === "Comptant" && totalPaye < totalAEncaisser ? `— reste ${fmt(totalAEncaisser - totalPaye)} F` : ""}
             </p>
           </div>
         )}
