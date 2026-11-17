@@ -354,7 +354,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       )}
 
       {!loading && tab === "virements" && <VirementsSection articles={articles || []} onDone={load} />}
-      {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} estAdmin={estAdmin} />}
+      {!loading && tab === "etat-stock" && <EtatStockSection articles={articles || []} brands={brands} estAdmin={estAdmin} />}
       {tab === "import" && <ImportSection brands={brands} onImported={load} />}
       {tab === "inventaire" && <InventaireSection brands={brands} onApplique={load} />}
       {tab === "soldes" && <SoldesSection brands={brands} />}
@@ -666,7 +666,7 @@ function ReglagesStockBas({ parametres, onMaj }) {
   );
 }
 
-function EtatStockSection({ articles, estAdmin }) {
+function EtatStockSection({ articles, brands = [], estAdmin }) {
   const [filtreFamille, setFiltreFamille] = useState("Tous");
   const [filtreQuantite, setFiltreQuantite] = useState("tous");
   const [filtreActif, setFiltreActif] = useState("tous");
@@ -698,6 +698,23 @@ function EtatStockSection({ articles, estAdmin }) {
 
   const totalPourBoutiqueEtFamille = (b, f) =>
     articlesPourEncarts.filter((a) => a.famille === f).reduce((s, a) => s + (a.stocks || []).filter((si) => si.boutique === b).reduce((s2, i) => s2 + i.quantite, 0), 0);
+
+  // Stock par marque : mêmes filtres que ci-dessus (famille, quantité, actifs/veille).
+  const lignesParMarque = (() => {
+    const parMarque = new Map();
+    for (const a of articlesPourEncarts) {
+      if (filtreFamille !== "Tous" && a.famille !== filtreFamille) continue;
+      const ligne = parMarque.get(a.marqueId) || { nom: brands.find((b) => b.id === a.marqueId)?.nom || "Sans marque", articles: 0, parBoutique: {}, total: 0 };
+      ligne.articles += 1;
+      for (const si of a.stocks || []) {
+        ligne.parBoutique[si.boutique] = (ligne.parBoutique[si.boutique] || 0) + si.quantite;
+        ligne.total += si.quantite;
+      }
+      parMarque.set(a.marqueId, ligne);
+    }
+    return [...parMarque.values()].sort((x, y) => y.total - x.total || x.nom.localeCompare(y.nom));
+  })();
+  const totalGeneralMarques = lignesParMarque.reduce((s, l) => s + l.total, 0);
 
   const totalFamille = (f) => articlesPourEncarts.filter((a) => a.famille === f).reduce((s, a) => s + totalStock(a), 0);
 
@@ -749,6 +766,43 @@ function EtatStockSection({ articles, estAdmin }) {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-2xl overflow-hidden mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="text-xs font-mono uppercase tracking-wide px-4 pt-3 pb-2" style={{ color: "#8C3B2E" }}>
+          Stock par marque{filtreFamille !== "Tous" ? ` — ${filtreFamille}s` : ""}{filtreActif === "actifs" ? " (actifs)" : filtreActif === "veille" ? " (en veille)" : ""}
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
+              <th className="text-left px-4 py-2">Marque</th>
+              <th className="text-right px-4 py-2">Articles</th>
+              {BOUTIQUES.map((b) => <th key={b} className="text-right px-4 py-2">{b}</th>)}
+              <th className="text-right px-4 py-2">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignesParMarque.map((l) => (
+              <tr key={l.nom} style={{ borderTop: "1px solid #EFE7D9" }}>
+                <td className="px-4 py-2">{l.nom}</td>
+                <td className="text-right px-4 py-2" style={{ color: "#6B5D52" }}>{l.articles}</td>
+                {BOUTIQUES.map((b) => <td key={b} className="text-right px-4 py-2">{l.parBoutique[b] || 0}</td>)}
+                <td className="text-right px-4 py-2 font-semibold">{l.total}</td>
+              </tr>
+            ))}
+            {lignesParMarque.length === 0 && (
+              <tr><td colSpan={3 + BOUTIQUES.length} className="px-4 py-4 text-center" style={{ color: "#6B5D52" }}>Aucune marque.</td></tr>
+            )}
+            {lignesParMarque.length > 0 && (
+              <tr style={{ borderTop: "2px solid #DDD3C4", background: "#FAF6EE" }}>
+                <td className="px-4 py-2 font-semibold">Total</td>
+                <td className="text-right px-4 py-2" style={{ color: "#6B5D52" }}>{lignesParMarque.reduce((s, l) => s + l.articles, 0)}</td>
+                {BOUTIQUES.map((b) => <td key={b} className="text-right px-4 py-2 font-semibold">{lignesParMarque.reduce((s, l) => s + (l.parBoutique[b] || 0), 0)}</td>)}
+                <td className="text-right px-4 py-2 font-semibold" style={{ color: "#8C3B2E" }}>{totalGeneralMarques}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
