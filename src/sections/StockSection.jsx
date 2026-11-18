@@ -676,6 +676,7 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
   const [parametresStock, setParametresStock] = useState(null);
   const [marqueOuverte, setMarqueOuverte] = useState(null);
   const [reassortOuvert, setReassortOuvert] = useState(false);
+  const [detailOuvert, setDetailOuvert] = useState(false);
   const [groupesOuverts, setGroupesOuverts] = useState({}); // ex. { "Chaussure": true, "Chaussure:absent": true }
   const basculer = (cle) => setGroupesOuverts((g) => ({ ...g, [cle]: !g[cle] }));
 
@@ -939,7 +940,12 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
-        <table className="w-full text-sm">
+        <button type="button" onClick={() => setDetailOuvert(!detailOuvert)} className="w-full flex items-center justify-between px-4 py-3 text-left">
+          <span className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>{detailOuvert ? "▾" : "▸"} Détail article par article</span>
+          <span className="text-xs" style={{ color: "#6B5D52" }}>{filtered.length} article(s)</span>
+        </button>
+        {detailOuvert && (
+        <table className="w-full text-sm" style={{ borderTop: "1px solid #EFE7D9" }}>
           <thead>
             <tr style={{ background: "#F1E9DC", color: "#6B5D52" }}>
               <th className="text-left px-4 py-2">Article</th>
@@ -971,6 +977,7 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
             )}
           </tbody>
         </table>
+        )}
       </div>
    </div>
   );
