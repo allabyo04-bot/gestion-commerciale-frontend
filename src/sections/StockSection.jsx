@@ -666,12 +666,18 @@ function ReglagesStockBas({ parametres, onMaj }) {
   );
 }
 
+// Un article est "bientôt épuisé" quand il reste 3 paires ou moins, deux boutiques confondues.
+const SEUIL_BIENTOT_EPUISE = 3;
+
 function EtatStockSection({ articles, brands = [], estAdmin }) {
   const [filtreFamille, setFiltreFamille] = useState("Tous");
   const [filtreQuantite, setFiltreQuantite] = useState("tous");
   const [filtreActif, setFiltreActif] = useState("tous");
   const [parametresStock, setParametresStock] = useState(null);
   const [marqueOuverte, setMarqueOuverte] = useState(null);
+  const [reassortOuvert, setReassortOuvert] = useState(false);
+  const [groupesOuverts, setGroupesOuverts] = useState({}); // ex. { "Chaussure": true, "Chaussure:absent": true }
+  const basculer = (cle) => setGroupesOuverts((g) => ({ ...g, [cle]: !g[cle] }));
 
   useEffect(() => { api.articles.parametresStock().then(setParametresStock).catch(() => {}); }, []);
 
@@ -720,6 +726,39 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
   })();
   const totalGeneralMarques = lignesParMarque.reduce((s, l) => s + l.total, 0);
 
+  // Réassort entre boutiques — articles ACTIFS uniquement (un article en veille ne se réassortit pas).
+  // Comme la boutique fonctionne par collection, on ne cherche pas à "racheter" : on repère ce qui peut être
+  // déplacé d'une boutique à l'autre, et ce qui va bientôt être épuisé.
+  const reassort = (() => {
+    const res = {};
+    for (const f of FAMILLES) res[f] = { absent: [], pointures: [], bientot: [] };
+    for (const a of articles) {
+      if (a.actif === false || !res[a.famille]) continue;
+      const q = {}; const tot = {};
+      for (const b of BOUTIQUES) { q[b] = {}; tot[b] = 0; }
+      for (const si of a.stocks || []) {
+        if (!q[si.boutique] || si.quantite <= 0) continue;
+        const cle = si.pointure || "—";
+        q[si.boutique][cle] = (q[si.boutique][cle] || 0) + si.quantite;
+        tot[si.boutique] += si.quantite;
+      }
+      const totalArticle = BOUTIQUES.reduce((t, b) => t + tot[b], 0);
+      if (totalArticle > 0 && totalArticle <= SEUIL_BIENTOT_EPUISE) res[a.famille].bientot.push({ article: a, total: totalArticle, tot, q });
+      for (const src of BOUTIQUES) for (const dst of BOUTIQUES) {
+        if (src === dst) continue;
+        if (tot[src] > 0 && tot[dst] === 0) {
+          res[a.famille].absent.push({ article: a, src, dst, quantite: tot[src], pointures: q[src] });
+        } else if (tot[src] > 0 && tot[dst] > 0) {
+          const manquantes = Object.keys(q[src]).filter((pt) => !(q[dst][pt] > 0));
+          if (manquantes.length > 0) res[a.famille].pointures.push({ article: a, src, dst, pointures: Object.fromEntries(manquantes.map((pt) => [pt, q[src][pt]])) });
+        }
+      }
+    }
+    return res;
+  })();
+  const texteTailles = (obj) => Object.keys(obj).sort((x, y) => (parseFloat(x) || 999) - (parseFloat(y) || 999)).map((pt) => `${pt === "—" ? "sans pointure" : `T${pt}`}×${obj[pt]}`).join(", ");
+  const nbReassortTotal = FAMILLES.reduce((t, f) => t + reassort[f].absent.length + reassort[f].pointures.length + reassort[f].bientot.length, 0);
+
   const totalFamille = (f) => articlesPourEncarts.filter((a) => a.famille === f).reduce((s, a) => s + totalStock(a), 0);
 
   return (
@@ -732,9 +771,8 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
           </button>
         ))}
       </div>
-      {estAdmin && parametresStock && <ReglagesStockBas parametres={parametresStock} onMaj={setParametresStock} />}
       <div className="flex gap-2 mb-3">
-        {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"], ["bas", "Stock bas"]].map(([id, label]) => (
+        {[["tous", "Tout"], ["stock", "En stock"], ["nulle", "Quantité nulle"]].map(([id, label]) => (
           <button key={id} onClick={() => setFiltreQuantite(id)} className="px-4 py-2 rounded-full text-sm font-medium"
             style={filtreQuantite === id ? { background: "#8C3B2E", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>
             {label}
@@ -843,6 +881,63 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
         </table>
       </div>
 
+      <div className="rounded-2xl overflow-hidden mb-6" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <button type="button" onClick={() => setReassortOuvert(!reassortOuvert)} className="w-full flex items-center justify-between px-4 py-3 text-left">
+          <span className="text-xs font-mono uppercase tracking-wide" style={{ color: "#8C3B2E" }}>{reassortOuvert ? "▾" : "▸"} Réassort entre boutiques</span>
+          <span className="text-xs" style={{ color: "#6B5D52" }}>{nbReassortTotal} à regarder · articles actifs</span>
+        </button>
+        {reassortOuvert && (
+          <div style={{ borderTop: "1px solid #EFE7D9" }}>
+            {FAMILLES.map((f) => {
+              const r = reassort[f];
+              const nb = r.absent.length + r.pointures.length + r.bientot.length;
+              const ouverte = !!groupesOuverts[f];
+              const sections = [
+                ["absent", "À transférer — article absent d'une boutique", r.absent, (l) => (
+                  <>De <strong>{l.src}</strong> vers <strong>{l.dst}</strong> : {l.quantite} paire(s) <span style={{ color: "#6B5D52" }}>({texteTailles(l.pointures)})</span></>
+                )],
+                ["pointures", "À transférer — pointures manquantes dans une boutique", r.pointures, (l) => (
+                  <>De <strong>{l.src}</strong> vers <strong>{l.dst}</strong> : <span style={{ color: "#6B5D52" }}>{texteTailles(l.pointures)}</span></>
+                )],
+                ["bientot", `Bientôt épuisés (${SEUIL_BIENTOT_EPUISE} paires ou moins en tout)`, r.bientot, (l) => (
+                  <>{l.total} paire(s) en tout : {BOUTIQUES.map((b) => `${b} ${l.tot[b]}`).join(" · ")} <span style={{ color: "#6B5D52" }}>({texteTailles(Object.assign({}, ...BOUTIQUES.map((b) => l.q[b])))})</span></>
+                )],
+              ];
+              return (
+                <div key={f} style={{ borderTop: "1px solid #EFE7D9" }}>
+                  <button type="button" onClick={() => basculer(f)} className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium" style={{ background: ouverte ? "#FAF6EE" : undefined }}>
+                    <span>{ouverte ? "▾" : "▸"} {f}s</span>
+                    <span className="text-xs font-normal" style={{ color: "#6B5D52" }}>{nb} à regarder</span>
+                  </button>
+                  {ouverte && (
+                    <div className="px-4 pb-3" style={{ background: "#FAF6EE" }}>
+                      {nb === 0 && <p className="text-xs py-2" style={{ color: "#6B5D52" }}>Rien à signaler.</p>}
+                      {sections.map(([cle, titre, lignes, rendu]) => lignes.length > 0 && (
+                        <div key={cle} className="mt-2">
+                          <button type="button" onClick={() => basculer(`${f}:${cle}`)} className="text-xs font-medium text-left" style={{ color: "#8C3B2E" }}>
+                            {groupesOuverts[`${f}:${cle}`] ? "▾" : "▸"} {titre} ({lignes.length})
+                          </button>
+                          {groupesOuverts[`${f}:${cle}`] && (
+                            <ul className="mt-1">
+                              {lignes.map((l, i) => (
+                                <li key={`${l.article.id}-${i}`} className="text-xs py-1" style={{ borderTop: "1px solid #EFE7D9" }}>
+                                  <span className="font-medium">{l.article.designation}</span> <span className="font-mono" style={{ color: "#6B5D52" }}>· {l.article.reference}</span>
+                                  <br />{rendu(l)}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
         <table className="w-full text-sm">
           <thead>
@@ -855,20 +950,17 @@ function EtatStockSection({ articles, brands = [], estAdmin }) {
           </thead>
           <tbody>
             {filtered.map((a) => {
-              const bas = articleEnStockBas(a, parametresStock);
               return (
               <tr key={a.id} style={{ borderTop: "1px solid #EFE7D9" }}>
                 <td className="px-4 py-2">
                   {a.designation} <span className="font-mono text-xs" style={{ color: "#6B5D52" }}>· {a.reference}</span>
                   {a.actif === false && <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{ background: "#DDD3C4", color: "#6B5D52" }}>En veille</span>}
-                  {bas && <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{ background: "#FBEAE7", color: "#B04A3B" }}>⚠ Stock bas</span>}
                 </td>
                 <td className="px-4 py-2">{a.famille}</td>
                 {BOUTIQUES.map((b) => {
                   const stockLigne = (a.stocks || []).filter((s) => s.boutique === b);
                   const total = stockLigne.reduce((s, i) => s + i.quantite, 0);
-                  const basIci = stockLigne.some((s) => ligneEnStockBas(s, parametresStock));
-                  return <td key={b} className="text-right px-4 py-2" style={basIci ? { color: "#B04A3B", fontWeight: 600 } : undefined}>{total}</td>;
+                  return <td key={b} className="text-right px-4 py-2">{total}</td>;
                 })}
                 <td className="text-right px-4 py-2 font-semibold">{totalStock(a)}</td>
               </tr>
