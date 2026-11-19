@@ -23,6 +23,16 @@ function debutMoisISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+// Même période du mois précédent : du 1er au jour J (ramené au dernier jour si le mois d'avant est plus court).
+function periodeMoisPrecedent() {
+  const auj = new Date();
+  const dernierJourPrec = new Date(auj.getFullYear(), auj.getMonth(), 0).getDate();
+  const jour = Math.min(auj.getDate(), dernierJourPrec);
+  const prec = new Date(auj.getFullYear(), auj.getMonth() - 1, 1);
+  const base = `${prec.getFullYear()}-${String(prec.getMonth() + 1).padStart(2, "0")}`;
+  return { dateDebut: `${base}-01`, dateFin: `${base}-${String(jour).padStart(2, "0")}`, jour };
+}
+
 export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite, onNaviguerEtats } = {}) {
   const { user, permissions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
@@ -37,6 +47,7 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
   const [rappelEnCours, setRappelEnCours] = useState(null);
   const [detailOuvert, setDetailOuvert] = useState(null); // { titre, lignes } | null
   const [caMois, setCaMois] = useState(null);
+  const [caMoisPrec, setCaMoisPrec] = useState(null);
   const [alertesStock, setAlertesStock] = useState([]);
   const [credits, setCredits] = useState(null);
   const [meilleurVendeur, setMeilleurVendeur] = useState(null);
@@ -64,6 +75,9 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
           setCaJour({ parBoutique: recap.parBoutique, cumul: recap.cumul });
           const recapMois = await api.etats.recapBoutiques({ dateDebut: debutMoisISO(), dateFin: jour });
           setCaMois({ cumul: recapMois.cumul });
+          const prec = periodeMoisPrecedent();
+          api.etats.recapBoutiques({ dateDebut: prec.dateDebut, dateFin: prec.dateFin })
+            .then((r) => setCaMoisPrec({ total: r.cumul.totalVentes })).catch(() => {});
         } else {
           const res = await api.etats.parDate({ dateDebut: jour, dateFin: jour });
           setCaJour({ parBoutique: [{ boutique: user.boutique, totalVentes: res.total, nombreVentes: res.nombre }], cumul: { totalVentes: res.total, nombreVentes: res.nombre } });
@@ -185,6 +199,18 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
       <p className="font-display text-2xl font-semibold mb-6">
         Bonjour {user?.prenom} 👋
       </p>
+
+      {estAdmin && peutVoirVentes && caMois && caMoisPrec && caMoisPrec.total > 0 && (() => {
+        const variation = Math.round(((caMois.cumul.totalVentes - caMoisPrec.total) / caMoisPrec.total) * 100);
+        const hausse = variation >= 0;
+        return (
+          <p className="text-sm mb-6 -mt-3" style={{ color: COULEUR.texteDoux }}>
+            Ce mois : <strong style={{ color: COULEUR.texte }}>{fmt(caMois.cumul.totalVentes)} F</strong>{" "}
+            <strong style={{ color: hausse ? "#3F7D4E" : "#B04A3B" }}>{hausse ? "▲ +" : "▼ "}{variation} %</strong>{" "}
+            par rapport à la même période du mois dernier ({fmt(caMoisPrec.total)} F).
+          </p>
+        );
+      })()}
 
       {peutVoirVentes && caJour && (
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
