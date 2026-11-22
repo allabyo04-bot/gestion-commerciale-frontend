@@ -41,7 +41,25 @@ async function request(path, { method = "GET", body } = {}) {
   return data;
 }
 
+// Récupère un fichier protégé (pièce jointe) avec le jeton de connexion et le rend sous forme de Blob.
+export async function recupererFichier(path) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  return res.blob();
+}
+
 export const api = {
+  obligations: {
+    resume: () => request("/api/obligations/resume"),
+    list: (statut = "OUVERTES") => request(`/api/obligations?statut=${statut}`),
+    create: (o) => request("/api/obligations", { method: "POST", body: o }),
+    update: (id, o) => request(`/api/obligations/${id}`, { method: "PUT", body: o }),
+    regler: (id, body = {}) => request(`/api/obligations/${id}/regler`, { method: "POST", body }),
+    remove: (id) => request(`/api/obligations/${id}`, { method: "DELETE" }),
+    ajouterPiece: (id, piece) => request(`/api/obligations/${id}/pieces`, { method: "POST", body: piece }),
+    supprimerPiece: (pieceId) => request(`/api/obligations/pieces/${pieceId}`, { method: "DELETE" }),
+  },
   auth: {
     login: (login, pin) => request("/api/auth/login", { method: "POST", body: { login, pin } }),
     me: () => request("/api/auth/me"),
