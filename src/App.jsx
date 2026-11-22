@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, FileWarning, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
+import { ShoppingCart, Heart, FileWarning, Handshake, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import StockSection from "./sections/StockSection.jsx";
@@ -11,6 +11,7 @@ import LivraisonSection from "./sections/LivraisonSection.jsx";
 import AdministrationSection from "./sections/AdministrationSection.jsx";
 import FideliteSection from "./sections/FideliteSection.jsx";
 import ObligationsSection from "./sections/ObligationsSection.jsx";
+import FournisseursSection from "./sections/FournisseursSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
@@ -19,6 +20,8 @@ import { LIVRAISON_ACTIF, FIDELITE_ACTIF } from "./constants.js";
 function Shell() {
   const { user, loading, logout, permissions, fonctions } = useAuth();
   const lot6 = !!fonctions.lot6;
+  const lot7 = !!fonctions.lot7;
+  const [nbFournisseursUrgents, setNbFournisseursUrgents] = useState(0);
   const [nbObligationsUrgentes, setNbObligationsUrgentes] = useState(0);
   const [tab, setTab] = useState("accueil");
   const [ventesSubTabDemande, setVentesSubTabDemande] = useState(null);
@@ -45,6 +48,16 @@ function Shell() {
     const interval = setInterval(rafraichir, 60000);
     return () => clearInterval(interval);
   }, [estAdmin, lot6]);
+  // Lot 7 : pastille sur le menu Fournisseurs = échéances de règlement dépassées ou à moins de 7 jours.
+  useEffect(() => {
+    if (!estAdmin || !lot7) { setNbFournisseursUrgents(0); return undefined; }
+    const rafraichir = async () => {
+      try { const r = await api.fournisseurs.alertes(); setNbFournisseursUrgents(r.enRetard + r.sous7); } catch { /* ignore */ }
+    };
+    rafraichir();
+    const interval = setInterval(rafraichir, 60000);
+    return () => clearInterval(interval);
+  }, [estAdmin, lot7]);
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
   // Interrupteur temporaire (voir constants.js) : le module Livraison est construit et prêt,
@@ -63,6 +76,7 @@ function Shell() {
     { id: "stock", label: "Stock", icon: Boxes, perm: "stock" },
     // Lot 6 : obligations administratives (taxes, amendes, convocations, pièces), derrière l'interrupteur
     ...(estAdmin && lot6 ? [{ id: "obligations", label: "Obligations", icon: FileWarning }] : []),
+    ...(estAdmin && lot7 ? [{ id: "fournisseurs", label: "Fournisseurs", icon: Handshake }] : []),
     // Réservé à l'administrateur : un seul menu qui regroupe journal, remises, livraisons, listes, accès.
     ...(estAdmin ? [{ id: "administration", label: "Administration", icon: Settings }] : []),
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
@@ -84,6 +98,13 @@ function Shell() {
             <button key={id} onClick={() => setTab(id)} title={label} className="relative flex items-center justify-center md:justify-start gap-2.5 px-2 md:px-3 py-2.5 rounded-lg text-sm font-medium text-left"
               style={activeTab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52" }}>
               <Icon size={18} className="shrink-0" /> <span className="truncate hidden md:inline">{label}</span>
+              {id === "fournisseurs" && nbFournisseursUrgents > 0 && (
+                <span className="md:ml-auto absolute top-0.5 right-0.5 md:static flex items-center justify-center rounded-full text-[10px] font-bold shrink-0"
+                  style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
+                  title={`${nbFournisseursUrgents} règlement(s) fournisseur en retard ou à échéance sous 7 jours`}>
+                  {nbFournisseursUrgents}
+                </span>
+              )}
               {id === "obligations" && nbObligationsUrgentes > 0 && (
                 <span className="md:ml-auto absolute top-0.5 right-0.5 md:static flex items-center justify-center rounded-full text-[10px] font-bold shrink-0"
                   style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
@@ -121,6 +142,7 @@ function Shell() {
           {activeTab === "stock" && <StockSection />}
           {activeTab === "administration" && <AdministrationSection ongletInitial={tab === "utilisateurs" || tab === "roles" ? "ACCES" : "SUIVI"} peutGererAcces={!!permissions.utilisateurs} />}
           {activeTab === "obligations" && <ObligationsSection />}
+          {activeTab === "fournisseurs" && <FournisseursSection />}
           {activeTab === "fidelite" && <FideliteSection sousOngletInitial={fideliteSubTabDemande} onSousOngletInitialConsomme={() => setFideliteSubTabDemande(null)} />}
           {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
         </div>

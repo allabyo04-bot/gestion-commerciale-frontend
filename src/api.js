@@ -364,6 +364,21 @@ depenses: {
       set: (data) => request("/api/depenses/budget", { method: "POST", body: data }),
     },
   },
+fournisseurs: {
+    list: () => request("/api/fournisseurs"),
+    creer: (data) => request("/api/fournisseurs", { method: "POST", body: data }),
+    modifier: (id, data) => request(`/api/fournisseurs/${id}`, { method: "PUT", body: data }),
+    supprimer: (id) => request(`/api/fournisseurs/${id}`, { method: "DELETE" }),
+    commandes: (params = {}) => request(`/api/fournisseurs/commandes?${new URLSearchParams(params).toString()}`),
+    creerCommande: (data) => request("/api/fournisseurs/commandes", { method: "POST", body: data }),
+    supprimerCommande: (id) => request(`/api/fournisseurs/commandes/${id}`, { method: "DELETE" }),
+    ajouterLigne: (commandeId, type, data) => request(`/api/fournisseurs/commandes/${commandeId}/${type}`, { method: "POST", body: data }),
+    supprimerLigne: (type, id) => request(`/api/fournisseurs/${type}/${id}`, { method: "DELETE" }),
+    alertes: () => request("/api/fournisseurs/alertes"),
+    synthese: (params = {}) => request(`/api/fournisseurs/synthese?${new URLSearchParams(params).toString()}`),
+    tresorerie: (mois = 3) => request(`/api/fournisseurs/tresorerie?mois=${mois}`),
+    definirSolde: (data) => request("/api/fournisseurs/tresorerie/solde", { method: "PUT", body: data }),
+  },
 budgetComplet: {
     sousCategories: {
       list: () => request("/api/budget-complet/sous-categories"),
