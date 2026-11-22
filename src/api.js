@@ -364,6 +364,17 @@ depenses: {
       set: (data) => request("/api/depenses/budget", { method: "POST", body: data }),
     },
   },
+caracteristiques: {
+    list: () => request("/api/caracteristiques"),
+    articles: () => request("/api/caracteristiques/articles"),
+    creer: (data) => request("/api/caracteristiques", { method: "POST", body: data }),
+    modifier: (id, data) => request(`/api/caracteristiques/${id}`, { method: "PUT", body: data }),
+    supprimer: (id) => request(`/api/caracteristiques/${id}`, { method: "DELETE" }),
+    ajouterValeur: (id, valeur) => request(`/api/caracteristiques/${id}/valeurs`, { method: "POST", body: { valeur } }),
+    modifierValeur: (id, data) => request(`/api/caracteristiques/valeurs/${id}`, { method: "PUT", body: data }),
+    supprimerValeur: (id) => request(`/api/caracteristiques/valeurs/${id}`, { method: "DELETE" }),
+    setArticle: (articleId, valeurs) => request(`/api/caracteristiques/article/${articleId}`, { method: "PUT", body: { valeurs } }),
+  },
 fournisseurs: {
     list: () => request("/api/fournisseurs"),
     creer: (data) => request("/api/fournisseurs", { method: "POST", body: data }),

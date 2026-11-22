@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useCaracteristiques, FiltresCaracteristiques, correspondAuxFiltres, BadgesCaracteristiques, ChampsCaracteristiques, GestionCaracteristiques } from "./CaracteristiquesViews.jsx";
 
 const FAMILLE_COLORS = { Chaussure: { bg: "#8C3B2E", fg: "#FBF3EC" }, Sac: { bg: "#A8823D", fg: "#2B2320" }, "Article d'entretien": { bg: "#5C7A5E", fg: "#FBF3EC" } };
 
@@ -20,8 +21,11 @@ function totalStockBoutique(article, boutique) {
 function uidLocal() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`; }
 
 export default function StockSection() {
-  const { user } = useAuth();
+  const { user, fonctions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
+  const lot5 = !!fonctions?.lot5;
+  const carac = useCaracteristiques(lot5);
+  const [filtresCarac, setFiltresCarac] = useState({});
   const [tab, setTab] = useState("articles");
   const [articles, setArticles] = useState(null);
   const [brands, setBrands] = useState([]);
@@ -93,13 +97,15 @@ useEffect(() => { if (tab === "historique") loadMouvements(articleFiltreId); }, 
   };
 
   const openNewArticle = () => setModalArticle({ isNew: true, designation: "", famille: "Chaussure", marqueId: brands?.[0]?.id || "", prixVente: "" });
-  const openEditArticle = (a) => setModalArticle({ ...a, isNew: false });
+  const openEditArticle = (a) => setModalArticle({ ...a, isNew: false, caracValeurs: { ...(carac.liens.get(a.id) || {}) } });
 
   const submitArticle = async (form) => {
     if (!form.designation.trim() || !form.marqueId || !form.prixVente) { setError("Désignation, marque et prix de vente sont obligatoires."); return; }
     try {
-      if (form.isNew) await api.articles.create(form);
+      let articleId = form.id;
+      if (form.isNew) articleId = (await api.articles.create(form)).id;
       else await api.articles.update(form.id, { designation: form.designation, prixVente: form.prixVente, actif: form.actif });
+      if (lot5 && form.caracValeurs && Object.keys(form.caracValeurs).length) { await api.caracteristiques.setArticle(articleId, form.caracValeurs); await carac.recharger(); }
       setModalArticle(null); setError(""); load();
     } catch (e) { setError(e.message); }
   };
@@ -121,12 +127,13 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
  const filteredArticles = useMemo(() => (articles || []).filter((a) => {
     if (filterFamille !== "Tous" && a.famille !== filterFamille) return false;
     if (filterBrand !== "Toutes" && a.marqueId !== filterBrand) return false;
+    if (lot5 && !correspondAuxFiltres(carac, a.id, filtresCarac)) return false;
     if (searchArticle.trim()) {
       const q = searchArticle.trim().toLowerCase();
       if (!a.designation.toLowerCase().includes(q) && !a.reference.toLowerCase().includes(q)) return false;
     }
     return true;
-  }), [articles, filterFamille, filterBrand, searchArticle]);
+  }), [articles, filterFamille, filterBrand, searchArticle, lot5, carac, filtresCarac]);
 
   const editingArticle = stockEditor ? articles.find((a) => a.id === stockEditor) : null;
 
@@ -135,7 +142,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-6 items-start">
         <div className="flex flex-col gap-2 shrink-0" style={{ width: "200px" }}>
-          {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"], ["reception", "Réception"]].map(([id, label]) => (
+          {[["articles", "Articles"], ["marques", "Marques (sous-familles)"], ["virements", "Virements"], ["historique", "Historique des mouvements"], ["etat-stock", "État du stock"], ["import", "Import"], ["inventaire", "Inventaire (Excel)"], ["soldes", "Soldes"], ["reception", "Réception"], ...(lot5 && estAdmin ? [["caracteristiques", "Caractéristiques"]] : [])].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-lg text-sm font-medium text-left" style={tab === id ? { background: "#2B2320", color: "#FBF3EC" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{label}</button>
           ))}
         </div>
@@ -170,6 +177,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
               </button>
             </div>
           </div>
+          <FiltresCaracteristiques carac={carac} famille={filterFamille} filtres={filtresCarac} setFiltres={setFiltresCarac} />
           {infoVeille && (
             <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>{infoVeille}</p>
           )}
@@ -198,6 +206,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                       <span className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: "#DDD3C4", color: "#6B5D52" }}><PauseCircle size={11} /> En veille</span>
                     )}
                   </div>
+                  <BadgesCaracteristiques carac={carac} article={a} />
                   <p className="text-xs mt-1.5 font-mono" style={{ color: "#A89A87" }}>
                     {BOUTIQUES.map((b) => `${b} ${totalStockBoutique(a, b)}`).join("  ·  ")}
                   </p>
@@ -214,6 +223,8 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
           </div>
         </div>
       )}
+
+      {!loading && tab === "caracteristiques" && lot5 && estAdmin && <GestionCaracteristiques carac={carac} onError={setError} />}
 
       {!loading && tab === "marques" && (
         <div>
@@ -361,7 +372,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
       {tab === "reception" && <ReceptionSection articles={articles} onApplique={load} />}
         </div>
       </div>
-      {modalArticle && <ArticleModal article={modalArticle} brands={brands} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
+      {modalArticle && <ArticleModal article={modalArticle} brands={brands} carac={carac} onError={setError} onCancel={() => setModalArticle(null)} onSubmit={submitArticle} />}
       {editingArticle && (
         <StockEditorModal
           article={editingArticle}
@@ -386,7 +397,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
   );
 }
 
-function ArticleModal({ article, brands, onCancel, onSubmit }) {
+function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
   const [form, setForm] = useState(article);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   return (
@@ -411,6 +422,7 @@ function ArticleModal({ article, brands, onCancel, onSubmit }) {
           </Field>
           <Field label="Prix de vente (F CFA)"><input value={form.prixVente} onChange={(e) => set("prixVente", e.target.value.replace(/\D/g, ""))} style={inputStyle} inputMode="numeric" /></Field>
         </div>
+        <ChampsCaracteristiques carac={carac} famille={form.famille} valeurs={form.caracValeurs || {}} onChange={(v) => set("caracValeurs", v)} onError={onError} />
         {!form.isNew && (
           <p className="text-xs mt-3" style={{ color: "#6B5D52" }}>La famille et la marque ne sont pas modifiables après création (ça changerait la structure du stock déjà en place).</p>
      )}
