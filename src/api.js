@@ -63,6 +63,11 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  analyses: {
+    pointuresParMarque: (params = {}) => request(`/api/analyses/pointures-par-marque?${new URLSearchParams(params)}`),
+    meilleursMois: (params = {}) => request(`/api/analyses/meilleurs-mois?${new URLSearchParams(params)}`),
+    habitudesClientes: (params = {}) => request(`/api/analyses/habitudes-clientes?${new URLSearchParams(params)}`),
+  },
   etatsClientes: {
     fichesIncompletes: (params = {}) => request(`/api/etats-clientes/fiches-incompletes?${new URLSearchParams(params)}`),
     bonus: (params = {}) => request(`/api/etats-clientes/bonus?${new URLSearchParams(params)}`),

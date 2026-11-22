@@ -7,6 +7,7 @@ import { ReceiptModal } from "./VentesSection.jsx";
 import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
 import { Statistiques, FraisExpedition } from "./LieuxLivreursView.jsx";
 import { FichesIncompletes, EtatBonus, NouvellesClientes } from "./EtatsClientesViews.jsx";
+import { PointuresParMarque, MeilleursMois, HabitudesClientes } from "./AnalysesViews.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -23,6 +24,8 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
   const estAdmin = !!user?.role?.systeme;
   const lot1 = !!fonctions.lot1;
   const lot2 = !!fonctions.lot2;
+  const lot3 = !!fonctions.lot3;
+  const ONGLETS_LOT3 = ["pointures-marque", "meilleurs-mois", "habitudes"];
 
   const [sousOnglet, setSousOnglet] = useState("date");
   // Arrivée depuis un lien de l'accueil (ex. "Voir le détail" des paires par marque)
@@ -212,6 +215,8 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }, { id: "frais-exp", label: "Frais d'expédition", icon: Truck }] : []),
     // Lot 2 (C1, D2, D3) : états sur les clientes et la fidélité
     ...(estAdmin && lot2 ? [{ id: "fiches-inc", label: "Fiches incomplètes", icon: Heart }, { id: "bonus-etat", label: "Bonus", icon: Award }, { id: "nouvelles-cl", label: "Nouvelles clientes", icon: Heart }] : []),
+    // Lot 3 (F4, F3, G1) : analyses de ventes et de stock
+    ...(estAdmin && lot3 ? [{ id: "pointures-marque", label: "Pointures par marque", icon: Footprints }, { id: "meilleurs-mois", label: "Meilleurs mois", icon: Calendar }, { id: "habitudes", label: "Habitudes des clientes", icon: Heart }] : []),
     // Suivi des clientes — caché tant que SUIVI_CLIENTES_ACTIF est à false, réservé à l'administratrice
     ...(estAdmin && SUIVI_CLIENTES_ACTIF ? [
       { id: "paires", label: "Paires par marque", icon: Footprints },
@@ -235,8 +240,11 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
         </div>
 
         <div className="flex-1 min-w-0">
-      {ongletSuivi || (lot1 && (sousOnglet === "stats-lieux" || sousOnglet === "frais-exp")) || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) ? (
+      {ongletSuivi || (lot1 && (sousOnglet === "stats-lieux" || sousOnglet === "frais-exp")) || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) || (lot3 && ONGLETS_LOT3.includes(sousOnglet)) ? (
         <>
+          {lot3 && sousOnglet === "pointures-marque" && <PointuresParMarque />}
+          {lot3 && sousOnglet === "meilleurs-mois" && <MeilleursMois />}
+          {lot3 && sousOnglet === "habitudes" && <HabitudesClientes />}
           {lot2 && sousOnglet === "fiches-inc" && <FichesIncompletes />}
           {lot2 && sousOnglet === "bonus-etat" && <EtatBonus />}
           {lot2 && sousOnglet === "nouvelles-cl" && <NouvellesClientes />}
