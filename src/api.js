@@ -364,6 +364,24 @@ depenses: {
       set: (data) => request("/api/depenses/budget", { method: "POST", body: data }),
     },
   },
+budgetComplet: {
+    sousCategories: {
+      list: () => request("/api/budget-complet/sous-categories"),
+      create: (data) => request("/api/budget-complet/sous-categories", { method: "POST", body: data }),
+      update: (id, data) => request(`/api/budget-complet/sous-categories/${id}`, { method: "PUT", body: data }),
+      remove: (id) => request(`/api/budget-complet/sous-categories/${id}`, { method: "DELETE" }),
+    },
+    postes: {
+      list: (annee) => request(`/api/budget-complet/postes?annee=${annee}`),
+      set: (data) => request("/api/budget-complet/postes", { method: "PUT", body: data }),
+    },
+    objectifs: {
+      list: (annee) => request(`/api/budget-complet/objectifs?annee=${annee}`),
+      set: (data) => request("/api/budget-complet/objectifs", { method: "PUT", body: data }),
+    },
+    etat: (params) => request(`/api/budget-complet/etat?${new URLSearchParams(params).toString()}`),
+    objectifMois: () => request("/api/budget-complet/objectif-mois"),
+  },
 
 creancesHistoriques: {
     list: (params = {}) => {

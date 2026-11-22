@@ -4,19 +4,27 @@ import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, fmt } from "../constants.js";
 import { ErrorBanner, selectStyle } from "../components/Shared.jsx";
+import BudgetComplet from "./BudgetCompletViews.jsx";
 
 const COULEUR = { carte: "#FFFFFF", bordure: "#EAE1D2", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 const BOUTIQUES_DEPENSE = [...BOUTIQUES, "Générale"];
+
+function nomSous(sousCats, d) {
+  const s = d.sousCategorieId && sousCats.find((x) => x.id === d.sousCategorieId);
+  return s ? ` › ${s.nom}` : "";
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function DepensesSection() {
-  const { user } = useAuth();
+  const { user, fonctions } = useAuth();
+  const lot4 = !!fonctions?.lot4;
   const estAdmin = !!user?.role?.systeme;
   const [tab, setTab] = useState("saisir");
   const [categories, setCategories] = useState([]);
+  const [sousCats, setSousCats] = useState([]);
   const [mesDepenses, setMesDepenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -24,11 +32,15 @@ export default function DepensesSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [cats, dep] = await Promise.all([api.depenses.categories.list(), api.depenses.list()]);
+      const [cats, dep, scs] = await Promise.all([
+        api.depenses.categories.list(), api.depenses.list(),
+        lot4 ? api.budgetComplet.sousCategories.list() : Promise.resolve([]),
+      ]);
       setCategories(cats);
       setMesDepenses(dep);
+      setSousCats(scs);
     } catch (e) { setError(e.message); } finally { setLoading(false); }
-  }, []);
+  }, [lot4]);
   useEffect(() => { load(); }, [load]);
 
   const TABS = [
@@ -55,23 +67,25 @@ export default function DepensesSection() {
       {loading && <p className="text-sm" style={{ color: COULEUR.texteDoux }}>Chargement…</p>}
 
       {!loading && tab === "saisir" && (
-        <SaisieDepense categories={categories} mesDepenses={mesDepenses} estAdmin={estAdmin} onSaved={load} onError={setError} />
+        <SaisieDepense categories={categories} sousCats={sousCats} mesDepenses={mesDepenses} estAdmin={estAdmin} onSaved={load} onError={setError} />
       )}
       {!loading && estAdmin && tab === "toutes" && (
-        <ToutesLesDepenses categories={categories} onError={setError} />
+        <ToutesLesDepenses categories={categories} sousCats={sousCats} onError={setError} />
       )}
       {!loading && estAdmin && tab === "categories" && (
-        <GestionCategories categories={categories} onChanged={load} onError={setError} />
+        <GestionCategories categories={categories} sousCats={sousCats} lot4={lot4} onChanged={load} onError={setError} />
       )}
       {!loading && estAdmin && tab === "budget" && (
-        <BudgetPrevisionnel categories={categories} onError={setError} />
+        lot4 ? <BudgetComplet onError={setError} /> : <BudgetPrevisionnel categories={categories} onError={setError} />
       )}
     </div>
   );
 }
 
-function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) {
+function SaisieDepense({ categories, sousCats = [], mesDepenses, estAdmin, onSaved, onError }) {
   const [categorieId, setCategorieId] = useState("");
+  const [sousCategorieId, setSousCategorieId] = useState("");
+  const sousDeLaCategorie = sousCats.filter((s) => s.categorieId === categorieId && s.actif);
   const [montant, setMontant] = useState("");
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState("");
@@ -85,9 +99,10 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
     setEnvoi(true);
     try {
       const data = { categorieId, montant: Number(montant), description, reference };
+      if (sousCategorieId) data.sousCategorieId = sousCategorieId;
       if (estAdmin) data.boutique = boutique;
       await api.depenses.create(data);
-      setCategorieId(""); setMontant(""); setDescription(""); setReference("");
+      setCategorieId(""); setSousCategorieId(""); setMontant(""); setDescription(""); setReference("");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       onSaved();
@@ -101,11 +116,20 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Catégorie</label>
-            <select value={categorieId} onChange={(e) => setCategorieId(e.target.value)} style={selectStyle}>
+            <select value={categorieId} onChange={(e) => { setCategorieId(e.target.value); setSousCategorieId(""); }} style={selectStyle}>
               <option value="">— Choisir —</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
             </select>
           </div>
+          {sousDeLaCategorie.length > 0 && (
+            <div>
+              <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Sous-catégorie</label>
+              <select value={sousCategorieId} onChange={(e) => setSousCategorieId(e.target.value)} style={selectStyle}>
+                <option value="">— Aucune —</option>
+                {sousDeLaCategorie.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs mb-1" style={{ color: COULEUR.texteDoux }}>Montant (F CFA)</label>
             <input value={montant} onChange={(e) => setMontant(e.target.value.replace(/\D/g, ""))} inputMode="numeric" style={selectStyle} />
@@ -147,7 +171,7 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
             {mesDepenses.map((d) => (
               <tr key={d.id} style={{ borderTop: "1px solid #EFE7D9" }}>
                 <td className="px-4 py-2">{new Date(d.date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</td>
-                <td className="px-4 py-2">{d.categorie?.nom}</td>
+                <td className="px-4 py-2">{d.categorie?.nom}{nomSous(sousCats, d)}</td>
                 <td className="px-4 py-2">{d.description || "—"}</td>
                 <td className="text-right px-4 py-2">{fmt(d.montant)} F</td>
               </tr>
@@ -162,7 +186,7 @@ function SaisieDepense({ categories, mesDepenses, estAdmin, onSaved, onError }) 
   );
 }
 
-function ToutesLesDepenses({ categories, onError }) {
+function ToutesLesDepenses({ categories, sousCats = [], onError }) {
   const [depenses, setDepenses] = useState([]);
   const [boutique, setBoutique] = useState("");
   const [categorieId, setCategorieId] = useState("");
@@ -229,7 +253,7 @@ function ToutesLesDepenses({ categories, onError }) {
                 <tr key={d.id} style={{ borderTop: "1px solid #EFE7D9" }}>
                   <td className="px-4 py-2">{new Date(d.date).toLocaleString("fr-FR")}</td>
                   <td className="px-4 py-2">{d.boutique}</td>
-                  <td className="px-4 py-2">{d.categorie?.nom}</td>
+                  <td className="px-4 py-2">{d.categorie?.nom}{nomSous(sousCats, d)}</td>
                   <td className="px-4 py-2">{d.description || "—"}</td>
                   <td className="px-4 py-2">{d.effectuePar?.prenom} {d.effectuePar?.nom}</td>
                   <td className="text-right px-4 py-2">{fmt(d.montant)} F</td>
@@ -252,7 +276,7 @@ function ToutesLesDepenses({ categories, onError }) {
   );
 }
 
-function GestionCategories({ categories, onChanged, onError }) {
+function GestionCategories({ categories, sousCats = [], lot4, onChanged, onError }) {
   const [nouveau, setNouveau] = useState("");
   const [editionId, setEditionId] = useState(null);
   const [nomEdite, setNomEdite] = useState("");
@@ -302,8 +326,33 @@ function GestionCategories({ categories, onChanged, onError }) {
                 </div>
               </div>
             )}
+            {lot4 && <SousCategories categorie={c} sousCats={sousCats.filter((s) => s.categorieId === c.id)} onChanged={onChanged} onError={onError} />}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Lot 4 (H2) : sous-catégories d'une catégorie (ex. Impressions > Cartes, Sacs, Étiquettes).
+function SousCategories({ categorie, sousCats, onChanged, onError }) {
+  const [nouveau, setNouveau] = useState("");
+  const agir = async (f) => { try { await f(); onChanged(); } catch (e) { onError(e.message); } };
+  const ajouter = () => nouveau.trim() && agir(async () => { await api.budgetComplet.sousCategories.create({ categorieId: categorie.id, nom: nouveau.trim() }); setNouveau(""); });
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: "1px dashed #EAE1D2" }}>
+      {sousCats.map((s) => (
+        <div key={s.id} className="flex items-center justify-between text-xs py-0.5" style={{ color: s.actif ? COULEUR.texteDoux : "#A89B8C" }}>
+          <span style={{ textDecoration: s.actif ? "none" : "line-through" }}>› {s.nom}</span>
+          <span className="flex items-center gap-2">
+            <button onClick={() => agir(() => api.budgetComplet.sousCategories.update(s.id, { actif: !s.actif }))} className="underline">{s.actif ? "Désactiver" : "Réactiver"}</button>
+            <button onClick={() => window.confirm(`Supprimer la sous-catégorie « ${s.nom} » ?`) && agir(() => api.budgetComplet.sousCategories.remove(s.id))} style={{ color: "#B04A3B" }}><Trash2 size={12} /></button>
+          </span>
+        </div>
+      ))}
+      <div className="flex items-center gap-1.5 mt-1">
+        <input value={nouveau} onChange={(e) => setNouveau(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ajouter()} placeholder="Nouvelle sous-catégorie" className="flex-1 px-2 py-1 rounded text-xs outline-none" style={{ border: "1px solid #DDD3C4" }} />
+        <button onClick={ajouter} className="text-xs px-2 py-1 rounded" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>+</button>
       </div>
     </div>
   );

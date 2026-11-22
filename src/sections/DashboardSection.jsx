@@ -34,8 +34,14 @@ function periodeMoisPrecedent() {
 }
 
 export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite, onNaviguerEtats } = {}) {
-  const { user, permissions } = useAuth();
+  const { user, permissions, fonctions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
+  const [objectifMois, setObjectifMois] = useState(null);
+  const lot4 = !!fonctions?.lot4;
+  useEffect(() => {
+    if (!lot4 || estAdmin) return;
+    api.budgetComplet.objectifMois().then(setObjectifMois).catch(() => setObjectifMois(null));
+  }, [lot4, estAdmin]);
   const peutVoirVentes = !!permissions.ventes;
   const peutVoirStock = !!permissions.stock;
 
@@ -199,6 +205,12 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
       <p className="font-display text-2xl font-semibold mb-6">
         Bonjour {user?.prenom} 👋
       </p>
+
+      {!estAdmin && objectifMois?.pourcentage != null && (
+        <p className="text-sm mb-6 -mt-3" style={{ color: COULEUR.texteDoux }}>
+          Objectif du mois pour {objectifMois.boutique} : <strong style={{ color: objectifMois.pourcentage >= 100 ? "#3F7D4E" : COULEUR.texte }}>{objectifMois.pourcentage} % atteint</strong>
+        </p>
+      )}
 
       {estAdmin && peutVoirVentes && caMois && caMoisPrec && caMoisPrec.total > 0 && (() => {
         const variation = Math.round(((caMois.cumul.totalVentes - caMoisPrec.total) / caMoisPrec.total) * 100);
