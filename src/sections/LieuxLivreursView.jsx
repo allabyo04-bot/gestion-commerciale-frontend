@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, fmt } from "../constants.js";
 import { ErrorBanner, selectStyle } from "../components/Shared.jsx";
 import { cleNom } from "../components/LieuxChamps.jsx";
@@ -36,6 +37,9 @@ export function Statistiques() {
   const [dateFin, setDateFin] = useState(jourIso(new Date()));
   const [boutique, setBoutique] = useState("");
   const [vue, setVue] = useState("livraisons");
+  const [zoneFiltre, setZoneFiltre] = useState(""); // lot 1 (B4) : "" = toutes, "CI", "HORS_CI"
+  const { fonctions } = useAuth();
+  const lot1 = !!fonctions.lot1;
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const valide = dateDebut && dateFin && dateDebut <= dateFin;
@@ -62,6 +66,14 @@ export function Statistiques() {
       </div>
       {!valide && <p className="text-xs mb-3" style={{ color: "#B04A3B" }}>Choisis deux dates, la première avant la seconde (ou le même jour).</p>}
       <ErrorBanner error={error} onClose={() => setError("")} />
+      {lot1 && vue === "expeditions" && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {[["", "Toutes"], ["CI", "En Côte d'Ivoire"], ["HORS_CI", "Hors Côte d'Ivoire"]].map(([z, t]) => (
+            <button key={z} type="button" onClick={() => setZoneFiltre(z)} className="px-3 py-1.5 rounded-lg text-sm font-medium"
+              style={zoneFiltre === z ? { background: "#2B2320", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>{t}</button>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2 mb-4 flex-wrap">{onglet("livraisons", "Livraisons par lieu")}{onglet("expeditions", "Expéditions par destination")}{onglet("livreurs", "Par livreur")}</div>
 
       {d && vue === "livraisons" && (
@@ -97,7 +109,7 @@ export function Statistiques() {
           </div>
           <div className="rounded-xl p-4" style={carte}>
             <p className="text-sm font-medium mb-2">Par destination</p>
-            <Tableau lignes={d.expeditions.parLieu} colonnes={[
+            <Tableau lignes={d.expeditions.parLieu.filter((l) => !lot1 || !zoneFiltre || l.zone === zoneFiltre)} colonnes={[
               { titre: "Destination", valeur: (l) => l.lieu }, { titre: "Zone", valeur: (l) => zoneLibelle[l.zone] }, { titre: "Expéditions", valeur: (l) => l.nbVentes },
               { titre: "Part", valeur: (l) => virgule(l.part) }, { titre: "Paires", valeur: (l) => l.paires }, { titre: "Montant (F)", valeur: (l) => fmt(l.ca) }]} />
           </div>

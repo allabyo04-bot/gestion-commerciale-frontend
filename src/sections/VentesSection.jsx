@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { BOUTIQUES, POINTURES, CIVILITES, MOIS, JOURS, COMMUNES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, fmt } from "../constants.js";
+import { BOUTIQUES, POINTURES, CIVILITES, MOIS, JOURS, COMMUNES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, libelleModeVente, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
 import { DestinationExpedition } from "../components/LieuxChamps.jsx";
 
@@ -13,7 +13,8 @@ function uid() { return `tmp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 const WHATSAPP_RECU_ACTIF = true;
 
 export default function VentesSection({ subTabInitial, onSubTabInitialConsomme } = {}) {
-  const { user } = useAuth();
+  const { user, fonctions } = useAuth();
+  const lot1 = !!fonctions.lot1;
   const estAdmin = !!user?.role?.systeme;
   const [subTab, setSubTab] = useState(subTabInitial || "nouvelle");
   useEffect(() => {
@@ -365,12 +366,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   </Field>
                 ) : (
                   <Field label="Vendeur">
-                    <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>Non applicable ({modeVente})</div>
+                    <div style={{ ...inputStyle, background: "#F1E9DC", color: "#6B5D52" }}>Non applicable ({libelleModeVente(modeVente, lot1)})</div>
                   </Field>
                 )}
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => { setModeVente(e.target.value); setExpeditionZone(""); setExpeditionLieu(""); }} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m}>{m}</option>)}</select>
+                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => { setModeVente(e.target.value); setExpeditionZone(""); setExpeditionLieu(""); }} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m} value={m}>{libelleModeVente(m, lot1)}</option>)}</select>
                 </Field>
 <Field label="Type de vente">
                   <div className="flex gap-2 mt-1">
@@ -676,7 +677,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                     {v.numero}{v.client ? ` · ${v.client.nomPrenoms}` : ""}
                     {v.statut === "Annulee" && <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>ANNULÉE</span>}
                   </p>
-                  <p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {v.modeVente}{v.montantRemise > 0 ? " · Remise appliquée" : ""}</p>
+                  <p className="text-xs" style={{ color: "#6B5D52" }}>{new Date(v.date).toLocaleString("fr-FR")} · {v.boutique} · Vendeur : {v.vendeur?.nom} · {libelleModeVente(v.modeVente, lot1)}{v.montantRemise > 0 ? " · Remise appliquée" : ""}</p>
                   {v.statut === "Annulee" && <p className="text-xs mt-1" style={{ color: "#8C3B2E" }}>Motif : {v.motifAnnulation} · par {v.annuleePar?.prenom} {v.annuleePar?.nom}</p>}
                 </div>
                 <div className="flex items-center gap-3">
@@ -729,6 +730,8 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 }
 
 export function ReceiptModal({ vente, onClose }) {
+  const { fonctions } = useAuth();
+  const lot1 = !!fonctions.lot1;
   const infos = INFOS_BOUTIQUE[vente.boutique] || {};
 const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   const [fideliteRecu, setFideliteRecu] = useState(null);
@@ -777,10 +780,10 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
         <p className="text-center text-xs mb-4" style={{ color: "#6B5D52" }}>{new Date(vente.date).toLocaleString("fr-FR")} · {vente.boutique}</p>
         <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Vendeur : {vente.vendeur?.nom}</div>
         <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Caissier : {vente.caissier?.prenom} {vente.caissier?.nom}</div>
-        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Mode : {vente.modeVente}</div>
+        <div className="text-xs mb-2" style={{ color: "#6B5D52" }}>Mode : {libelleModeVente(vente.modeVente, lot1)}</div>
         {vente.client && <div className="text-xs mb-3" style={{ color: "#6B5D52" }}>Client : {vente.client.nomPrenoms}</div>}
         <div style={{ borderTop: "1px dashed #DDD3C4", borderBottom: "1px dashed #DDD3C4" }} className="py-3 space-y-1.5">
-          {vente.lignes.map((l) => <div key={l.id} className="flex justify-between gap-2 text-xs"><span>{l.designation}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span className="whitespace-nowrap">{fmt(l.sousTotal)} F</span></div>)}
+          {vente.lignes.map((l) => <div key={l.id} className="flex justify-between gap-2 text-xs"><span>{l.designation}{lot1 && l.marque ? ` (${l.marque})` : ""}{l.pointure ? ` T${l.pointure}` : ""} ×{l.quantite}</span><span className="whitespace-nowrap">{fmt(l.sousTotal)} F</span></div>)}
           {vente.cartesCadeauxEmises?.map((c) => <div key={c.id} className="flex justify-between gap-2 text-xs"><span>Carte cadeau n° {c.numero}</span><span className="whitespace-nowrap">{fmt(c.montant)} F</span></div>)}
         </div>
         {(vente.montantRemise > 0 || vente.montantBonusFidelite > 0) ? (

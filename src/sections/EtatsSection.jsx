@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { MODES_PAIEMENT, LIVRAISON_ACTIF, SUIVI_CLIENTES_ACTIF } from "../constants.js";
 import { ReceiptModal } from "./VentesSection.jsx";
 import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
+import { Statistiques } from "./LieuxLivreursView.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -17,8 +18,9 @@ function todayISO() {
 }
 
 export default function EtatsSection({ sousOngletInitial, onSousOngletInitialConsomme } = {}) {
-  const { user } = useAuth();
+  const { user, fonctions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
+  const lot1 = !!fonctions.lot1;
 
   const [sousOnglet, setSousOnglet] = useState("date");
   // Arrivée depuis un lien de l'accueil (ex. "Voir le détail" des paires par marque)
@@ -204,6 +206,8 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     ...(estAdmin ? [{ id: "recap", label: "Récap boutiques", icon: Store }] : []),
     ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
     ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
+    // Lot 1 (B5) : états des livraisons et des expéditions, déplacés depuis Administration
+    ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }] : []),
     // Suivi des clientes — caché tant que SUIVI_CLIENTES_ACTIF est à false, réservé à l'administratrice
     ...(estAdmin && SUIVI_CLIENTES_ACTIF ? [
       { id: "paires", label: "Paires par marque", icon: Footprints },
@@ -227,8 +231,9 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
         </div>
 
         <div className="flex-1 min-w-0">
-      {ongletSuivi ? (
+      {ongletSuivi || (lot1 && sousOnglet === "stats-lieux") ? (
         <>
+          {sousOnglet === "stats-lieux" && <Statistiques />}
           {sousOnglet === "paires" && <PairesParMarque />}
           {sousOnglet === "remercier" && <ClientesARemercier />}
           {sousOnglet === "relancer" && <ClientesARelancer />}

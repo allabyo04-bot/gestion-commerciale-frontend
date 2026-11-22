@@ -7,6 +7,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Interrupteurs par lot (voir routes/fonctions.js) : { lot1: false, ... }
+  const [fonctions, setFonctions] = useState({});
 
   const chargerSession = useCallback(async () => {
     const token = localStorage.getItem("gc_token");
@@ -22,6 +24,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => { chargerSession(); }, [chargerSession]);
+  useEffect(() => {
+    if (!user) { setFonctions({}); return; }
+    api.fonctions.lire().then(setFonctions).catch(() => setFonctions({}));
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = async (loginId, pin) => {
     setError("");
@@ -44,7 +50,7 @@ export function AuthProvider({ children }) {
   const permissions = user?.role?.permissions || {};
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, permissions }}>
+    <AuthContext.Provider value={{ user, loading, error, login, logout, permissions, fonctions, setFonctions }}>
       {children}
     </AuthContext.Provider>
   );

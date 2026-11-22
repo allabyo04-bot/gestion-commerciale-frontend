@@ -63,6 +63,10 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  fonctions: {
+    lire: () => request("/api/fonctions"),
+    regler: (code, actif) => request(`/api/fonctions/${code}`, { method: "PUT", body: { actif } }),
+  },
   referentiels: {
     lieux: () => request("/api/referentiels/lieux"),
     quartiers: (commune) => request(`/api/referentiels/quartiers?commune=${encodeURIComponent(commune || "")}`),

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Eye, Percent, Truck, ListChecks, ShieldCheck } from "lucide-react";
+import { useAuth } from "../context/AuthContext.jsx";
+import { api } from "../api.js";
+import { Eye, Percent, Truck, ListChecks, ShieldCheck, ToggleLeft } from "lucide-react";
 import { FICHES_LIVRAISON_ACTIF } from "../constants.js";
 import { JournalGeneral, FichesClients, RemisesParCaissiere, ControleLivraisons } from "./JournalAuditSection.jsx";
 import { Statistiques, Gestion } from "./LieuxLivreursView.jsx";
@@ -36,11 +38,41 @@ const ONGLETS = [
   ["LIVRAISONS", "Livraisons", Truck],
   ["LISTES", "Listes", ListChecks],
   ["ACCES", "Utilisateurs et rôles", ShieldCheck],
+  ["INTERRUPTEURS", "Interrupteurs", ToggleLeft],
 ];
 
+const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"]];
+
+// Réservé au développeur : allume ou éteint les nouveautés de chaque lot, sans toucher au code.
+function Interrupteurs() {
+  const { fonctions, setFonctions } = useAuth();
+  const [erreur, setErreur] = useState("");
+  const basculer = async (code) => {
+    try { setErreur(""); setFonctions(await api.fonctions.regler(code, !fonctions[code])); } catch (e) { setErreur(e.message); }
+  };
+  return (
+    <div className="max-w-xl">
+      <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Une nouveauté éteinte reste invisible pour tout le monde. Allume-la quand le lot est validé et l'acompte reçu.</p>
+      {erreur && <p className="text-sm mb-3" style={{ color: "#B04A3B" }}>{erreur}</p>}
+      {LOTS.map(([code, titre]) => (
+        <div key={code} className="flex items-center justify-between rounded-xl p-4 mb-2" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+          <div><p className="text-sm font-medium">{titre}</p><p className="text-xs" style={{ color: "#6B5D52" }}>{fonctions[code] ? "Allumé : visible par tous" : "Éteint : invisible"}</p></div>
+          <button type="button" onClick={() => basculer(code)} className="px-4 py-2 rounded-full text-sm font-medium"
+            style={fonctions[code] ? { background: "#3F6B4A", color: "#F3F7F3" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{fonctions[code] ? "Allumé" : "Éteint"}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdministrationSection({ ongletInitial = "SUIVI", peutGererAcces = true }) {
+  const { user, fonctions } = useAuth();
+  const lot1 = !!fonctions.lot1;
+  const developpeur = ["phil"].includes(String(user?.login || "").toLowerCase()) || String(user?.prenom || "").toLowerCase() === "phil";
   const [vue, setVue] = useState(ongletInitial);
-  const onglets = ONGLETS.filter(([id]) => id !== "ACCES" || peutGererAcces);
+  const onglets = ONGLETS.filter(([id]) => (id !== "ACCES" || peutGererAcces) && (id !== "INTERRUPTEURS" || developpeur));
+  // Lot 1 (B5) : les statistiques lieux et livreurs passent dans le menu États
+  const itemsLivraisons = [...(lot1 ? [] : [["STATS", "Statistiques lieux et livreurs"]]), ...(FICHES_LIVRAISON_ACTIF ? [["CONTROLE", "Contrôle des livraisons"]] : [])];
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold mb-1">Administration</h1>
@@ -54,8 +86,9 @@ export default function AdministrationSection({ ongletInitial = "SUIVI", peutGer
         </SousOnglets>
       )}
       {vue === "REMISES" && <RemisesParCaissiere />}
-      {vue === "LIVRAISONS" && (
-        <SousOnglets items={[["STATS", "Statistiques lieux et livreurs"], ...(FICHES_LIVRAISON_ACTIF ? [["CONTROLE", "Contrôle des livraisons"]] : [])]}>
+      {vue === "INTERRUPTEURS" && developpeur && <Interrupteurs />}
+      {vue === "LIVRAISONS" && itemsLivraisons.length > 0 && (
+        <SousOnglets items={itemsLivraisons}>
           {(v) => (v === "STATS" ? <Statistiques /> : <ControleLivraisons />)}
         </SousOnglets>
       )}
