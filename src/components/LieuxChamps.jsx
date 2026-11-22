@@ -83,7 +83,7 @@ export const nomEstUnNumero = (t) => String(t || "").replace(/\D/g, "").length >
 /** Numéro correct : 8 chiffres minimum. */
 export const telephoneValide = (t) => String(t || "").replace(/\D/g, "").length >= 8;
 
-export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointure, onPointure, pointureObligatoire = false, autoFocus = false, onResolution, titre = "Téléphone" }) {
+export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointure, onPointure, pointureObligatoire = false, masquerPointureSiConnue = false, autoFocus = false, onResolution, titre = "Téléphone" }) {
   const [res, setRes] = useState(null);
   const [cherche, setCherche] = useState(false);
   const refTel = useRef(null);
@@ -148,6 +148,8 @@ export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointu
               Nouvelle cliente : sa fiche sera créée à l'enregistrement{nom.trim() ? "" : " (nom vide : elle s'appellera « CLIENTE 000n »)"}.
             </p>
           )}
+          {/* Lot 1 (A6) : cliente déjà connue, la pointure n'est plus demandée */}
+          {!(trouvee && masquerPointureSiConnue) && (<>
           <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>
             Pointure {pointureObligatoire && nouvelle ? <span style={{ color: "#B04A3B" }}>(obligatoire)</span> : <span>(facultative)</span>}
           </label>
@@ -155,6 +157,7 @@ export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointu
             <option value="">— Choisir —</option>
             {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
           </select>
+          </>)}
         </div>
       )}
     </div>

@@ -386,7 +386,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
             <ClienteParTelephone
               telephone={clientTelephone} onTelephone={(v) => { setClientTelephone(v); if (clientId) setClientId(""); }}
               nom={clientNom} onNom={setClientNom} pointure={clientPointure} onPointure={setClientPointure}
-              pointureObligatoire autoFocus onResolution={setRechercheTel} />
+              pointureObligatoire masquerPointureSiConnue={lot1} autoFocus onResolution={setRechercheTel} />
 
             <details className="mt-3">
               <summary className="text-xs cursor-pointer" style={{ color: "#8C3B2E" }}>Chercher la cliente par son nom</summary>
