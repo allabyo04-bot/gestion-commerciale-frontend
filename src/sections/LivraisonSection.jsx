@@ -203,6 +203,9 @@ export default function LivraisonSection() {
 // NOUVEAU BON — départ du livreur : ce qui sort décrémente le stock tout de suite.
 // ------------------------------------------------------------
 function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, onClientCree }) {
+  const { user: utilisateur, fonctions } = useAuth();
+  const lot1 = !!fonctions.lot1;
+  const cleBrouillon = `gc_brouillon_bon_${utilisateur?.id || ""}`;
   const [boutique, setBoutique] = useState(boutiqueDefaut);
   const [clientId, setClientId] = useState("");
   const [clientNom, setClientNom] = useState("");
@@ -229,6 +232,34 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
   const [avanceModePaiement, setAvanceModePaiement] = useState("especes");
   const [avanceOuvert, setAvanceOuvert] = useState(false);
   const [notesOuvert, setNotesOuvert] = useState(false);
+
+  // Lot 1 (A4) : le bon en cours est conservé quand la caissière quitte l'écran (vente, autre menu) et retrouvé tel quel.
+  // Seules les données saisies sont gardées, jamais le stock : rien ne sort avant la validation du bon.
+  const [brouillonRepris, setBrouillonRepris] = useState(false);
+  useEffect(() => {
+    if (!lot1) return;
+    try {
+      const d = JSON.parse(sessionStorage.getItem(cleBrouillon) || "null");
+      if (d) {
+        if (d.boutique) setBoutique(d.boutique);
+        setClientId(d.clientId || ""); setClientNom(d.clientNom || ""); setClientTelephone(d.clientTelephone || ""); setClientPointure(d.clientPointure || "");
+        setCommune(d.commune || ""); setQuartier(d.quartier || ""); setLivreurId(d.livreurId || ""); setNotes(d.notes || "");
+        setLignes(d.lignes || []); setCartesCadeaux(d.cartesCadeaux || []);
+        setAvance(d.avance || ""); setAvanceModePaiement(d.avanceModePaiement || "especes");
+        setAvanceOuvert(!!d.avanceOuvert); setNotesOuvert(!!d.notesOuvert);
+      }
+    } catch { /* brouillon illisible : on repart d'une page vierge */ }
+    setBrouillonRepris(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lot1]);
+  useEffect(() => {
+    if (!lot1 || !brouillonRepris) return;
+    try {
+      const vide = !clientId && !clientNom && !clientTelephone && !commune && !quartier && !livreurId && !notes && !lignes.length && !cartesCadeaux.length && !avance;
+      if (vide) sessionStorage.removeItem(cleBrouillon);
+      else sessionStorage.setItem(cleBrouillon, JSON.stringify({ boutique, clientId, clientNom, clientTelephone, clientPointure, commune, quartier, livreurId, notes, lignes, cartesCadeaux, avance, avanceModePaiement, avanceOuvert, notesOuvert }));
+    } catch { /* stockage indisponible : pas de brouillon, rien de cassé */ }
+  }, [lot1, brouillonRepris, cleBrouillon, boutique, clientId, clientNom, clientTelephone, clientPointure, commune, quartier, livreurId, notes, lignes, cartesCadeaux, avance, avanceModePaiement, avanceOuvert, notesOuvert]);
 
   // Mention du bonus Cendrillon : le bonus ne se déduit PAS sur une livraison. Quand la cliente est identifiée
   // (fiche choisie, ou numéro déjà connu), on prévient la vendeuse pour qu'elle lui rappelle de l'utiliser en boutique.

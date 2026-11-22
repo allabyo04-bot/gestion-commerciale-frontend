@@ -32,6 +32,48 @@ function Tableau({ colonnes, lignes, vide = "Rien à afficher sur cette période
 }
 
 // ── Statistiques ─────────────────────────────────────────────────────────────
+// Lot 1 (B3) : coût des expéditions dont les frais sont supportés par la boutique, sur une période.
+export function FraisExpedition() {
+  const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
+  const [dateFin, setDateFin] = useState(jourIso(new Date()));
+  const [boutique, setBoutique] = useState("");
+  const [d, setD] = useState(null);
+  const [error, setError] = useState("");
+  const valide = dateDebut && dateFin && dateDebut <= dateFin;
+  useEffect(() => {
+    if (!valide) return;
+    setError("");
+    api.etats.fraisExpedition({ dateDebut, dateFin, ...(boutique ? { boutique } : {}) }).then(setD).catch((e) => setError(e.message));
+  }, [dateDebut, dateFin, boutique, valide]);
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Du</label><input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} style={selectStyle} /></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Au</label><input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} style={selectStyle} /></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
+          <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}><option value="">Les deux</option>{BOUTIQUES.map((b) => <option key={b}>{b}</option>)}</select></div>
+      </div>
+      <ErrorBanner error={error} onClose={() => setError("")} />
+      {d && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {[["Coût total", d.total], ["Livreurs", d.totalLivreur], ["Transport", d.totalTransport]].map(([t, v]) => (
+              <div key={t} className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{t}</p><p className="font-display text-2xl font-semibold">{fmt(v)} F</p></div>
+            ))}
+          </div>
+          <p className="text-sm" style={{ color: "#6B5D52" }}>{d.nb} expédition{d.nb > 1 ? "s" : ""} aux frais de la boutique sur la période.</p>
+          <div className="rounded-xl p-4" style={carte}>
+            <Tableau vide="Aucune expédition prise en charge sur cette période." lignes={d.lignes} colonnes={[
+              { titre: "Date", valeur: (l) => new Date(l.date).toLocaleDateString("fr-FR") }, { titre: "Vente", valeur: (l) => l.numero }, { titre: "Boutique", valeur: (l) => l.boutique },
+              { titre: "Destination", valeur: (l) => l.expeditionLieu || "—" }, { titre: "Livreur (F)", valeur: (l) => fmt(l.fraisLivreur || 0) },
+              { titre: "Transport (F)", valeur: (l) => fmt(l.fraisTransport || 0) }, { titre: "Total (F)", valeur: (l) => fmt(l.fraisTotal) }]} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Statistiques() {
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));

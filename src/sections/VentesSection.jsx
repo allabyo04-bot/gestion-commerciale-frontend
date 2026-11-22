@@ -54,6 +54,10 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
   const [expeditionZone, setExpeditionZone] = useState("");
   const [expeditionLieu, setExpeditionLieu] = useState("");
+  // Lot 1 (B3) : frais d'expédition pris en charge par la boutique
+  const [fraisPris, setFraisPris] = useState(false);
+  const [fraisLivreur, setFraisLivreur] = useState("");
+  const [fraisTransport, setFraisTransport] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
   const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
@@ -215,7 +219,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
-    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu("");
+    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisLivreur(""); setFraisTransport("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -260,8 +264,9 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
-        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined } : undefined,
+        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined, whatsapp: (nouvelleCliente.whatsapp || "").trim() || undefined, adresse: (nouvelleCliente.adresse || "").trim() || undefined } : undefined,
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
+        ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisLivreur: Number(fraisLivreur) || 0, fraisTransport: Number(fraisTransport) || 0 } : {}),
         expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
@@ -391,7 +396,8 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                         <span className="text-sm font-medium">Nouvelle cliente · {nouvelleCliente.telephone}</span>
                         <button onClick={() => setNouvelleCliente(null)} style={{ color: "#B04A3B" }} title="Ne pas créer de fiche"><X size={14} /></button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+                      {lot1 && <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Renseigne sa fiche dans le cadre ci-dessous.</p>}
+                      {!lot1 && <div className="grid grid-cols-2 gap-2 mt-2">
                         <input value={nouvelleCliente.nom} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, nom: e.target.value })} placeholder="Nom et prénoms (obligatoire)" style={{ ...inputStyle, marginTop: 0 }} />
                         <select value={nouvelleCliente.civilite} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, civilite: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
                           {CIVILITES.map((c) => <option key={c}>{c}</option>)}
@@ -415,7 +421,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                           {COMMUNES.map((c) => <option key={c}>{c}</option>)}
                         </select>
                         <input value={nouvelleCliente.quartier} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, quartier: e.target.value })} placeholder="Quartier (facultatif)" style={{ ...inputStyle, marginTop: 0 }} />
-                      </div>
+                      </div>}
                       <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente. Seuls le nom et le téléphone sont obligatoires.</p>
                     </div>
                   ) : (
@@ -430,7 +436,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                             </button>
                           ))}
                           {numeroSaisiInconnu && (
-                            <button onClick={() => { setNouvelleCliente({ telephone: clientSearch.trim(), nom: "", pointure: "", civilite: "Madame", jourAnniv: "", moisAnniv: "", commune: "", quartier: "" }); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm font-medium" style={{ background: "#FBF3E3", color: "#8A6A22", borderTop: "1px solid #EFE7D9" }}>
+                            <button onClick={() => { setNouvelleCliente({ telephone: clientSearch.trim(), nom: "", pointure: "", civilite: "Madame", jourAnniv: "", moisAnniv: "", commune: "", quartier: "", whatsapp: "", adresse: "" }); setClientSearch(""); }} className="w-full text-left px-3 py-2 text-sm font-medium" style={{ background: "#FBF3E3", color: "#8A6A22", borderTop: "1px solid #EFE7D9" }}>
                               + Numéro inconnu : créer la fiche de cette cliente ({clientSearch.trim()})
                             </button>
                           )}
@@ -440,7 +446,21 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   )}
                 </Field>
               </div>
+              {lot1 && !clientId && nouvelleCliente && <FicheNouvelleCliente nc={nouvelleCliente} onChange={setNouvelleCliente} modeVente={modeVente} />}
               {modeVente === "Expédition" && <DestinationExpedition zone={expeditionZone} onZone={setExpeditionZone} lieu={expeditionLieu} onLieu={setExpeditionLieu} />}
+              {lot1 && modeVente === "Expédition" && (
+                <div className="rounded-lg p-3 mt-3" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={fraisPris} onChange={(e) => setFraisPris(e.target.checked)} /> Frais d'expédition pris en charge par la boutique
+                  </label>
+                  {fraisPris && (
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur qui dépose le colis (F)</label><input type="number" min="0" inputMode="numeric" value={fraisLivreur} onChange={(e) => setFraisLivreur(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
+                      <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Transport du colis (F)</label><input type="number" min="0" inputMode="numeric" value={fraisTransport} onChange={(e) => setFraisTransport(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
+                    </div>
+                  )}
+                </div>
+              )}
               {FIDELITE_ACTIF && fideliteClient && (fideliteClient.bonusDisponible > 0 || (fideliteClient.prochainPalierDistance != null && fideliteClient.prochainPalierDistance <= 50000)) && (
                 <div className="mt-3 px-3 py-2 rounded-lg text-sm" style={bonusApplicable ? { background: "#E9F0EA", color: "#3F6B4A" } : { background: "#FBF3E3", color: "#A8823D" }}>
                   {bonusApplicable ? (
@@ -725,6 +745,40 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Lot 1 (A1, A3) : fiche de la nouvelle cliente, pleine largeur (plus de fenêtre tronquée), tous les champs de la
+// fiche, sans jamais bloquer la vente. Les champs s'adaptent au mode : une expédition n'a ni commune ni quartier.
+function FicheNouvelleCliente({ nc, onChange, modeVente }) {
+  const maj = (champ) => (e) => onChange({ ...nc, [champ]: e.target.value });
+  const st = { ...inputStyle, marginTop: 0 };
+  const expedition = modeVente === "Expédition";
+  return (
+    <div className="mt-3 rounded-lg p-4" style={{ background: "#FBF3E3", border: "1px solid #EBD9A8" }}>
+      <p className="text-sm font-medium mb-3">Fiche de la nouvelle cliente · {nc.telephone}</p>
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div className="sm:col-span-2"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Nom et prénoms (obligatoire)</label><input value={nc.nom} onChange={maj("nom")} style={st} /></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Civilité</label>
+          <select value={nc.civilite} onChange={maj("civilite")} style={st}>{CIVILITES.map((c) => <option key={c}>{c}</option>)}</select></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
+          <select value={nc.pointure} onChange={maj("pointure")} style={st}><option value="">—</option>{POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}</select></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Anniversaire (jour)</label>
+          <select value={nc.jourAnniv} onChange={maj("jourAnniv")} style={st}><option value="">—</option>{JOURS.map((j) => <option key={j}>{j}</option>)}</select></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Anniversaire (mois)</label>
+          <select value={nc.moisAnniv} onChange={maj("moisAnniv")} style={st}><option value="">—</option>{MOIS.map((m) => <option key={m}>{m}</option>)}</select></div>
+        <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>WhatsApp (si différent du téléphone)</label><input value={nc.whatsapp || ""} onChange={maj("whatsapp")} style={st} inputMode="tel" /></div>
+        {!expedition && (
+          <>
+            <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Commune</label>
+              <select value={nc.commune} onChange={maj("commune")} style={st}><option value="">—</option>{COMMUNES.map((c) => <option key={c}>{c}</option>)}</select></div>
+            <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Quartier</label><input value={nc.quartier} onChange={maj("quartier")} style={st} /></div>
+            <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Adresse</label><input value={nc.adresse || ""} onChange={maj("adresse")} style={st} /></div>
+          </>
+        )}
+      </div>
+      <p className="text-xs mt-3" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente. Seuls le nom et le téléphone sont obligatoires : la vente peut être validée même si la fiche est incomplète.</p>
     </div>
   );
 }

@@ -383,6 +383,10 @@ etats: {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/livraison-jour${qs ? `?${qs}` : ""}`);
     },
+    fraisExpedition: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/api/etats/frais-expedition${qs ? `?${qs}` : ""}`);
+    },
     livraisons: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/api/etats/livraisons${qs ? `?${qs}` : ""}`);
