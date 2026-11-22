@@ -63,6 +63,11 @@ export const api = {
   securite: {
     changerCode: (codeActuel, nouveauCode) => request("/api/securite/changer-code", { method: "POST", body: { codeActuel, nouveauCode } }),
   },
+  etatsClientes: {
+    fichesIncompletes: (params = {}) => request(`/api/etats-clientes/fiches-incompletes?${new URLSearchParams(params)}`),
+    bonus: (params = {}) => request(`/api/etats-clientes/bonus?${new URLSearchParams(params)}`),
+    nouvellesClientes: (params = {}) => request(`/api/etats-clientes/nouvelles-clientes?${new URLSearchParams(params)}`),
+  },
   fonctions: {
     lire: () => request("/api/fonctions"),
     regler: (code, actif) => request(`/api/fonctions/${code}`, { method: "PUT", body: { actif } }),

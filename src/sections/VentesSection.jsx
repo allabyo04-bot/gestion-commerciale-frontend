@@ -15,6 +15,7 @@ const WHATSAPP_RECU_ACTIF = true;
 export default function VentesSection({ subTabInitial, onSubTabInitialConsomme } = {}) {
   const { user, fonctions } = useAuth();
   const lot1 = !!fonctions.lot1;
+  const lot2 = !!fonctions.lot2;
   const estAdmin = !!user?.role?.systeme;
   const [subTab, setSubTab] = useState(subTabInitial || "nouvelle");
   useEffect(() => {
@@ -459,6 +460,11 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                       <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Transport du colis (F)</label><input type="number" min="0" inputMode="numeric" value={fraisTransport} onChange={(e) => setFraisTransport(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
                     </div>
                   )}
+                </div>
+              )}
+              {lot2 && FIDELITE_ACTIF && fideliteClient?.viaExpedition && (
+                <div className="mt-3 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "#E7EEF8", color: "#2F5A8A" }}>
+                  📦 Cliente d'expédition{fideliteClient.bonusDisponible > 0 ? ` — elle a droit à son bonus de ${fmt(fideliteClient.bonusDisponible)} F, à lui remettre en boutique.` : " — son bonus se remet en boutique."}
                 </div>
               )}
               {FIDELITE_ACTIF && fideliteClient && (fideliteClient.bonusDisponible > 0 || (fideliteClient.prochainPalierDistance != null && fideliteClient.prochainPalierDistance <= 50000)) && (

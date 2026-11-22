@@ -6,6 +6,7 @@ import { MODES_PAIEMENT, LIVRAISON_ACTIF, SUIVI_CLIENTES_ACTIF } from "../consta
 import { ReceiptModal } from "./VentesSection.jsx";
 import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
 import { Statistiques, FraisExpedition } from "./LieuxLivreursView.jsx";
+import { FichesIncompletes, EtatBonus, NouvellesClientes } from "./EtatsClientesViews.jsx";
 
 const COULEUR = { fond: "#FAF7F2", carte: "#FFFDF9", bordure: "#DDD3C4", texte: "#2B2320", texteDoux: "#6B5D52", accent: "#8C3B2E" };
 
@@ -21,6 +22,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
   const { user, fonctions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
   const lot1 = !!fonctions.lot1;
+  const lot2 = !!fonctions.lot2;
 
   const [sousOnglet, setSousOnglet] = useState("date");
   // Arrivée depuis un lien de l'accueil (ex. "Voir le détail" des paires par marque)
@@ -208,6 +210,8 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
     // Lot 1 (B5) : états des livraisons et des expéditions, déplacés depuis Administration
     ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }, { id: "frais-exp", label: "Frais d'expédition", icon: Truck }] : []),
+    // Lot 2 (C1, D2, D3) : états sur les clientes et la fidélité
+    ...(estAdmin && lot2 ? [{ id: "fiches-inc", label: "Fiches incomplètes", icon: Heart }, { id: "bonus-etat", label: "Bonus", icon: Award }, { id: "nouvelles-cl", label: "Nouvelles clientes", icon: Heart }] : []),
     // Suivi des clientes — caché tant que SUIVI_CLIENTES_ACTIF est à false, réservé à l'administratrice
     ...(estAdmin && SUIVI_CLIENTES_ACTIF ? [
       { id: "paires", label: "Paires par marque", icon: Footprints },
@@ -231,8 +235,11 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
         </div>
 
         <div className="flex-1 min-w-0">
-      {ongletSuivi || (lot1 && (sousOnglet === "stats-lieux" || sousOnglet === "frais-exp")) ? (
+      {ongletSuivi || (lot1 && (sousOnglet === "stats-lieux" || sousOnglet === "frais-exp")) || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) ? (
         <>
+          {lot2 && sousOnglet === "fiches-inc" && <FichesIncompletes />}
+          {lot2 && sousOnglet === "bonus-etat" && <EtatBonus />}
+          {lot2 && sousOnglet === "nouvelles-cl" && <NouvellesClientes />}
           {sousOnglet === "stats-lieux" && <Statistiques />}
           {sousOnglet === "frais-exp" && <FraisExpedition />}
           {sousOnglet === "paires" && <PairesParMarque />}

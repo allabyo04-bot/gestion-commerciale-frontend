@@ -41,7 +41,7 @@ const ONGLETS = [
   ["INTERRUPTEURS", "Interrupteurs", ToggleLeft],
 ];
 
-const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"]];
+const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"], ["lot2", "Lot 2 — Clientes et fidélité"]];
 
 // Réservé au développeur : allume ou éteint les nouveautés de chaque lot, sans toucher au code.
 function Interrupteurs() {
