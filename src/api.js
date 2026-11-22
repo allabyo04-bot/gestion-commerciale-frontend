@@ -51,6 +51,10 @@ export async function recupererFichier(path) {
 
 export const api = {
   obligations: {
+    types: () => request("/api/obligations/types"),
+    creerType: (nom) => request("/api/obligations/types", { method: "POST", body: { nom } }),
+    modifierType: (code, body) => request(`/api/obligations/types/${code}`, { method: "PUT", body }),
+    supprimerType: (code) => request(`/api/obligations/types/${code}`, { method: "DELETE" }),
     resume: () => request("/api/obligations/resume"),
     list: (statut = "OUVERTES") => request(`/api/obligations?statut=${statut}`),
     create: (o) => request("/api/obligations", { method: "POST", body: o }),

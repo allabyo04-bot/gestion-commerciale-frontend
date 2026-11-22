@@ -5,13 +5,12 @@ import { fmt } from "../constants.js";
 import { ErrorBanner, inputStyle, selectStyle, Field } from "../components/Shared.jsx";
 
 // Lot 6 : suivi des obligations administratives de La Pointure (taxes, amendes, convocations, pièces, bail, droits d'auteur).
-const CATEGORIES = { TAXE: "Taxe", AMENDE: "Amende / transaction", CONVOCATION: "Convocation", DOCUMENT: "Pièce à renouveler", BAIL: "Bail / timbre", DROITS_AUTEUR: "Droits d'auteur (BURIDA)", AUTRE: "Autre" };
 const PERIODICITES = { UNIQUE: "Une seule fois", MENSUELLE: "Chaque mois", TRIMESTRIELLE: "Chaque trimestre", ANNUELLE: "Chaque année" };
 const STATUTS = { A_FAIRE: "À faire", EN_COURS: "En cours", PAYE: "Payée", REGULARISE: "Régularisée" };
 const carte = { background: "#FFFFFF", border: "1px solid #EAE1D2" };
 const dateFr = (d) => new Date(d).toLocaleDateString("fr-FR");
 const versInput = (d) => new Date(d).toISOString().slice(0, 10);
-const VIDE = { intitule: "", categorie: "TAXE", organisme: "", reference: "", montant: "", periodicite: "UNIQUE", echeance: "", statut: "A_FAIRE", boutique: "", responsable: "", delaiObtentionJours: "", notes: "" };
+const VIDE = { intitule: "", categorie: "", organisme: "", reference: "", montant: "", periodicite: "UNIQUE", echeance: "", statut: "A_FAIRE", boutique: "", responsable: "", delaiObtentionJours: "", notes: "" };
 
 function Delai({ o }) {
   if (o.joursRestants === null) return <span style={{ color: "#6B5D52" }}>{STATUTS[o.statut]}{o.reglementLe ? ` le ${dateFr(o.reglementLe)}` : ""}</span>;
@@ -42,8 +41,9 @@ function lireFichier(fichier) {
   });
 }
 
-function Formulaire({ initial, onSauve, onFermer }) {
-  const [f, setF] = useState(initial ? { ...VIDE, ...initial, echeance: versInput(initial.echeance), montant: initial.montant ?? "", delaiObtentionJours: initial.delaiObtentionJours ?? "" } : VIDE);
+function Formulaire({ initial, types, onSauve, onFermer }) {
+  const premierType = types.find((t) => t.actif)?.code || "";
+  const [f, setF] = useState(initial ? { ...VIDE, ...initial, echeance: versInput(initial.echeance), montant: initial.montant ?? "", delaiObtentionJours: initial.delaiObtentionJours ?? "" } : { ...VIDE, categorie: premierType });
   const [error, setError] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const maj = (c) => (e) => setF({ ...f, [c]: e.target.value });
@@ -58,7 +58,7 @@ function Formulaire({ initial, onSauve, onFermer }) {
         <ErrorBanner error={error} onClose={() => setError("")} />
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2"><Field label="Intitulé (obligatoire)"><input value={f.intitule} onChange={maj("intitule")} placeholder="Ex. Proposition de transaction n° 819" style={inputStyle} /></Field></div>
-          <Field label="Type"><select value={f.categorie} onChange={maj("categorie")} style={inputStyle}>{Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          <Field label="Type"><select value={f.categorie} onChange={maj("categorie")} style={inputStyle}>{types.filter((t) => t.actif || t.code === f.categorie).map((t) => <option key={t.code} value={t.code}>{t.nom}{t.actif ? "" : " (masqué)"}</option>)}</select></Field>
           <Field label="Organisme"><input value={f.organisme} onChange={maj("organisme")} placeholder="Ex. Direction générale des impôts" style={inputStyle} /></Field>
           <Field label="Échéance (obligatoire)"><input type="date" value={f.echeance} onChange={maj("echeance")} style={inputStyle} /></Field>
           <Field label="Montant (F)"><input type="number" min="0" inputMode="numeric" value={f.montant} onChange={maj("montant")} style={inputStyle} /></Field>
@@ -80,7 +80,7 @@ function Formulaire({ initial, onSauve, onFermer }) {
   );
 }
 
-function Ligne({ o, onChange, onModifier, onError }) {
+function Ligne({ o, nomType, onChange, onModifier, onError }) {
   const [ouvert, setOuvert] = useState(false);
   const [occupe, setOccupe] = useState(false);
   const ouverte = o.statut === "A_FAIRE" || o.statut === "EN_COURS";
@@ -111,7 +111,7 @@ function Ligne({ o, onChange, onModifier, onError }) {
       <div className="flex flex-wrap items-start justify-between gap-2 cursor-pointer" onClick={() => setOuvert(!ouvert)}>
         <div className="min-w-0">
           <p className="text-sm font-medium">{o.intitule}</p>
-          <p className="text-xs" style={{ color: "#6B5D52" }}>{CATEGORIES[o.categorie]}{o.organisme ? ` · ${o.organisme}` : ""}{o.reference ? ` · n° ${o.reference}` : ""}{o.periodicite !== "UNIQUE" ? ` · ${PERIODICITES[o.periodicite].toLowerCase()}` : ""}</p>
+          <p className="text-xs" style={{ color: "#6B5D52" }}>{nomType(o.categorie)}{o.organisme ? ` · ${o.organisme}` : ""}{o.reference ? ` · n° ${o.reference}` : ""}{o.periodicite !== "UNIQUE" ? ` · ${PERIODICITES[o.periodicite].toLowerCase()}` : ""}</p>
         </div>
         <div className="text-right text-sm">
           <p><Delai o={o} /></p>
@@ -143,14 +143,42 @@ function Ligne({ o, onChange, onModifier, onError }) {
   );
 }
 
+// L'administratrice crée, renomme, masque ou supprime ses propres types (Taxe, Patente, Assurance...).
+function GestionTypes({ types, onChange, onError }) {
+  const [nouveau, setNouveau] = useState("");
+  const agir = async (fn) => { try { await fn(); onChange(); } catch (e) { onError(e.message); } };
+  const renommer = (t) => { const nom = window.prompt("Nouveau nom du type :", t.nom); if (nom && nom.trim() && nom.trim() !== t.nom) agir(() => api.obligations.modifierType(t.code, { nom })); };
+  return (
+    <div className="rounded-xl p-4 mt-2" style={carte}>
+      <div className="flex gap-2 mb-3">
+        <input value={nouveau} onChange={(e) => setNouveau(e.target.value)} placeholder="Nouveau type (ex. Patente, Assurance…)" style={{ ...inputStyle, marginTop: 0 }} />
+        <button type="button" disabled={!nouveau.trim()} onClick={() => agir(async () => { await api.obligations.creerType(nouveau); setNouveau(""); })} className="px-4 py-2 rounded-lg text-sm font-medium shrink-0" style={{ background: "#2B2320", color: "#FBF3EC" }}>Ajouter</button>
+      </div>
+      {types.map((t) => (
+        <div key={t.code} className="flex items-center justify-between gap-2 py-2" style={{ borderTop: "1px solid #EFE7D9", opacity: t.actif ? 1 : 0.55 }}>
+          <span className="text-sm">{t.nom} <span className="text-xs" style={{ color: "#6B5D52" }}>· {t.nbFiches} fiche{t.nbFiches > 1 ? "s" : ""}{t.actif ? "" : " · masqué"}</span></span>
+          <span className="flex gap-2 text-xs">
+            <button type="button" onClick={() => renommer(t)} className="underline">Renommer</button>
+            <button type="button" onClick={() => agir(() => api.obligations.modifierType(t.code, { actif: !t.actif }))} className="underline">{t.actif ? "Masquer" : "Réactiver"}</button>
+            {t.nbFiches === 0 && <button type="button" onClick={() => window.confirm(`Supprimer le type « ${t.nom} » ?`) && agir(() => api.obligations.supprimerType(t.code))} className="underline" style={{ color: "#B04A3B" }}>Supprimer</button>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ObligationsSection() {
   const [filtre, setFiltre] = useState("OUVERTES");
   const [liste, setListe] = useState(null);
   const [resume, setResume] = useState(null);
   const [error, setError] = useState("");
   const [forme, setForme] = useState(null); // null | "nouvelle" | obligation
+  const [types, setTypes] = useState([]);
+  const [gererTypes, setGererTypes] = useState(false);
+  const nomType = (code) => types.find((t) => t.code === code)?.nom || code;
   const charger = useCallback(async () => {
-    try { const [l, r] = await Promise.all([api.obligations.list(filtre), api.obligations.resume()]); setListe(l); setResume(r); } catch (e) { setError(e.message); }
+    try { const [l, r, t] = await Promise.all([api.obligations.list(filtre), api.obligations.resume(), api.obligations.types()]); setListe(l); setResume(r); setTypes(t); } catch (e) { setError(e.message); }
   }, [filtre]);
   useEffect(() => { charger(); }, [charger]);
   const Chiffre = ({ t, v, alerte }) => <div className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{t}</p><p className="font-display text-2xl font-semibold" style={alerte && v > 0 ? { color: "#B04A3B" } : undefined}>{v}</p></div>;
@@ -162,6 +190,10 @@ export default function ObligationsSection() {
       </div>
       <p className="text-sm mb-4" style={{ color: "#6B5D52" }}>Taxes, amendes, convocations, pièces à renouveler : ne manquer aucune échéance.</p>
       <ErrorBanner error={error} onClose={() => setError("")} />
+      <div className="mb-3">
+        <button type="button" onClick={() => setGererTypes(!gererTypes)} className="text-xs underline" style={{ color: "#6B5D52" }}>{gererTypes ? "Fermer la gestion des types" : "Gérer les types d'obligations"}</button>
+        {gererTypes && <GestionTypes types={types} onChange={charger} onError={setError} />}
+      </div>
       {resume && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <Chiffre t="En retard" v={resume.enRetard} alerte /><Chiffre t="Dans les 7 jours" v={resume.sous7} alerte /><Chiffre t="Dans les 30 jours" v={resume.sous30} />
@@ -174,8 +206,8 @@ export default function ObligationsSection() {
         ))}
       </div>
       {liste && liste.length === 0 && <p className="text-sm py-6" style={{ color: "#6B5D52" }}>{filtre === "OUVERTES" ? "Aucune obligation à traiter. Ajoute la première avec « Nouvelle »." : "Rien à afficher ici."}</p>}
-      {liste?.map((o) => <Ligne key={o.id} o={o} onChange={charger} onModifier={setForme} onError={setError} />)}
-      {forme && <Formulaire initial={forme === "nouvelle" ? null : forme} onFermer={() => setForme(null)} onSauve={() => { setForme(null); charger(); }} />}
+      {liste?.map((o) => <Ligne key={o.id} o={o} nomType={nomType} onChange={charger} onModifier={setForme} onError={setError} />)}
+      {forme && <Formulaire initial={forme === "nouvelle" ? null : forme} types={types} onFermer={() => setForme(null)} onSauve={() => { setForme(null); charger(); }} />}
     </div>
   );
 }
