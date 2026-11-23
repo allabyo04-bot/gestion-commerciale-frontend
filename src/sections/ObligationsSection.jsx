@@ -3,6 +3,7 @@ import { Plus, Paperclip, Trash2, Check, X, FileText } from "lucide-react";
 import { api, recupererFichier } from "../api.js";
 import { fmt } from "../constants.js";
 import { ErrorBanner, inputStyle, selectStyle, Field } from "../components/Shared.jsx";
+import CourrierObligation from "./CourrierObligation.jsx";
 
 // Lot 6 : suivi des obligations administratives de La Pointure (taxes, amendes, convocations, pièces, bail, droits d'auteur).
 const PERIODICITES = { UNIQUE: "Une seule fois", MENSUELLE: "Chaque mois", TRIMESTRIELLE: "Chaque trimestre", ANNUELLE: "Chaque année" };
@@ -83,6 +84,7 @@ function Formulaire({ initial, types, onSauve, onFermer }) {
 function Ligne({ o, nomType, onChange, onModifier, onError }) {
   const [ouvert, setOuvert] = useState(false);
   const [occupe, setOccupe] = useState(false);
+  const [courrier, setCourrier] = useState(false);
   const ouverte = o.statut === "A_FAIRE" || o.statut === "EN_COURS";
   const regler = async (statut) => {
     if (!window.confirm(statut === "PAYE" ? "Marquer cette obligation comme payée ?" : "Marquer cette obligation comme régularisée ?")) return;
@@ -134,11 +136,13 @@ function Ligne({ o, nomType, onChange, onModifier, onError }) {
             {ouverte && <button type="button" disabled={occupe} onClick={() => regler("PAYE")} className="px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1" style={{ background: "#3F6B4A", color: "#F3F7F3" }}><Check size={13} /> Payée</button>}
             {ouverte && <button type="button" disabled={occupe} onClick={() => regler("REGULARISE")} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #3F6B4A", color: "#3F6B4A" }}>Régularisée</button>}
             <label className="px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1 cursor-pointer" style={{ border: "1px solid #DDD3C4" }}><Paperclip size={13} /> Joindre une photo ou un PDF<input type="file" accept="image/*,application/pdf" onChange={joindre} className="hidden" /></label>
+            <button type="button" onClick={() => setCourrier(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1" style={{ border: "1px solid #DDD3C4" }}><FileText size={13} /> Générer un courrier</button>
             <button type="button" onClick={() => onModifier(o)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ border: "1px solid #DDD3C4" }}>Modifier</button>
             <button type="button" onClick={supprimer} className="px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1" style={{ border: "1px solid #E5C6C0", color: "#B04A3B" }}><Trash2 size={13} /> Supprimer</button>
           </div>
         </div>
       )}
+      {courrier && <CourrierObligation o={o} onFermer={() => setCourrier(false)} />}
     </div>
   );
 }
