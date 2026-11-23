@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, FileWarning, Handshake, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
+import { ShoppingCart, Heart, FileWarning, Handshake, Briefcase, ClipboardList, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import StockSection from "./sections/StockSection.jsx";
@@ -12,6 +12,8 @@ import AdministrationSection from "./sections/AdministrationSection.jsx";
 import FideliteSection from "./sections/FideliteSection.jsx";
 import ObligationsSection from "./sections/ObligationsSection.jsx";
 import FournisseursSection from "./sections/FournisseursSection.jsx";
+import RHSection from "./sections/RHSection.jsx";
+import MesDemandesSection from "./sections/MesDemandesSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 import { api } from "./api.js";
@@ -21,6 +23,9 @@ function Shell() {
   const { user, loading, logout, permissions, fonctions } = useAuth();
   const lot6 = !!fonctions.lot6;
   const lot7 = !!fonctions.lot7;
+  const lot9 = !!fonctions.lot9;
+  const [nbDemandesRH, setNbDemandesRH] = useState(0);
+  const [employeLie, setEmployeLie] = useState(false);
   const [nbFournisseursUrgents, setNbFournisseursUrgents] = useState(0);
   const [nbObligationsUrgentes, setNbObligationsUrgentes] = useState(0);
   const [tab, setTab] = useState("accueil");
@@ -58,6 +63,19 @@ function Shell() {
     const interval = setInterval(rafraichir, 60000);
     return () => clearInterval(interval);
   }, [estAdmin, lot7]);
+  // Lot 9 : pastille « demandes à traiter » pour l'administratrice ; menu « Mes demandes » pour une employée dont le compte est relié à une fiche.
+  useEffect(() => {
+    if (!user || !lot9) { setNbDemandesRH(0); setEmployeLie(false); return undefined; }
+    const rafraichir = async () => {
+      try {
+        if (estAdmin) setNbDemandesRH((await api.rh.resumeDemandes()).enAttente);
+        else setEmployeLie((await api.rh.mesDemandes()).lie);
+      } catch { /* ignore */ }
+    };
+    rafraichir();
+    const interval = setInterval(rafraichir, 60000);
+    return () => clearInterval(interval);
+  }, [user, estAdmin, lot9]);
   if (loading) return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
   if (!user) return <LoginScreen />;
   // Interrupteur temporaire (voir constants.js) : le module Livraison est construit et prêt,
@@ -77,6 +95,8 @@ function Shell() {
     // Lot 6 : obligations administratives (taxes, amendes, convocations, pièces), derrière l'interrupteur
     ...(estAdmin && lot6 ? [{ id: "obligations", label: "Obligations", icon: FileWarning }] : []),
     ...(estAdmin && lot7 ? [{ id: "fournisseurs", label: "Fournisseurs", icon: Handshake }] : []),
+    ...(estAdmin && lot9 ? [{ id: "rh", label: "Ressources humaines", icon: Briefcase }] : []),
+    ...(!estAdmin && lot9 && employeLie ? [{ id: "mes-demandes", label: "Mes demandes", icon: ClipboardList }] : []),
     // Réservé à l'administrateur : un seul menu qui regroupe journal, remises, livraisons, listes, accès.
     ...(estAdmin ? [{ id: "administration", label: "Administration", icon: Settings }] : []),
   ].filter((n) => !n.perm || (Array.isArray(n.perm) ? n.perm.some((p) => permissions[p]) : permissions[n.perm]));
@@ -103,6 +123,13 @@ function Shell() {
                   style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
                   title={`${nbFournisseursUrgents} règlement(s) fournisseur en retard ou à échéance sous 7 jours`}>
                   {nbFournisseursUrgents}
+                </span>
+              )}
+              {id === "rh" && nbDemandesRH > 0 && (
+                <span className="md:ml-auto absolute top-0.5 right-0.5 md:static flex items-center justify-center rounded-full text-[10px] font-bold shrink-0"
+                  style={{ background: "#B04A3B", color: "#FBF3EC", minWidth: "18px", height: "18px", padding: "0 4px" }}
+                  title={`${nbDemandesRH} demande(s) du personnel à traiter`}>
+                  {nbDemandesRH}
                 </span>
               )}
               {id === "obligations" && nbObligationsUrgentes > 0 && (
@@ -143,6 +170,8 @@ function Shell() {
           {activeTab === "administration" && <AdministrationSection ongletInitial={tab === "utilisateurs" || tab === "roles" ? "ACCES" : "SUIVI"} peutGererAcces={!!permissions.utilisateurs} />}
           {activeTab === "obligations" && <ObligationsSection />}
           {activeTab === "fournisseurs" && <FournisseursSection />}
+          {activeTab === "rh" && <RHSection onChange={() => api.rh.resumeDemandes().then((r) => setNbDemandesRH(r.enAttente)).catch(() => {})} />}
+          {activeTab === "mes-demandes" && <MesDemandesSection />}
           {activeTab === "fidelite" && <FideliteSection sousOngletInitial={fideliteSubTabDemande} onSousOngletInitialConsomme={() => setFideliteSubTabDemande(null)} />}
           {!activeTab && <p className="text-sm" style={{ color: "#6B5D52" }}>Ton rôle ne donne accès à aucun module pour l'instant. Contacte un administrateur.</p>}
         </div>
