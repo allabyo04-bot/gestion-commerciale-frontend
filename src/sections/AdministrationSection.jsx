@@ -41,7 +41,7 @@ const ONGLETS = [
   ["INTERRUPTEURS", "Interrupteurs", ToggleLeft],
 ];
 
-const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"], ["lot2", "Lot 2 — Clientes et fidélité"], ["lot3", "Lot 3 — Analyses de ventes et de stock"], ["lot4", "Lot 4 — Dépenses, budget et objectifs"], ["lot5", "Lot 5 — Fiche article enrichie"], ["lot6", "Lot 6 — Obligations administratives"], ["lot7", "Lot 7 — Fournisseurs, achats et trésorerie"]];
+const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"], ["lot2", "Lot 2 — Clientes et fidélité"], ["lot3", "Lot 3 — Analyses de ventes et de stock"], ["lot4", "Lot 4 — Dépenses, budget et objectifs"], ["lot5", "Lot 5 — Fiche article enrichie"], ["lot6", "Lot 6 — Obligations administratives"], ["lot7", "Lot 7 — Fournisseurs, achats et trésorerie"], ["rappels", "Rappels par e-mail des échéances (lots 6 et 7)"]];
 
 // Réservé au développeur : allume ou éteint les nouveautés de chaque lot, sans toucher au code.
 function Interrupteurs() {
@@ -61,6 +61,41 @@ function Interrupteurs() {
             style={fonctions[code] ? { background: "#3F6B4A", color: "#F3F7F3" } : { background: "transparent", color: "#6B5D52", border: "1px solid #DDD3C4" }}>{fonctions[code] ? "Allumé" : "Éteint"}</button>
         </div>
       ))}
+      <RappelsEmail />
+    </div>
+  );
+}
+
+// Aperçu et envoi immédiat du rappel d'échéances (le rappel automatique du matin dépend de l'interrupteur « rappels »).
+function RappelsEmail() {
+  const [apercu, setApercu] = useState(null);
+  const [message, setMessage] = useState("");
+  const [occupe, setOccupe] = useState(false);
+  const voir = async () => {
+    try { setMessage(""); setOccupe(true); setApercu(await api.rappels.apercu()); } catch (e) { setMessage(e.message); } finally { setOccupe(false); }
+  };
+  const envoyer = async () => {
+    try {
+      setOccupe(true);
+      const r = await api.rappels.envoyer();
+      setMessage(r.envoye ? `E-mail envoyé à ${r.destinataire} (${r.total} échéance${r.total > 1 ? "s" : ""}).` : r.raison);
+    } catch (e) { setMessage(e.message); } finally { setOccupe(false); }
+  };
+  return (
+    <div className="rounded-xl p-4 mt-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+      <p className="text-sm font-medium mb-1">Rappels par e-mail</p>
+      <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Quand l'interrupteur est allumé, un e-mail part chaque matin s'il y a une échéance en retard ou proche. Ces deux boutons te permettent de voir et d'essayer sans attendre.</p>
+      <div className="flex gap-2 mb-2">
+        <button type="button" disabled={occupe} onClick={voir} className="px-4 py-2 rounded-full text-sm font-medium" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Voir ce qui partirait</button>
+        <button type="button" disabled={occupe} onClick={envoyer} className="px-4 py-2 rounded-full text-sm font-medium" style={{ background: "#2B2320", color: "#FBF3EC" }}>Envoyer maintenant</button>
+      </div>
+      {message && <p className="text-sm mb-2" style={{ color: "#6B5D52" }}>{message}</p>}
+      {apercu && (
+        <div className="text-xs" style={{ color: "#6B5D52" }}>
+          <p className="mb-1">Destinataire : {apercu.destinataire || "non configuré"}{apercu.configure ? "" : " — envoi non configuré sur le serveur"}</p>
+          <pre className="whitespace-pre-wrap" style={{ fontFamily: "inherit" }}>{apercu.total ? `${apercu.sujet}\n\n${apercu.texte}` : "Rien à signaler pour le moment (ou les lots 6 et 7 sont éteints)."}</pre>
+        </div>
+      )}
     </div>
   );
 }

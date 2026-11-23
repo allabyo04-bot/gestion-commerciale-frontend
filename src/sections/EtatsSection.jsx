@@ -19,6 +19,27 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Menu réorganisé (derrière l'interrupteur lot1) : les états sont rangés par thème au lieu d'une longue liste.
+const GROUPES_ETATS = [
+  ["Ventes", ["date", "mode", "type", "vendeur", "recap"]],
+  ["Livraisons et expéditions", ["livraisons", "stats-lieux", "frais-exp"]],
+  ["Clientes et fidélité", ["clients", "nouvelles-cl", "fiches-inc", "bonus-etat", "remercier", "relancer", "habitudes"]],
+  ["Stock et analyses", ["paires", "pointures-marque", "meilleurs-mois"]],
+  ["Contrôle", ["audit"]],
+];
+function regrouper(sousOnglets) {
+  const vus = new Set();
+  const groupes = GROUPES_ETATS.map(([titre, ids]) => {
+    const items = ids.map((id) => sousOnglets.find((s) => s.id === id)).filter(Boolean);
+    items.forEach((s) => vus.add(s.id));
+    return { titre, items };
+  }).filter((g) => g.items.length > 0);
+  // Filet de sécurité : un état non classé reste visible, dans un groupe « Autres ».
+  const autres = sousOnglets.filter((s) => !vus.has(s.id));
+  if (autres.length) groupes.push({ titre: "Autres", items: autres });
+  return groupes;
+}
+
 export default function EtatsSection({ sousOngletInitial, onSousOngletInitialConsomme } = {}) {
   const { user, fonctions } = useAuth();
   const estAdmin = !!user?.role?.systeme;
@@ -230,12 +251,17 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     <div>
       <div className="flex gap-6 items-start">
         <div className="flex flex-col gap-2 no-print shrink-0" style={{ width: "200px" }}>
-          {SOUS_ONGLETS.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setSousOnglet(id)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-left"
-              style={sousOnglet === id ? { background: COULEUR.texte, color: "#FBF3EC" } : { background: "transparent", color: COULEUR.texteDoux, border: `1px solid ${COULEUR.bordure}` }}>
-              <Icon size={14} /> {label}
-            </button>
+          {(lot1 ? regrouper(SOUS_ONGLETS) : [{ titre: null, items: SOUS_ONGLETS }]).map(({ titre, items }) => (
+            <div key={titre || "tous"} className="flex flex-col gap-2">
+              {titre && <p className="text-[10px] tracking-[0.12em] uppercase font-mono mt-3 mb-0.5 px-1" style={{ color: COULEUR.accent }}>{titre}</p>}
+              {items.map(({ id, label, icon: Icon }) => (
+                <button key={id} onClick={() => setSousOnglet(id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-left"
+                  style={sousOnglet === id ? { background: COULEUR.texte, color: "#FBF3EC" } : { background: "transparent", color: COULEUR.texteDoux, border: `1px solid ${COULEUR.bordure}` }}>
+                  <Icon size={14} /> {label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
 

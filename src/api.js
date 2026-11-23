@@ -95,6 +95,10 @@ export const api = {
     bonus: (params = {}) => request(`/api/etats-clientes/bonus?${new URLSearchParams(params)}`),
     nouvellesClientes: (params = {}) => request(`/api/etats-clientes/nouvelles-clientes?${new URLSearchParams(params)}`),
   },
+  rappels: {
+    apercu: () => request("/api/rappels/apercu"),
+    envoyer: () => request("/api/rappels/envoyer", { method: "POST", body: {} }),
+  },
   fonctions: {
     lire: () => request("/api/fonctions"),
     regler: (code, actif) => request(`/api/fonctions/${code}`, { method: "PUT", body: { actif } }),
