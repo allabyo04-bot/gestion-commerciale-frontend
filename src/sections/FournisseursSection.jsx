@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
 import { fmt } from "../constants.js";
 import { ErrorBanner, selectStyle } from "../components/Shared.jsx";
+import BonsAchat from "./BonsAchatView.jsx";
 
 // Lot 7 : fournisseurs, commandes, livraisons, paiements, échéancier, alertes et trésorerie (administratrice seulement).
 const C = { carte: "#FFFFFF", bordure: "#EAE1D2", doux: "#6B5D52", accent: "#8C3B2E" };
@@ -37,12 +38,13 @@ export default function FournisseursSection() {
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       <div className="flex gap-2 mb-6 flex-wrap">
-        {[["situation", "Situation"], ["commandes", "Commandes"], ["fournisseurs", "Fournisseurs"], ["tresorerie", "Trésorerie"]].map(([id, l]) => (
+        {[["situation", "Situation"], ["commandes", "Commandes"], ["bons-achat", "Bons d'achat"], ["fournisseurs", "Fournisseurs"], ["tresorerie", "Trésorerie"]].map(([id, l]) => (
           <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-sm font-medium" style={pill(tab === id)}>{l}</button>
         ))}
       </div>
       {tab === "situation" && <Situation fournisseurs={fournisseurs} alertes={alertes} onError={setError} />}
       {tab === "commandes" && <Commandes fournisseurs={fournisseurs.filter((f) => f.actif)} onChanged={charger} onError={setError} />}
+      {tab === "bons-achat" && <BonsAchat fournisseurs={fournisseurs} onError={setError} />}
       {tab === "fournisseurs" && <ListeFournisseurs fournisseurs={fournisseurs} onChanged={charger} onError={setError} />}
       {tab === "tresorerie" && <Tresorerie onError={setError} />}
     </div>

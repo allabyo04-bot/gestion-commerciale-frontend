@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { usePointures } from "../publics.js";
 import { BOUTIQUES, POINTURES, CIVILITES, MOIS, JOURS, COMMUNES, MODES_VENTE, MODES_PAIEMENT, INFOS_BOUTIQUE, MESSAGE_FIN_TICKET, PAYS_INDICATIF, FIDELITE_ACTIF, libelleModeVente, fmt } from "../constants.js";
 import { Field, ErrorBanner, inputStyle } from "../components/Shared.jsx";
 import { DestinationExpedition } from "../components/LieuxChamps.jsx";
@@ -14,6 +15,7 @@ const WHATSAPP_RECU_ACTIF = true;
 
 export default function VentesSection({ subTabInitial, onSubTabInitialConsomme } = {}) {
   const { user, fonctions } = useAuth();
+  const { pointuresDe, toutes: toutesPointures } = usePointures();
   const lot1 = !!fonctions.lot1;
   const lot2 = !!fonctions.lot2;
   const estAdmin = !!user?.role?.systeme;
@@ -57,8 +59,8 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [expeditionLieu, setExpeditionLieu] = useState("");
   // Lot 1 (B3) : frais d'expédition pris en charge par la boutique
   const [fraisPris, setFraisPris] = useState(false);
-  const [fraisLivreur, setFraisLivreur] = useState("");
-  const [fraisTransport, setFraisTransport] = useState("");
+  const [fraisEstime, setFraisEstime] = useState("");
+  const [partCliente, setPartCliente] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
   const [typeVente, setTypeVente] = useState("Comptant");
   const [lignes, setLignes] = useState([]);
@@ -132,7 +134,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
     return item?.quantite || 0;
   };
   const articleADuStock = (article, b) => {
-    if (article.famille === "Chaussure") return POINTURES.some((p) => disponibilite(article, b, p) > 0);
+    if (article.famille === "Chaussure") return pointuresDe(article).some((p) => disponibilite(article, b, p) > 0);
     return disponibilite(article, b) > 0;
   };
 
@@ -220,7 +222,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
-    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisLivreur(""); setFraisTransport("");
+    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisEstime(""); setPartCliente("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -267,7 +269,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined, whatsapp: (nouvelleCliente.whatsapp || "").trim() || undefined, adresse: (nouvelleCliente.adresse || "").trim() || undefined } : undefined,
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
-        ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisLivreur: Number(fraisLivreur) || 0, fraisTransport: Number(fraisTransport) || 0 } : {}),
+        ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisEstime: Number(fraisEstime) || 0, partCliente: Number(partCliente) || 0 } : {}),
         expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
@@ -405,7 +407,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                         </select>
                         <select value={nouvelleCliente.pointure} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, pointure: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
                           <option value="">Pointure (facultative)</option>
-                          {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                          {toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}
                         </select>
                         <div className="grid grid-cols-2 gap-2">
                           <select value={nouvelleCliente.jourAnniv} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, jourAnniv: e.target.value })} style={{ ...inputStyle, marginTop: 0 }}>
@@ -452,13 +454,16 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
               {lot1 && modeVente === "Expédition" && (
                 <div className="rounded-lg p-3 mt-3" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={fraisPris} onChange={(e) => setFraisPris(e.target.checked)} /> Frais d'expédition pris en charge par la boutique
+                    <input type="checkbox" checked={fraisPris} onChange={(e) => setFraisPris(e.target.checked)} /> Suivre les frais d'expédition de ce colis (la boutique en paie tout ou partie)
                   </label>
                   {fraisPris && (
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Livreur qui dépose le colis (F)</label><input type="number" min="0" inputMode="numeric" value={fraisLivreur} onChange={(e) => setFraisLivreur(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
-                      <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Transport du colis (F)</label><input type="number" min="0" inputMode="numeric" value={fraisTransport} onChange={(e) => setFraisTransport(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
-                    </div>
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Coût estimé de l'expédition (F)</label><input type="number" min="0" inputMode="numeric" value={fraisEstime} onChange={(e) => setFraisEstime(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
+                        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Part payée par la cliente (F, 0 si rien)</label><input type="number" min="0" inputMode="numeric" value={partCliente} onChange={(e) => setPartCliente(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
+                      </div>
+                      <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>À la charge de la boutique (estimation) : <strong>{fmt(Math.max(0, (Number(fraisEstime) || 0) - (Number(partCliente) || 0)))} F</strong>. Le coût réel se saisit au retour du livreur (menu Livreurs).</p>
+                    </>
                   )}
                 </div>
               )}
@@ -490,7 +495,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                         <span className="text-sm">{currentArticle?.designation} · {brandName(currentArticle?.marqueId)}</span>
                         <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
                           {currentArticle?.famille === "Chaussure"
-                            ? POINTURES.reduce((s, p) => s + disponibilite(currentArticle, boutique, p), 0)
+                            ? pointuresDe(currentArticle).reduce((s, p) => s + disponibilite(currentArticle, boutique, p), 0)
                             : disponibilite(currentArticle, boutique)} en stock
                         </span>
                       </div>
@@ -519,7 +524,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   <Field label="Pointure">
                     <select value={selPointure} onChange={(e) => setSelPointure(e.target.value)} style={inputStyle}>
                       <option value="">— Choisir —</option>
-                      {POINTURES.filter((p) => disponibilite(currentArticle, boutique, p) > 0).map((p) => { const dispo = disponibilite(currentArticle, boutique, p); return <option key={p} value={p}>T{p} ({dispo} dispo.)</option>; })}
+                      {pointuresDe(currentArticle).filter((p) => disponibilite(currentArticle, boutique, p) > 0).map((p) => { const dispo = disponibilite(currentArticle, boutique, p); return <option key={p} value={p}>T{p} ({dispo} dispo.)</option>; })}
                     </select>
                   </Field>
                  ) : (
@@ -758,6 +763,10 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 // Lot 1 (A1, A3) : fiche de la nouvelle cliente, pleine largeur (plus de fenêtre tronquée), tous les champs de la
 // fiche, sans jamais bloquer la vente. Les champs s'adaptent au mode : une expédition n'a ni commune ni quartier.
 function FicheNouvelleCliente({ nc, onChange, modeVente }) {
+  const { toutes: toutesPointures } = usePointures();
+  const { fonctions } = useAuth();
+  const [canaux, setCanaux] = useState([]);
+  useEffect(() => { if (fonctions.lot2) api.referentiels.lieux().then((l) => setCanaux((l.canaux || []).filter((c) => c.actif))).catch(() => {}); }, [fonctions.lot2]);
   const maj = (champ) => (e) => onChange({ ...nc, [champ]: e.target.value });
   const st = { ...inputStyle, marginTop: 0 };
   const expedition = modeVente === "Expédition";
@@ -769,11 +778,12 @@ function FicheNouvelleCliente({ nc, onChange, modeVente }) {
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Civilité</label>
           <select value={nc.civilite} onChange={maj("civilite")} style={st}>{CIVILITES.map((c) => <option key={c}>{c}</option>)}</select></div>
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
-          <select value={nc.pointure} onChange={maj("pointure")} style={st}><option value="">—</option>{POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}</select></div>
+          <select value={nc.pointure} onChange={maj("pointure")} style={st}><option value="">—</option>{toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}</select></div>
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Anniversaire (jour)</label>
           <select value={nc.jourAnniv} onChange={maj("jourAnniv")} style={st}><option value="">—</option>{JOURS.map((j) => <option key={j}>{j}</option>)}</select></div>
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Anniversaire (mois)</label>
           <select value={nc.moisAnniv} onChange={maj("moisAnniv")} style={st}><option value="">—</option>{MOIS.map((m) => <option key={m}>{m}</option>)}</select></div>
+        {fonctions.lot2 && <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Comment nous a-t-elle connus ? (facultatif)</label><select value={nc.canal || ""} onChange={maj("canal")} style={st}><option value="">—</option>{canaux.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}</select></div>}
         <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>WhatsApp (si différent du téléphone)</label><input value={nc.whatsapp || ""} onChange={maj("whatsapp")} style={st} inputMode="tel" /></div>
         {!expedition && (
           <>
@@ -990,6 +1000,7 @@ function RemisesAdminSection({ onTraite }) {
 }
 
 function RetoursSection({ ventes, articles, boutique, onDone }) {
+  const { toutes: toutesPointures } = usePointures();
   const [numero, setNumero] = useState("");
   const [venteChoisie, setVenteChoisie] = useState(null);
   const [ligneChoisie, setLigneChoisie] = useState("");
@@ -1271,7 +1282,7 @@ function RetoursSection({ ventes, articles, boutique, onDone }) {
 
               <Field label={modeEchange === "article" ? "Pointure du nouvel article" : "Nouvelle pointure"}>
                 <select value={nouvellePointure} onChange={(e) => setNouvellePointure(e.target.value)} style={inputStyle}>
-                  <option value="">— Choisir —</option>{POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                  <option value="">— Choisir —</option>{toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}
                 </select>
               </Field>
 

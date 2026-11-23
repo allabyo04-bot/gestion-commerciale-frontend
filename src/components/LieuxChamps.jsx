@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Plus, Check } from "lucide-react";
 import { api } from "../api.js";
-import { POINTURES } from "../constants.js";
+import { usePointures } from "../publics.js";
 import { selectStyle } from "./Shared.jsx";
 
 // Nom sans accents ni majuscules : "to" retrouve "Togo", "cote" retrouve "Côte d'Ivoire".
@@ -84,6 +84,7 @@ export const nomEstUnNumero = (t) => String(t || "").replace(/\D/g, "").length >
 export const telephoneValide = (t) => String(t || "").replace(/\D/g, "").length >= 8;
 
 export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointure, onPointure, pointureObligatoire = false, masquerPointureSiConnue = false, autoFocus = false, onResolution, titre = "Téléphone" }) {
+  const { toutes: toutesPointures } = usePointures();
   const [res, setRes] = useState(null);
   const [cherche, setCherche] = useState(false);
   const refTel = useRef(null);
@@ -155,7 +156,7 @@ export function ClienteParTelephone({ telephone, onTelephone, nom, onNom, pointu
           </label>
           <select value={pointure} onChange={(e) => onPointure(e.target.value)} style={{ ...champ, maxWidth: "180px" }}>
             <option value="">— Choisir —</option>
-            {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+            {toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}
           </select>
           </>)}
         </div>

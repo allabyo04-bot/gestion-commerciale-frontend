@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, Cake, Search, X, SlidersHorizontal, Receipt, Download, Crown } from "lucide-react";
 import { api } from "../api.js";
-import { CIVILITES, JOURS, MOIS, COMMUNES, CLIENT_POINTURES, PAYS_LIST, PAYS_INDICATIF, QUARTIERS_PAR_COMMUNE, BOUTIQUES, FIDELITE_ACTIF, fmt } from "../constants.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { usePointures } from "../publics.js";
+import { CIVILITES, JOURS, MOIS, COMMUNES, PAYS_LIST, PAYS_INDICATIF, QUARTIERS_PAR_COMMUNE, BOUTIQUES, FIDELITE_ACTIF, fmt } from "../constants.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 
 export default function ClientsSection() {
+  const { toutes: toutesPointures } = usePointures();
   const [subTab, setSubTab] = useState("fiche");
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +161,7 @@ export default function ClientsSection() {
               <div className="grid sm:grid-cols-5 gap-3">
                 <Field label="Pointure">
                   <select value={filtrePointure} onChange={(e) => setFiltrePointure(e.target.value)} style={selectStyle}>
-                    <option value="">Toutes</option>{CLIENT_POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                    <option value="">Toutes</option>{toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}
                   </select>
                 </Field>
                 <Field label="Mois anniversaire">
@@ -412,6 +415,11 @@ function AchatsParCarteReport() {
 }
 
 function ClientModal({ client, onCancel, onSubmit }) {
+  const { toutes: toutesPointures } = usePointures();
+  const { fonctions } = useAuth();
+  const lot2 = !!fonctions.lot2;
+  const [canaux, setCanaux] = useState([]);
+  useEffect(() => { if (lot2) api.referentiels.lieux().then((l) => setCanaux((l.canaux || []).filter((c) => c.actif))).catch(() => {}); }, [lot2]);
   const [form, setForm] = useState(client);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const quartiersConnus = QUARTIERS_PAR_COMMUNE[form.commune] || [];
@@ -470,9 +478,12 @@ function ClientModal({ client, onCancel, onSubmit }) {
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Taille/Pointure"><select value={form.pointure} onChange={(e) => set("pointure", e.target.value)} style={inputStyle}><option value="">—</option>{CLIENT_POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}</select></Field>
+          <Field label="Taille/Pointure"><select value={form.pointure} onChange={(e) => set("pointure", e.target.value)} style={inputStyle}><option value="">—</option>{toutesPointures.map((p) => <option key={p} value={p}>T{p}</option>)}</select></Field>
           <Field label="Pays"><select value={form.pays} onChange={(e) => set("pays", e.target.value)} style={inputStyle}>{PAYS_LIST.map((p) => <option key={p}>{p}</option>)}</select></Field>
         </div>
+        {lot2 && (
+          <Field label="Comment nous a-t-elle connus ?"><select value={form.canalConnaissance || ""} onChange={(e) => set("canalConnaissance", e.target.value)} style={inputStyle}><option value="">— Non renseigné —</option>{canaux.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}</select></Field>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Carte de Fidélité"><input value={form.carteFidelite} onChange={(e) => set("carteFidelite", e.target.value)} style={inputStyle} /></Field>
           <Field label="Date de Délivrance"><input type="date" value={form.dateDelivrance} onChange={(e) => set("dateDelivrance", e.target.value)} style={inputStyle} /></Field>

@@ -211,6 +211,14 @@ export default function DashboardSection({ onNaviguerVentes, onNaviguerFidelite,
           Objectif du mois pour {objectifMois.boutique} : <strong style={{ color: objectifMois.pourcentage >= 100 ? "#3F7D4E" : COULEUR.texte }}>{objectifMois.pourcentage} % atteint</strong>
         </p>
       )}
+      {!estAdmin && objectifMois?.pourcentage == null && (objectifMois?.objectif != null || objectifMois?.palier) && (
+        <p className="text-sm mb-6 -mt-3" style={{ color: COULEUR.texteDoux }}>
+          Objectif du mois pour {objectifMois.boutique} :
+          {objectifMois.objectif != null && <> <strong style={{ color: COULEUR.texte }}>{fmt(objectifMois.objectif)} F à réaliser</strong></>}
+          {objectifMois.objectif != null && objectifMois.palier && " — "}
+          {objectifMois.palier && <strong style={{ color: objectifMois.atteint ? "#3F7D4E" : COULEUR.texte }}>{objectifMois.palier}</strong>}
+        </p>
+      )}
 
       {estAdmin && peutVoirVentes && caMois && caMoisPrec && caMoisPrec.total > 0 && (() => {
         const variation = Math.round(((caMois.cumul.totalVentes - caMoisPrec.total) / caMoisPrec.total) * 100);

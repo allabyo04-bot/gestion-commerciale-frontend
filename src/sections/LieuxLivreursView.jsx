@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, fmt } from "../constants.js";
 import { ErrorBanner, selectStyle } from "../components/Shared.jsx";
 import { cleNom } from "../components/LieuxChamps.jsx";
+import { usePointures, LIBELLE_PUBLIC, rafraichirEchelles } from "../publics.js";
 
 const jourIso = (d) => d.toISOString().slice(0, 10);
 const carte = { background: "#FFFFFF", border: "1px solid #EAE1D2" };
@@ -37,14 +38,16 @@ export function FraisExpedition() {
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));
   const [boutique, setBoutique] = useState("");
+  const [zone, setZone] = useState("");
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const valide = dateDebut && dateFin && dateDebut <= dateFin;
   useEffect(() => {
     if (!valide) return;
     setError("");
-    api.etats.fraisExpedition({ dateDebut, dateFin, ...(boutique ? { boutique } : {}) }).then(setD).catch((e) => setError(e.message));
-  }, [dateDebut, dateFin, boutique, valide]);
+    api.etats.fraisExpedition({ dateDebut, dateFin, ...(boutique ? { boutique } : {}), ...(zone ? { zone } : {}) }).then(setD).catch((e) => setError(e.message));
+  }, [dateDebut, dateFin, boutique, zone, valide]);
+  const libelleStatut = { EN_COURS: "En cours", A_REMBOURSER: "À rembourser", CLOTUREE: "Clôturée" };
   return (
     <div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -52,21 +55,28 @@ export function FraisExpedition() {
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Au</label><input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} style={selectStyle} /></div>
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Boutique</label>
           <select value={boutique} onChange={(e) => setBoutique(e.target.value)} style={selectStyle}><option value="">Les deux</option>{BOUTIQUES.map((b) => <option key={b}>{b}</option>)}</select></div>
+        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Destination</label>
+          <select value={zone} onChange={(e) => setZone(e.target.value)} style={selectStyle}><option value="">Toutes</option><option value="CI">Côte d'Ivoire</option><option value="HORS_CI">Hors Côte d'Ivoire</option></select></div>
       </div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       {d && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            {[["Coût total", d.total], ["Livreurs", d.totalLivreur], ["Transport", d.totalTransport]].map(([t, v]) => (
-              <div key={t} className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{t}</p><p className="font-display text-2xl font-semibold">{fmt(v)} F</p></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[["Coût net pour la boutique", d.totalBoutique, "réel − part cliente"], ["Coût réel total", d.totalReel, "payé aux livreurs"], ["Payé par les clientes", d.totalPartCliente, ""], ["Écart avec l'estimation", d.totalEcart, "réel − estimé"]].map(([t, v, n]) => (
+              <div key={t} className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{t}</p><p className="font-display text-2xl font-semibold">{v > 0 && t.startsWith("Écart") ? "+" : ""}{fmt(v)} F</p>{n && <p className="text-[11px]" style={{ color: "#8A7B6F" }}>{n}</p>}</div>
             ))}
           </div>
-          <p className="text-sm" style={{ color: "#6B5D52" }}>{d.nb} expédition{d.nb > 1 ? "s" : ""} aux frais de la boutique sur la période.</p>
+          <p className="text-sm" style={{ color: "#6B5D52" }}>
+            {d.nb} expédition{d.nb > 1 ? "s" : ""} suivie{d.nb > 1 ? "s" : ""} sur la période
+            {d.nbEnCours > 0 && <> · <strong>{d.nbEnCours} en cours</strong> (coût réel pas encore connu, estimation à la charge de la boutique : {fmt(d.totalBoutiqueEstime)} F)</>}.
+          </p>
           <div className="rounded-xl p-4" style={carte}>
-            <Tableau vide="Aucune expédition prise en charge sur cette période." lignes={d.lignes} colonnes={[
+            <Tableau vide="Aucune expédition suivie sur cette période." lignes={d.lignes} colonnes={[
               { titre: "Date", valeur: (l) => new Date(l.date).toLocaleDateString("fr-FR") }, { titre: "Vente", valeur: (l) => l.numero }, { titre: "Boutique", valeur: (l) => l.boutique },
-              { titre: "Destination", valeur: (l) => l.expeditionLieu || "—" }, { titre: "Livreur (F)", valeur: (l) => fmt(l.fraisLivreur || 0) },
-              { titre: "Transport (F)", valeur: (l) => fmt(l.fraisTransport || 0) }, { titre: "Total (F)", valeur: (l) => fmt(l.fraisTotal) }]} />
+              { titre: "Destination", valeur: (l) => l.expeditionLieu || "—" }, { titre: "Livreur", valeur: (l) => l.livreur || "—" },
+              { titre: "Estimé", valeur: (l) => fmt(l.estime) }, { titre: "Réel", valeur: (l) => (l.coutReel != null ? fmt(l.coutReel) : "—") },
+              { titre: "Part cliente", valeur: (l) => fmt(l.partCliente) }, { titre: "Net boutique", valeur: (l) => `${fmt(l.coutBoutique)}${l.enCours ? " (est.)" : ""}` },
+              { titre: "Statut", valeur: (l) => libelleStatut[l.statut] || l.statut }]} />
           </div>
         </div>
       )}
@@ -74,12 +84,12 @@ export function FraisExpedition() {
   );
 }
 
-export function Statistiques() {
+export function Statistiques({ vueInitiale = "livraisons", zoneInitiale = "", fige = false } = {}) {
   const [dateDebut, setDateDebut] = useState(jourIso(new Date(Date.now() - 30 * 86400000)));
   const [dateFin, setDateFin] = useState(jourIso(new Date()));
   const [boutique, setBoutique] = useState("");
-  const [vue, setVue] = useState("livraisons");
-  const [zoneFiltre, setZoneFiltre] = useState(""); // lot 1 (B4) : "" = toutes, "CI", "HORS_CI"
+  const [vue, setVue] = useState(vueInitiale);
+  const [zoneFiltre, setZoneFiltre] = useState(zoneInitiale); // lot 1 (B4) : "" = toutes, "CI", "HORS_CI"
   const { fonctions } = useAuth();
   const lot1 = !!fonctions.lot1;
   const [d, setD] = useState(null);
@@ -108,7 +118,7 @@ export function Statistiques() {
       </div>
       {!valide && <p className="text-xs mb-3" style={{ color: "#B04A3B" }}>Choisis deux dates, la première avant la seconde (ou le même jour).</p>}
       <ErrorBanner error={error} onClose={() => setError("")} />
-      {lot1 && vue === "expeditions" && (
+      {lot1 && vue === "expeditions" && !fige && (
         <div className="flex gap-2 mb-4 flex-wrap">
           {[["", "Toutes"], ["CI", "En Côte d'Ivoire"], ["HORS_CI", "Hors Côte d'Ivoire"]].map(([z, t]) => (
             <button key={z} type="button" onClick={() => setZoneFiltre(z)} className="px-3 py-1.5 rounded-lg text-sm font-medium"
@@ -116,7 +126,7 @@ export function Statistiques() {
           ))}
         </div>
       )}
-      <div className="flex gap-2 mb-4 flex-wrap">{onglet("livraisons", "Livraisons par lieu")}{onglet("expeditions", "Expéditions par destination")}{onglet("livreurs", "Par livreur")}</div>
+      {!fige && <div className="flex gap-2 mb-4 flex-wrap">{onglet("livraisons", "Livraisons par lieu")}{onglet("expeditions", "Expéditions par destination")}{onglet("livreurs", "Par livreur")}</div>}
 
       {d && vue === "livraisons" && (
         <div className="space-y-6">
@@ -287,8 +297,38 @@ function ClassementAnciennes({ setError }) {
   );
 }
 
+// Publics : échelle de pointures de chaque public (Femme, Homme, Enfants), modifiable. Une pointure retirée est mise en veille, jamais supprimée.
+function EchellesPointures({ setError }) {
+  const { echelles, publics } = usePointures();
+  const [saisie, setSaisie] = useState({});
+  const [enregistre, setEnregistre] = useState("");
+  const valeur = (id) => saisie[id] ?? (echelles?.[id] || []).join(", ");
+  const enregistrer = async (id) => {
+    try {
+      setError("");
+      const valeurs = valeur(id).split(/[\s,;]+/).filter(Boolean);
+      await api.publics.enregistrerEchelle(id, valeurs);
+      rafraichirEchelles(); setEnregistre(id); setTimeout(() => setEnregistre(""), 2500);
+    } catch (e) { setError(e.message); }
+  };
+  return (
+    <div className="rounded-xl p-4" style={carte}>
+      <p className="text-sm font-medium mb-1">Pointures par public</p>
+      <p className="text-xs mb-3" style={{ color: "#6B5D52" }}>Une pointure retirée de la liste n'apparaît plus pour les nouveaux articles, mais le stock déjà en place est conservé. Sépare les pointures par des virgules (ex. 24, 25, 26, 27.5).</p>
+      {publics.map((p) => (
+        <div key={p.id} className="mb-3">
+          <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>{LIBELLE_PUBLIC[p.id] || p.libelle}</label>
+          <textarea rows={2} value={valeur(p.id)} onChange={(e) => setSaisie({ ...saisie, [p.id]: e.target.value })} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #DDD3C4", fontSize: 13 }} />
+          <button type="button" onClick={() => enregistrer(p.id)} className="mt-1 px-3 py-1.5 rounded-lg text-sm" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>{enregistre === p.id ? "Enregistré ✓" : "Enregistrer"}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Gestion() {
-  const [lieux, setLieux] = useState({ communes: [], pays: [] });
+  const { fonctions } = useAuth();
+  const [lieux, setLieux] = useState({ communes: [], pays: [], canaux: [] });
   const [livreurs, setLivreurs] = useState([]);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -301,6 +341,8 @@ export function Gestion() {
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <ListeLieux titre="Communes de livraison (Abidjan)" type="COMMUNE" lieux={lieux.communes} onChange={load} setError={setError} />
         <ListeLieux titre="Pays d'expédition (hors Côte d'Ivoire)" type="PAYS" lieux={lieux.pays} onChange={load} setError={setError} avecRecherche />
+        {fonctions.lot2 && <ListeLieux titre="Canaux : comment la cliente nous a connus" type="CANAL" lieux={lieux.canaux || []} onChange={load} setError={setError} />}
+        {fonctions.publics && <EchellesPointures setError={setError} />}
         <ClassementAnciennes setError={setError} />
         <div className="lg:col-span-2"><GestionLivreurs livreurs={livreurs} onChange={load} setError={setError} /></div>
       </div>

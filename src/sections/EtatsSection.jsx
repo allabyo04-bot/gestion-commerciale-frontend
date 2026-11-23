@@ -6,6 +6,7 @@ import { MODES_PAIEMENT, LIVRAISON_ACTIF, SUIVI_CLIENTES_ACTIF } from "../consta
 import { ReceiptModal } from "./VentesSection.jsx";
 import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
 import { Statistiques, FraisExpedition } from "./LieuxLivreursView.jsx";
+import { ValeurStock } from "./ValeurStockView.jsx";
 import { FichesIncompletes, EtatBonus, NouvellesClientes } from "./EtatsClientesViews.jsx";
 import { PointuresParMarque, MeilleursMois, HabitudesClientes } from "./AnalysesViews.jsx";
 
@@ -22,9 +23,9 @@ function todayISO() {
 // Menu réorganisé (derrière l'interrupteur lot1) : les états sont rangés par thème au lieu d'une longue liste.
 const GROUPES_ETATS = [
   ["Ventes", ["date", "mode", "type", "vendeur", "recap"]],
-  ["Livraisons et expéditions", ["livraisons", "stats-lieux", "frais-exp"]],
+  ["Livraisons et expéditions", ["livraisons", "stats-lieux", "exp-ci", "exp-hci", "frais-exp"]],
   ["Clientes et fidélité", ["clients", "nouvelles-cl", "fiches-inc", "bonus-etat", "remercier", "relancer", "habitudes"]],
-  ["Stock et analyses", ["paires", "pointures-marque", "meilleurs-mois"]],
+  ["Stock et analyses", ["paires", "pointures-marque", "meilleurs-mois", "valeur-stock"]],
   ["Contrôle", ["audit"]],
 ];
 function regrouper(sousOnglets) {
@@ -46,6 +47,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
   const lot1 = !!fonctions.lot1;
   const lot2 = !!fonctions.lot2;
   const lot3 = !!fonctions.lot3;
+  const lot7 = !!fonctions.lot7;
   const ONGLETS_LOT3 = ["pointures-marque", "meilleurs-mois", "habitudes"];
 
   const [sousOnglet, setSousOnglet] = useState("date");
@@ -233,7 +235,9 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     ...(estAdmin ? [{ id: "audit", label: "Audit remises", icon: ShieldAlert }] : []),
     ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
     // Lot 1 (B5) : états des livraisons et des expéditions, déplacés depuis Administration
-    ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }, { id: "frais-exp", label: "Frais d'expédition", icon: Truck }] : []),
+    ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }, { id: "exp-ci", label: "Expéditions Côte d'Ivoire", icon: Truck }, { id: "exp-hci", label: "Expéditions hors Côte d'Ivoire", icon: Truck }, { id: "frais-exp", label: "Frais d'expédition", icon: Truck }] : []),
+    // Lot 7 (I1) : valeur du stock au prix d'achat et de vente, marge
+    ...(estAdmin && lot7 ? [{ id: "valeur-stock", label: "Valeur du stock et marge", icon: Store }] : []),
     // Lot 2 (C1, D2, D3) : états sur les clientes et la fidélité
     ...(estAdmin && lot2 ? [{ id: "fiches-inc", label: "Fiches incomplètes", icon: Heart }, { id: "bonus-etat", label: "Bonus", icon: Award }, { id: "nouvelles-cl", label: "Nouvelles clientes", icon: Heart }] : []),
     // Lot 3 (F4, F3, G1) : analyses de ventes et de stock
@@ -266,7 +270,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
         </div>
 
         <div className="flex-1 min-w-0">
-      {ongletSuivi || (lot1 && (sousOnglet === "stats-lieux" || sousOnglet === "frais-exp")) || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) || (lot3 && ONGLETS_LOT3.includes(sousOnglet)) ? (
+      {ongletSuivi || (lot1 && ["stats-lieux", "exp-ci", "exp-hci", "frais-exp"].includes(sousOnglet)) || (lot7 && sousOnglet === "valeur-stock") || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) || (lot3 && ONGLETS_LOT3.includes(sousOnglet)) ? (
         <>
           {lot3 && sousOnglet === "pointures-marque" && <PointuresParMarque />}
           {lot3 && sousOnglet === "meilleurs-mois" && <MeilleursMois />}
@@ -275,7 +279,10 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
           {lot2 && sousOnglet === "bonus-etat" && <EtatBonus />}
           {lot2 && sousOnglet === "nouvelles-cl" && <NouvellesClientes />}
           {sousOnglet === "stats-lieux" && <Statistiques />}
+          {sousOnglet === "exp-ci" && <Statistiques key="exp-ci" vueInitiale="expeditions" zoneInitiale="CI" fige />}
+          {sousOnglet === "exp-hci" && <Statistiques key="exp-hci" vueInitiale="expeditions" zoneInitiale="HORS_CI" fige />}
           {sousOnglet === "frais-exp" && <FraisExpedition />}
+          {lot7 && sousOnglet === "valeur-stock" && <ValeurStock />}
           {sousOnglet === "paires" && <PairesParMarque />}
           {sousOnglet === "remercier" && <ClientesARemercier />}
           {sousOnglet === "relancer" && <ClientesARelancer />}

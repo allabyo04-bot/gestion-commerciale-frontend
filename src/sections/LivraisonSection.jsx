@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, X, Search, Printer, Truck, CheckCircle2, RotateCcw, AlertTriangle, Percent, Clock, XCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { usePointures } from "../publics.js";
 import { BOUTIQUES, POINTURES, CLIENT_POINTURES, MODES_PAIEMENT, fmt, FICHES_LIVRAISON_ACTIF, SEUIL_AVERTISSEMENT_LIVRAISON, BONUS_A_APPELER_ACTIF } from "../constants.js";
 import { Field, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { ReceiptModal } from "./VentesSection.jsx";
@@ -221,6 +222,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
 
   const [rechercheArticle, setRechercheArticle] = useState("");
   const [articleChoisi, setArticleChoisi] = useState(null);
+  const { pointuresDe } = usePointures();
   const [pointureChoisie, setPointureChoisie] = useState("");
   const [quantiteChoisie, setQuantiteChoisie] = useState("1");
   const [lignes, setLignes] = useState([]);
@@ -460,7 +462,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
                     <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Pointure</label>
                     <select value={pointureChoisie} onChange={(e) => setPointureChoisie(e.target.value)} style={champ}>
                       <option value="">—</option>
-                      {POINTURES.map((p) => <option key={p} value={p}>T{p}</option>)}
+                      {pointuresDe(articleChoisi).map((p) => <option key={p} value={p}>T{p}</option>)}
                     </select>
                   </div>
                 )}

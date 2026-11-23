@@ -1,4 +1,4 @@
-import { ShoppingCart, Heart, FileWarning, Handshake, Briefcase, ClipboardList, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown } from "lucide-react";
+import { ShoppingCart, Heart, FileWarning, Handshake, Briefcase, ClipboardList, Users as UsersIcon, Boxes, ShieldCheck, LogOut, BarChart3, LayoutDashboard, Wallet, Truck, Settings, Crown, Bike } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 import StockSection from "./sections/StockSection.jsx";
@@ -13,6 +13,7 @@ import FideliteSection from "./sections/FideliteSection.jsx";
 import ObligationsSection from "./sections/ObligationsSection.jsx";
 import FournisseursSection from "./sections/FournisseursSection.jsx";
 import RHSection from "./sections/RHSection.jsx";
+import LivreursSection from "./sections/LivreursSection.jsx";
 import MesDemandesSection from "./sections/MesDemandesSection.jsx";
 import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
@@ -86,6 +87,8 @@ function Shell() {
     // Accessible avec la permission "ventes" (comme avant) OU juste "livraison" (nouveau rôle
     // Livreur, sans accès au reste de Ventes) — voir le filtre plus bas qui gère perm en tableau.
     ...(LIVRAISON_ACTIF ? [{ id: "livraison", label: "Livraison", icon: Truck, perm: ["ventes", "livraison"] }] : []),
+    // Lots 1 et 10 : frais d'expédition à saisir au retour du livreur, remise de fin de journée, comptes des livreurs
+    ...((fonctions.lot1 || fonctions.lot10) ? [{ id: "livreurs", label: "Livreurs", icon: Bike, perm: ["ventes", "livraison"] }] : []),
     { id: "etats", label: "États", icon: BarChart3, perm: "ventes" },
     { id: "depenses", label: "Dépenses", icon: Wallet, perm: "ventes" },
     { id: "clients", label: "Clients", icon: Heart, perm: "clients" },
@@ -164,6 +167,7 @@ function Shell() {
           )}
           {activeTab === "livraison" && <LivraisonSection />}
           {activeTab === "etats" && <EtatsSection sousOngletInitial={etatsSubTabDemande} onSousOngletInitialConsomme={() => setEtatsSubTabDemande(null)} />}
+          {activeTab === "livreurs" && <LivreursSection />}
           {activeTab === "depenses" && <DepensesSection />}
           {activeTab === "clients" && <ClientsSection />}
           {activeTab === "stock" && <StockSection />}

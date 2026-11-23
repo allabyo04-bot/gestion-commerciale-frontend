@@ -138,9 +138,16 @@ export function NouvellesClientes() {
             <Chiffre titre="Nouvelles clientes" valeur={d.total} />
             {Object.entries(d.parBoutique).map(([b, n]) => <Chiffre key={b} titre={b} valeur={n} />)}
           </div>
+          {d.parCanal && Object.keys(d.parCanal).length > 0 && (
+            <div className="rounded-xl p-4" style={carte}>
+              <p className="text-sm font-medium mb-2">Par canal (comment elles nous ont connus)</p>
+              <Tableau vide="Aucune donnée." lignes={Object.entries(d.parCanal).map(([canal, v]) => ({ id: canal, canal, ...v })).sort((x, y) => y.total - x.total)} colonnes={[
+                { titre: "Canal", valeur: (l) => l.canal }, { titre: "Nouvelles clientes", valeur: (l) => l.total }, ...BOUTIQUES.map((bq) => ({ titre: bq, valeur: (l) => l[bq] || 0 }))]} />
+            </div>
+          )}
           <div className="rounded-xl p-4" style={carte}>
             <Tableau vide="Aucune nouvelle cliente sur cette période." lignes={d.lignes} colonnes={[
-              { titre: "Créée le", valeur: (l) => dateFr(l.creeLe) }, { titre: "Cliente", valeur: (l) => l.nomPrenoms }, { titre: "Téléphone", valeur: (l) => l.telephone || "—" }, { titre: "Boutique", valeur: (l) => l.boutique }]} />
+              { titre: "Créée le", valeur: (l) => dateFr(l.creeLe) }, { titre: "Cliente", valeur: (l) => l.nomPrenoms }, { titre: "Téléphone", valeur: (l) => l.telephone || "—" }, { titre: "Boutique", valeur: (l) => l.boutique }, { titre: "Canal", valeur: (l) => l.canal || "—" }]} />
           </div>
         </div>
       )}

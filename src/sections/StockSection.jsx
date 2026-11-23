@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Plus, Pencil, Trash2, Package, Tag, ChevronRight, X, Search, PauseCircle } from "lucide-react";
 import { api } from "../api.js";
 import { FAMILLES, BOUTIQUES, POINTURES, fmt } from "../constants.js";
+import { usePointures, LIBELLE_PUBLIC } from "../publics.js";
 import { Field, ConfirmModal, ErrorBanner, inputStyle, selectStyle } from "../components/Shared.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useCaracteristiques, FiltresCaracteristiques, correspondAuxFiltres, BadgesCaracteristiques, ChampsCaracteristiques, GestionCaracteristiques } from "./CaracteristiquesViews.jsx";
@@ -201,6 +202,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
                   <div className="flex items-center gap-2 mt-4 flex-wrap">
                     <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: fc.bg, color: fc.fg }}>{a.famille}</span>
                     <span className="text-xs px-2.5 py-1 rounded-full flex items-center gap-1" style={{ background: "#F1E9DC", color: "#6B5D52" }}><Tag size={11} /> {brandName(a.marqueId)}</span>
+                    {fonctions?.publics && a.famille === "Chaussure" && a.publicCible && a.publicCible !== "FEMME" && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "#EEF1F8", color: "#3F4F7A" }}>{LIBELLE_PUBLIC[a.publicCible]}</span>}
                     <span className="text-xs px-2.5 py-1 rounded-full font-mono" style={{ background: total > 0 ? "#E9F0EA" : "#FBEAE7", color: total > 0 ? "#3F6B4A" : "#B04A3B" }}>{total} en stock</span>
                     {a.actif === false && (
                       <span className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: "#DDD3C4", color: "#6B5D52" }}><PauseCircle size={11} /> En veille</span>
@@ -398,6 +400,7 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
 }
 
 function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
+  const { actif: publicsActifs, publics } = usePointures();
   const [form, setForm] = useState(article);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   return (
@@ -413,6 +416,13 @@ function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
             {FAMILLES.map((f) => <option key={f}>{f}</option>)}
           </select>
         </Field>
+        {publicsActifs && form.famille === "Chaussure" && (
+          <Field label="Public">
+            <select value={form.publicCible || "FEMME"} onChange={(e) => set("publicCible", e.target.value)} style={inputStyle} disabled={!form.isNew}>
+              {publics.map((p) => <option key={p.id} value={p.id}>{p.libelle}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Désignation"><input value={form.designation} onChange={(e) => set("designation", e.target.value)} style={inputStyle} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Marque">
@@ -435,6 +445,8 @@ function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
   );
 }
 function StockEditorModal({ article, onClose, onCorriger, onAjouter, onVirement }) {
+  const { pointuresDe } = usePointures();
+  const POINTURES = pointuresDe(article); // échelle du public de l'article
   const [mode, setMode] = useState("corriger");
   const [boutique, setBoutique] = useState(BOUTIQUES[0]);
   const [boutiqueDestination, setBoutiqueDestination] = useState(BOUTIQUES[1] || BOUTIQUES[0]);
@@ -1006,6 +1018,8 @@ function VirementsSection({ articles, onDone }) {
   const [saved, setSaved] = useState(false);
 
   const article = articles.find((a) => a.id === articleId);
+  const { pointuresDe } = usePointures();
+  const POINTURES = pointuresDe(article);
   const isChaussure = article?.famille === "Chaussure";
 
   const choisirArticle = (a) => {
@@ -1764,9 +1778,14 @@ function ReceptionSection({ articles, onApplique }) {
 
   const [rechercheArticle, setRechercheArticle] = useState("");
   const [articleChoisi, setArticleChoisi] = useState(null);
+  const { pointuresDe } = usePointures();
+  const POINTURES = pointuresDe(articleChoisi);
   const [pointureChoisie, setPointureChoisie] = useState("");
   const [quantiteChoisie, setQuantiteChoisie] = useState("");
   const [prixAchatChoisi, setPrixAchatChoisi] = useState("");
+  const [prixEuroChoisi, setPrixEuroChoisi] = useState("");
+  const { user: utilisateurRec, fonctions: fonctionsRec } = useAuth();
+  const saisieEuro = !!fonctionsRec?.lot7 && !!utilisateurRec?.role?.systeme;
 
   const [lignes, setLignes] = useState([]);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
@@ -1794,6 +1813,7 @@ function ReceptionSection({ articles, onApplique }) {
     setPointureChoisie("");
     setQuantiteChoisie("");
     setPrixAchatChoisi(a.prixAchat != null ? String(a.prixAchat) : "");
+    setPrixEuroChoisi(a.prixAchatEuro != null ? String(a.prixAchatEuro) : "");
   };
 
   const ajouterLigne = () => {
@@ -1804,9 +1824,9 @@ function ReceptionSection({ articles, onApplique }) {
     setLignes([...lignes, {
       id: uidLocal(), articleId: articleChoisi.id, designation: articleChoisi.designation,
       pointure: articleChoisi.famille === "Chaussure" ? pointureChoisie : "",
-      quantite, prixAchat: prixAchatChoisi ? Number(prixAchatChoisi) : null,
+      quantite, prixAchat: prixAchatChoisi ? Number(prixAchatChoisi) : null, prixAchatEuro: saisieEuro && prixEuroChoisi ? Number(String(prixEuroChoisi).replace(",", ".")) : null,
     }]);
-    setArticleChoisi(null); setPointureChoisie(""); setQuantiteChoisie(""); setPrixAchatChoisi("");
+    setArticleChoisi(null); setPointureChoisie(""); setQuantiteChoisie(""); setPrixAchatChoisi(""); setPrixEuroChoisi("");
     setErreur("");
   };
   const retirerLigne = (id) => setLignes(lignes.filter((l) => l.id !== id));
@@ -1818,7 +1838,7 @@ function ReceptionSection({ articles, onApplique }) {
     try {
       const rec = await api.receptions.creer({
         fournisseur: fournisseur || undefined, reference: reference || undefined, boutique, notes: notes || undefined,
-        lignes: lignes.map(({ articleId, pointure, quantite, prixAchat }) => ({ articleId, pointure, quantite, prixAchat })),
+        lignes: lignes.map(({ articleId, pointure, quantite, prixAchat, prixAchatEuro }) => ({ articleId, pointure, quantite, prixAchat, prixAchatEuro })),
       });
       setResultat(rec);
       setLignes([]); setFournisseur(""); setReference(""); setNotes("");
@@ -1887,8 +1907,14 @@ function ReceptionSection({ articles, onApplique }) {
               </div>
               <div>
                 <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Prix d'achat (optionnel)</label>
-                <input type="number" min="0" value={prixAchatChoisi} onChange={(e) => setPrixAchatChoisi(e.target.value)} style={selectStyle} />
+                <input type="number" min="0" value={prixAchatChoisi} onChange={(e) => setPrixAchatChoisi(e.target.value)} style={selectStyle} disabled={saisieEuro && !!prixEuroChoisi} />
               </div>
+              {saisieEuro && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>ou prix facturé en € {prixEuroChoisi ? `(= ${Math.round(Number(String(prixEuroChoisi).replace(",", ".")) * 655.957).toLocaleString("fr-FR")} F)` : ""}</label>
+                  <input type="text" inputMode="decimal" value={prixEuroChoisi} onChange={(e) => setPrixEuroChoisi(e.target.value)} style={selectStyle} placeholder="ex. 40" />
+                </div>
+              )}
               <button onClick={ajouterLigne} className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>Ajouter à la réception</button>
             </div>
           )}

@@ -310,6 +310,8 @@ function BudgetParPoste({ annee, onError }) {
 
 function Objectifs({ annee, onError }) {
   const [objectifs, setObjectifs] = useState([]);
+  const [mode, setMode] = useState("POURCENTAGE");
+  useEffect(() => { api.budgetComplet.objectifAffichage().then((r) => setMode(r.mode)).catch(() => {}); }, []);
   const charger = useCallback(async () => {
     try { setObjectifs(await api.budgetComplet.objectifs.list(annee)); } catch (e) { onError(e.message); }
   }, [annee, onError]);
@@ -320,8 +322,19 @@ function Objectifs({ annee, onError }) {
   return (
     <div>
       <p className="text-xs mb-3" style={{ color: C.doux }}>
-        Chiffre d'affaires visé, mois par mois et par boutique. Il sert de « ventes prévisionnelles » dans la synthèse, et les caissières voient uniquement le pourcentage atteint pour leur boutique (jamais les montants).
+        Chiffre d'affaires visé, mois par mois et par boutique. Il sert de « ventes prévisionnelles » dans la synthèse. Les caissières ne voient jamais la recette du mois : choisis ci-dessous ce qu'elles voient de l'objectif de leur boutique.
       </p>
+      <div className="mb-4 rounded-xl p-3" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
+        <label className="block text-xs mb-1" style={{ color: C.doux }}>Ce que voit la caissière sur son écran d'accueil</label>
+        <select value={mode} onChange={async (e) => { try { const r = await api.budgetComplet.reglerObjectifAffichage(e.target.value); setMode(r.mode); } catch (er) { onError(er.message); } }}
+          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #DDD3C4", background: "#fff", fontSize: 13 }}>
+          <option value="POURCENTAGE">Seulement le pourcentage atteint (réglage actuel)</option>
+          <option value="MONTANT_PALIERS">Le montant à réaliser + un palier d'avancement, sans pourcentage (recommandé)</option>
+          <option value="MONTANT">Seulement le montant à réaliser</option>
+          <option value="PALIERS">Seulement un palier d'avancement</option>
+        </select>
+        <p className="text-xs mt-2" style={{ color: C.doux }}>Montant + pourcentage permettrait de retrouver la recette par un simple calcul ; c'est pourquoi le montant s'affiche avec un palier (« Au démarrage », « En route », « Plus de la moitié », « Presque atteint », « Objectif atteint »).</p>
+      </div>
       <div className="rounded-2xl overflow-x-auto" style={cadre}>
         <table className="w-full text-sm">
           <thead>
