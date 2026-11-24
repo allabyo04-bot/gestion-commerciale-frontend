@@ -164,6 +164,7 @@ export const api = {
   },
   valeurStock: (params = {}) => request(`/api/etats/valeur-stock?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   prixAchatEuro: (articleId, prixAchatEuro) => request(`/api/articles/${articleId}/prix-achat-euro`, { method: "PUT", body: { prixAchatEuro } }),
+  whatsapp: { etat: () => request("/api/whatsapp/etat") },
   rappels: {
     apercu: () => request("/api/rappels/apercu"),
     envoyer: () => request("/api/rappels/envoyer", { method: "POST", body: {} }),

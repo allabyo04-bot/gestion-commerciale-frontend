@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
 import { Eye, Percent, Truck, ListChecks, ShieldCheck, ToggleLeft } from "lucide-react";
@@ -41,7 +41,7 @@ const ONGLETS = [
   ["INTERRUPTEURS", "Interrupteurs", ToggleLeft],
 ];
 
-const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"], ["lot2", "Lot 2 — Clientes et fidélité"], ["lot3", "Lot 3 — Analyses de ventes et de stock"], ["lot4", "Lot 4 — Dépenses, budget et objectifs"], ["lot5", "Lot 5 — Fiche article enrichie"], ["lot6", "Lot 6 — Obligations administratives"], ["lot7", "Lot 7 — Fournisseurs, achats et trésorerie"], ["lot9", "Lot 9 — Ressources humaines et paie"], ["lot10", "Lot 10 — Remise de fin de journée des livreurs"], ["publics", "Publics — Femme, Homme et Enfants (pointures par public)"], ["rappels", "Rappels par e-mail des échéances (lots 6 et 7)"]];
+const LOTS = [["lot1", "Lot 1 — Caisse et livraisons"], ["lot2", "Lot 2 — Clientes et fidélité"], ["lot3", "Lot 3 — Analyses de ventes et de stock"], ["lot4", "Lot 4 — Dépenses, budget et objectifs"], ["lot5", "Lot 5 — Fiche article enrichie"], ["lot6", "Lot 6 — Obligations administratives"], ["lot7", "Lot 7 — Fournisseurs, achats et trésorerie"], ["lot9", "Lot 9 — Ressources humaines et paie"], ["lot10", "Lot 10 — Remise de fin de journée des livreurs"], ["publics", "Publics — Femme, Homme et Enfants (pointures par public)"], ["rappels", "Rappels par e-mail des échéances (lots 6 et 7)"], ["whatsapp", "WhatsApp automatique — réception (360dialog)"]];
 
 // Réservé au développeur : allume ou éteint les nouveautés de chaque lot, sans toucher au code.
 function Interrupteurs() {
@@ -62,6 +62,36 @@ function Interrupteurs() {
         </div>
       ))}
       <RappelsEmail />
+      {fonctions.whatsapp && <WhatsappEtat />}
+    </div>
+  );
+}
+
+// État de la réception WhatsApp : adresse à donner à 360dialog, dernier événement reçu, derniers messages.
+function WhatsappEtat() {
+  const [etat, setEtat] = useState(null);
+  const [message, setMessage] = useState("");
+  const charger = async () => { try { setMessage(""); setEtat(await api.whatsapp.etat()); } catch (e) { setMessage(e.message); } };
+  useEffect(() => { charger(); }, []);
+  const base = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, "");
+  return (
+    <div className="rounded-xl p-4 mt-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+      <p className="text-sm font-medium mb-1">WhatsApp — réception</p>
+      <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Adresse à enregistrer chez 360dialog (réglage « webhook » du numéro) : <b>{base}/api/whatsapp/webhook?secret=</b>… (la clé secrète est celle définie dans Railway, variable WHATSAPP_WEBHOOK_SECRET).</p>
+      {message && <p className="text-xs mb-2" style={{ color: "#B04A3B" }}>{message}</p>}
+      {etat && (
+        <div className="text-xs" style={{ color: "#6B5D52" }}>
+          <p>Clé secrète configurée : <b>{etat.secretConfigure ? "oui" : "non — à ajouter avant l'inscription"}</b></p>
+          <p>Dernier événement reçu : <b>{etat.dernierEvenement ? new Date(etat.dernierEvenement).toLocaleString("fr-FR") : "aucun pour l'instant"}</b></p>
+          <p>Éléments d'historique reçus (non conservés) : <b>{etat.historiqueRecu}</b></p>
+          {etat.compteurs.length > 0 && <p className="mt-1">{etat.compteurs.map((c) => `${c.sens} / ${c.statut} : ${c.nombre}`).join(" · ")}</p>}
+          {etat.derniers.length > 0 && (
+            <table className="w-full mt-2"><thead><tr style={{ textAlign: "left" }}><th>Date</th><th>Sens</th><th>Numéro</th><th>État</th></tr></thead>
+              <tbody>{etat.derniers.map((m) => (<tr key={m.id}><td>{new Date(m.horodatage).toLocaleString("fr-FR")}</td><td>{m.sens}</td><td>{m.telephone || "—"}</td><td>{m.statut}{m.erreur ? ` (${m.erreur})` : ""}</td></tr>))}</tbody></table>
+          )}
+        </div>
+      )}
+      <button type="button" onClick={charger} className="mt-3 px-3 py-1.5 rounded-full text-xs" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Actualiser</button>
     </div>
   );
 }
