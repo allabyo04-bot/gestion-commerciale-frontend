@@ -23,7 +23,8 @@ export default function LivreursSection() {
   const onglets = [
     ...(lot1 ? [["frais", "Frais d'expédition"]] : []),
     ...(lot10 ? [["remises", "Remises de fin de journée"]] : []),
-    ...(lot10 && estAdmin ? [["apayer", "À payer"], ["comptes", "Comptes des livreurs"], ["tarifs", "Tarifs"]] : []),
+    ...(lot10 ? [["apayer", "À payer"]] : []),
+    ...(lot10 && estAdmin ? [["comptes", "Comptes des livreurs"], ["tarifs", "Tarifs"]] : []),
   ];
   const [onglet, setOnglet] = useState(onglets[0]?.[0] || "frais");
   return (
@@ -38,7 +39,7 @@ export default function LivreursSection() {
       </div>
       {onglet === "frais" && lot1 && <FraisAttente estAdmin={estAdmin} />}
       {onglet === "remises" && lot10 && <Remises estAdmin={estAdmin} />}
-      {onglet === "apayer" && lot10 && estAdmin && <APayer />}
+      {onglet === "apayer" && lot10 && <APayer />}
       {onglet === "comptes" && lot10 && estAdmin && <Comptes />}
       {onglet === "tarifs" && lot10 && estAdmin && <Tarifs />}
     </div>
@@ -188,7 +189,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
   const photo = useRef(null);
   const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); } catch (e) { setError(e.message); } }, [id]);
   useEffect(() => { recharger(); }, [recharger]);
-  useEffect(() => { if (estAdmin && r?.statut === "OUVERTE") api.remisesLivreurs.suggestion(id).then(setSug).catch(() => setSug(null)); }, [estAdmin, id, r?.statut, r?.remuneration]);
+  useEffect(() => { if (r?.statut === "OUVERTE") api.remisesLivreurs.suggestion(id).then(setSug).catch(() => setSug(null)); }, [id, r?.statut, r?.remuneration]);
   useEffect(() => { if (r?.livreurId && r.statut === "OUVERTE") api.remisesLivreurs.fraisARembourser(r.livreurId).then(setARembourser).catch(() => {}); }, [r?.livreurId, r?.statut, r?.bons?.length]);
   const agir = (f) => async (...a) => { try { setError(""); const x = await f(...a); if (x && x.id) setR(x); else await recharger(); } catch (e) { setError(e.message); } };
   const ouvrirPhoto = async (fichier) => { if (!fichier) return; try { setBon((b) => ({ ...b, preuve: "" })); setBon((b) => ({ ...b })); const p = await reduirePhoto(fichier); setBon((b) => ({ ...b, preuve: p })); } catch (e) { setError(e.message); } };
@@ -209,7 +210,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
         </div>
 
 
-        {estAdmin && ouverte && sug && (sug.lignes.length > 0 || sug.sansTarif.length > 0) && (
+        {ouverte && sug && (sug.lignes.length > 0 || sug.sansTarif.length > 0) && (
           <div className="rounded-lg p-3 mb-4" style={{ background: "#F3F7F3", border: "1px solid #D5E3D6" }}>
             <p className="text-sm font-medium mb-1">Rémunération calculée d'après les tarifs : {fmt(sug.total)} F</p>
             <ul className="text-xs mb-2" style={{ color: "#6B5D52" }}>
@@ -233,7 +234,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
                 </span>
               </div>
               {b.statut === "REFUSE" && b.motifRefus && <p className="text-xs mt-1" style={{ color: "#B04A3B" }}>Refusé : {b.motifRefus}</p>}
-              {estAdmin && ouverte && b.statut !== "VALIDE" && (
+              {ouverte && b.statut !== "VALIDE" && (
                 <div className="flex gap-2 mt-2 flex-wrap items-center">
                   <button type="button" onClick={() => agir(api.remisesLivreurs.statutBon)(b.id, "VALIDE")} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Check size={13} /> Valider</button>
                   <input placeholder="Raison du refus" value={refus[b.id] || ""} onChange={(e) => setRefus({ ...refus, [b.id]: e.target.value })} style={{ ...selectStyle, width: 190 }} />
@@ -274,10 +275,9 @@ function RemiseDetail({ id, estAdmin, onClose }) {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {estAdmin && ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.valider)(r.id)} style={bouton()}>Valider la remise</button>}
-          {estAdmin && !ouverte && r.solde > 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.payer)(r.id)} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
+          {ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.valider)(r.id)} style={bouton()}>Valider la remise</button>}
+          {!ouverte && r.solde > 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.payer)(r.id)} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
           {estAdmin && !ouverte && r.paye === 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.rouvrir)(r.id)} style={contour}>Rouvrir</button>}
-          {ouverte && !estAdmin && <p className="text-xs" style={{ color: "#6B5D52" }}>L'administratrice vérifie les bons puis valide la remise.</p>}
         </div>
       </div>
       {apercu && (
