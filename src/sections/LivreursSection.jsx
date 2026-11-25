@@ -219,6 +219,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
   const [sug, setSug] = useState(null);
   const [recuId, setRecuId] = useState(null);
   const [choixPaiement, setChoixPaiement] = useState(false);
+  const [confirmerSuppr, setConfirmerSuppr] = useState(false);
   const [paiements, setPaiements] = useState([]);
   const photo = useRef(null);
   const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); api.remisesLivreurs.paiements(id).then(setPaiements).catch(() => {}); } catch (e) { setError(e.message); } }, [id]);
@@ -331,6 +332,8 @@ function RemiseDetail({ id, estAdmin, onClose }) {
           {ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.valider)(r.id)} style={bouton()}>Valider la remise</button>}
           {!ouverte && r.solde > 0 && <button type="button" onClick={() => setChoixPaiement(true)} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
           {choixPaiement && <DialogPaiement montant={r.solde} onAnnuler={() => setChoixPaiement(false)} onConfirmer={async (mode, reference) => { setChoixPaiement(false); try { setError(""); const x = await api.remisesLivreurs.payer(r.id, undefined, mode, reference); setR(x); setRecuId(x.paiementId); setPaiements(await api.remisesLivreurs.paiements(r.id)); } catch (e) { setError(e.message); } }} />}
+          {estAdmin && ouverte && <button type="button" onClick={() => setConfirmerSuppr(true)} style={{ ...contour, color: "#B04A3B", borderColor: "#E3C4BD" }} className="inline-flex items-center gap-1"><Trash2 size={14} /> Supprimer cette remise</button>}
+          {confirmerSuppr && <ConfirmModal title="Supprimer cette remise ?" message="La remise et ses bons de frais seront effacés. Les livraisons pourront de nouveau être comptées dans une autre remise." onCancel={() => setConfirmerSuppr(false)} onConfirm={async () => { try { await api.remisesLivreurs.supprimer(r.id); onClose(); } catch (e) { setConfirmerSuppr(false); setError(e.message); } }} />}
           {estAdmin && !ouverte && r.paye === 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.rouvrir)(r.id)} style={contour}>Rouvrir</button>}
         </div>
       </div>
