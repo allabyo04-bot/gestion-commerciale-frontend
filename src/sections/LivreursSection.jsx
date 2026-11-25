@@ -222,13 +222,13 @@ function RemiseDetail({ id, estAdmin, onClose }) {
         <ErrorBanner error={error} onClose={() => setError("")} />
         {recuId && <BandeauRecu id={recuId} onFermer={() => setRecuId(null)} />}
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Field label="Encaissé (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.encaisse} onBlur={(e) => Number(e.target.value) !== r.encaisse && agir(api.remisesLivreurs.modifier)(r.id, { encaisse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
+          <Field label="Encaissé (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} key={`enc${r.encaisse}`} defaultValue={r.encaisse} onBlur={(e) => Number(e.target.value) !== r.encaisse && agir(api.remisesLivreurs.modifier)(r.id, { encaisse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
           <Field label="Remis en main propre (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.verse} onBlur={(e) => Number(e.target.value) !== r.verse && agir(api.remisesLivreurs.modifier)(r.id, { verse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
           <Field label="Rémunération (F)"><input type="number" min="0" disabled={!estAdmin || !ouverte} key={`remu${r.remuneration}`} defaultValue={r.remuneration} onBlur={(e) => Number(e.target.value) !== r.remuneration && agir(api.remisesLivreurs.modifier)(r.id, { remuneration: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
         </div>
 
 
-        {ouverte && sug && (sug.lignes.length > 0 || sug.sansTarif.length > 0) && (
+        {ouverte && sug && (sug.lignes.length > 0 || sug.sansTarif.length > 0 || sug.encaisseSuggere > 0) && (
           <div className="rounded-lg p-3 mb-4" style={{ background: "#F3F7F3", border: "1px solid #D5E3D6" }}>
             <p className="text-sm font-medium mb-1">Rémunération calculée d'après les tarifs : {fmt(sug.total)} F</p>
             <ul className="text-xs mb-2" style={{ color: "#6B5D52" }}>
@@ -237,6 +237,15 @@ function RemiseDetail({ id, estAdmin, onClose }) {
             </ul>
             {sug.total !== r.remuneration && <button type="button" onClick={() => agir(api.remisesLivreurs.appliquerRemuneration)(r.id)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Appliquer cette rémunération</button>}
             {sug.total === r.remuneration && <p className="text-xs" style={{ color: "#3F6B4A" }}>Déjà appliquée.</p>}
+            {sug.encaisseSuggere > 0 && (
+              <div className="mt-3 pt-3" style={{ borderTop: "1px solid #CFE0D2" }}>
+                <p className="text-sm font-medium mb-1">Espèces à récupérer auprès des clientes (d'après les ventes livrées) : {fmt(sug.encaisseSuggere)} F</p>
+                <ul className="text-xs mb-2" style={{ color: "#6B5D52" }}>{sug.detailEncaisse.map((x) => <li key={x.numero}>{x.numero} — {fmt(x.montant)} F</li>)}</ul>
+                {sug.encaisseSuggere !== r.encaisse
+                  ? <button type="button" onClick={() => agir(api.remisesLivreurs.modifier)(r.id, { encaisse: sug.encaisseSuggere })} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Reprendre comme « Encaissé »</button>
+                  : <p className="text-xs" style={{ color: "#3F6B4A" }}>Déjà repris.</p>}
+              </div>
+            )}
           </div>
         )}
         <p className="text-sm font-medium mb-2">Bons de frais avancés par le livreur</p>
