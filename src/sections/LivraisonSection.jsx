@@ -168,7 +168,7 @@ export default function LivraisonSection() {
                   <p className="font-medium text-sm">{b.numero} — {b.clientNom}</p>
                   {b.lieuLivraison && <p className="text-xs" style={{ color: "#8C3B2E" }}>📍 {b.lieuLivraison}</p>}
                   <p className="text-xs" style={{ color: "#6B5D52" }}>
-                    {b.boutique} · {b.statut === "ANNULE" ? "Annulé" : `Clôturé le ${new Date(b.dateCloture).toLocaleString("fr-FR")} par ${b.cloturePar?.prenom || ""}`}
+                    {b.boutique} · {b.statut === "ANNULE" ? "Annulé" : `Clôturé le ${new Date(b.dateCloture).toLocaleString("fr-FR")} par ${b.cloturePar?.prenom || ""}`}{b.livreurNom ? ` · Livreur : ${b.livreurNom}` : " · Livreur non renseigné"}
                     {b.venteGeneree ? ` · Vente ${b.venteGeneree.numero} (${fmt(b.venteGeneree.total)} F)` : ""}
                   </p>
                 </div>
