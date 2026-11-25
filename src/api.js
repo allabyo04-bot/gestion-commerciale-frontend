@@ -152,7 +152,7 @@ export const api = {
     statutBon: (bonId, statut, motifRefus) => request(`/api/remises-livreurs/bons/${bonId}/statut`, { method: "PUT", body: { statut, motifRefus } }),
     supprimerBon: (bonId) => request(`/api/remises-livreurs/bons/${bonId}`, { method: "DELETE" }),
     valider: (id) => request(`/api/remises-livreurs/${id}/valider`, { method: "POST", body: {} }),
-    payer: (id, montant) => request(`/api/remises-livreurs/${id}/payer`, { method: "POST", body: montant ? { montant } : {} }),
+    payer: (id, montant, mode, reference) => request(`/api/remises-livreurs/${id}/payer`, { method: "POST", body: { ...(montant ? { montant } : {}), mode, reference } }),
     paiements: (id) => request(`/api/remises-livreurs/${id}/paiements`),
     recu: (paiementId) => request(`/api/remises-livreurs/paiements/${paiementId}/recu`),
     etatPaiements: (params) => request(`/api/remises-livreurs/etat-paiements?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),

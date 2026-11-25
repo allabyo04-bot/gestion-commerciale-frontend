@@ -16,6 +16,22 @@ const jourIso = (d) => d.toISOString().slice(0, 10);
 const dateFr = (j) => (j ? new Date(j.length <= 10 ? `${j}T12:00:00` : j).toLocaleDateString("fr-FR") : "—");
 const STATUT_FRAIS = { EN_COURS: ["En cours", "#8A6A22", "#FBF3E3"], A_REMBOURSER: ["À rembourser", "#B04A3B", "#FBEAE7"], CLOTUREE: ["Clôturée", "#3F6B4A", "#E9F0EA"] };
 const STATUT_BON = { A_VERIFIER: ["À vérifier", "#8A6A22", "#FBF3E3"], VALIDE: ["Validé", "#3F6B4A", "#E9F0EA"], REFUSE: ["Refusé", "#B04A3B", "#FBEAE7"] };
+const MODES_PAIEMENT = [["ESPECES", "Espèces"], ["WAVE", "Wave"], ["MTN", "MTN Money"], ["ORANGE", "Orange Money"], ["AUTRE", "Autre"]];
+// Fenêtre de choix du moyen de paiement du livreur (la référence de transaction est facultative).
+const DialogPaiement = ({ montant, onConfirmer, onAnnuler }) => {
+  const [mode, setMode] = useState("ESPECES");
+  const [reference, setReference] = useState("");
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-30" style={{ background: "rgba(40,30,20,0.45)" }}>
+      <div className="rounded-xl p-5 w-full max-w-sm" style={{ background: "#FFFFFF" }}>
+        <p className="font-display text-lg font-semibold mb-3">Payer {fmt(montant)} F au livreur</p>
+        <Field label="Moyen de paiement"><select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>{MODES_PAIEMENT.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></Field>
+        {mode !== "ESPECES" && <div className="mt-3"><Field label="Référence de la transaction (facultatif)"><input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={60} style={inputStyle} /></Field></div>}
+        <div className="flex gap-2 mt-4"><button type="button" onClick={() => onConfirmer(mode, reference)} style={bouton("#3F6B4A")}>Confirmer le paiement</button><button type="button" onClick={onAnnuler} style={contour}>Annuler</button></div>
+      </div>
+    </div>
+  );
+};
 const BandeauRecu = ({ id, onFermer }) => {
   const [err, setErr] = useState("");
   const imprimer = async () => { try { imprimerRecuLivreur(await api.remisesLivreurs.recu(id)); } catch (e) { setErr(e.message); } };
@@ -202,6 +218,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
   const [apercu, setApercu] = useState(null);
   const [sug, setSug] = useState(null);
   const [recuId, setRecuId] = useState(null);
+  const [choixPaiement, setChoixPaiement] = useState(false);
   const [paiements, setPaiements] = useState([]);
   const photo = useRef(null);
   const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); api.remisesLivreurs.paiements(id).then(setPaiements).catch(() => {}); } catch (e) { setError(e.message); } }, [id]);
@@ -256,7 +273,8 @@ function RemiseDetail({ id, estAdmin, onClose }) {
               <div className="flex justify-between items-center gap-2 flex-wrap">
                 <span className="text-sm">{b.libelle} · <strong>{fmt(b.montant)} F</strong></span>
                 <span className="flex items-center gap-2"><Pastille t={STATUT_BON[b.statut]} />
-                  {b.aPreuve && <button type="button" className="text-xs underline" style={{ color: "#8C3B2E" }} onClick={async () => { try { setApercu((await api.remisesLivreurs.preuve(b.id)).preuve); } catch (e) { setError(e.message); } }}>Voir la preuve</button>}
+                  {!b.aPreuve && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#FBF3E3", color: "#8A6A22" }}>⚠ Sans justificatif</span>}
+                {b.aPreuve && <button type="button" className="text-xs underline" style={{ color: "#8C3B2E" }} onClick={async () => { try { setApercu((await api.remisesLivreurs.preuve(b.id)).preuve); } catch (e) { setError(e.message); } }}>Voir la preuve</button>}
                   {ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.supprimerBon)(b.id)} title="Retirer"><Trash2 size={14} color="#B04A3B" /></button>}
                 </span>
               </div>
@@ -311,7 +329,8 @@ function RemiseDetail({ id, estAdmin, onClose }) {
         )}
         <div className="flex gap-2 flex-wrap">
           {ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.valider)(r.id)} style={bouton()}>Valider la remise</button>}
-          {!ouverte && r.solde > 0 && <button type="button" onClick={async () => { try { setError(""); const x = await api.remisesLivreurs.payer(r.id); setR(x); setRecuId(x.paiementId); setPaiements(await api.remisesLivreurs.paiements(r.id)); } catch (e) { setError(e.message); } }} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
+          {!ouverte && r.solde > 0 && <button type="button" onClick={() => setChoixPaiement(true)} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
+          {choixPaiement && <DialogPaiement montant={r.solde} onAnnuler={() => setChoixPaiement(false)} onConfirmer={async (mode, reference) => { setChoixPaiement(false); try { setError(""); const x = await api.remisesLivreurs.payer(r.id, undefined, mode, reference); setR(x); setRecuId(x.paiementId); setPaiements(await api.remisesLivreurs.paiements(r.id)); } catch (e) { setError(e.message); } }} />}
           {estAdmin && !ouverte && r.paye === 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.rouvrir)(r.id)} style={contour}>Rouvrir</button>}
         </div>
       </div>
@@ -376,12 +395,14 @@ function APayer() {
   const charger = useCallback(async () => { try { setD(await api.remisesLivreurs.aPayer()); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { charger(); }, [charger]);
   const [recuId, setRecuId] = useState(null);
-  const payer = async (id) => { try { const x = await api.remisesLivreurs.payer(id); setRecuId(x.paiementId); charger(); } catch (e) { setError(e.message); } };
+  const [choix, setChoix] = useState(null); // { id, montant }
+  const payer = async (mode, reference) => { const c = choix; setChoix(null); try { const x = await api.remisesLivreurs.payer(c.id, undefined, mode, reference); setRecuId(x.paiementId); charger(); } catch (e) { setError(e.message); } };
   if (!d) return <ErrorBanner error={error} onClose={() => setError("")} />;
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
       {recuId && <BandeauRecu id={recuId} onFermer={() => setRecuId(null)} />}
+      {choix && <DialogPaiement montant={choix.montant} onAnnuler={() => setChoix(null)} onConfirmer={payer} />}
       <div className="rounded-xl p-4 mb-4" style={carte}><p className="text-xs" style={{ color: "#6B5D52" }}>Total à payer aux livreurs</p><p className="font-display text-3xl font-semibold">{fmt(d.total)} F</p></div>
       {!d.livreurs.length && <p className="text-sm" style={{ color: "#6B5D52" }}>Rien à payer : tous les livreurs sont à jour.</p>}
       <div className="space-y-3">
@@ -390,7 +411,7 @@ function APayer() {
             <div className="flex justify-between"><strong>{l.nom}</strong><strong style={{ color: "#B04A3B" }}>{fmt(l.total)} F</strong></div>
             <div className="mt-2 space-y-1">{l.jours.map((j) => (
               <div key={j.id} className="flex justify-between items-center text-sm"><span>Journée du {dateFr(j.jour)}</span>
-                <span className="flex items-center gap-3">{fmt(j.solde)} F <button type="button" onClick={() => payer(j.id)} style={bouton("#3F6B4A")}>Payé</button></span></div>
+                <span className="flex items-center gap-3">{fmt(j.solde)} F <button type="button" onClick={() => setChoix({ id: j.id, montant: j.solde })} style={bouton("#3F6B4A")}>Payé</button></span></div>
             ))}</div>
           </div>
         ))}

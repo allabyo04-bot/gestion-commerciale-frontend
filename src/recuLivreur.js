@@ -14,6 +14,7 @@ export function imprimerRecuLivreur(d) {
     <p>Je soussigné(e) <b>${esc(d.livreurNom)}</b>, livreur, reconnais avoir reçu de la boutique la somme de</p>
     <p class="montant">${f(d.montant)} F CFA</p>
     <p>au titre de mes frais avancés et de ma rémunération pour la journée du <b>${new Date(`${d.jourRemise}T12:00:00`).toLocaleDateString("fr-FR")}</b>.</p>
+    <p>Moyen de paiement : <b>${esc(d.mode || "Espèces")}</b>${d.reference ? ` — réf. ${esc(d.reference)}` : ""}</p>
     ${d.soldeRestant > 0 ? `<p class="petit">Reste dû après ce paiement : ${f(d.soldeRestant)} F.</p>` : `<p class="petit">Cette journée est entièrement réglée.</p>`}
     <div class="sign"><div>La caissière<br><b>${esc(d.payeParNom || "")}</b><div class="trait"></div></div><div>Le livreur<br><b>${esc(d.livreurNom)}</b><div class="trait"></div></div></div>
   </div>`;

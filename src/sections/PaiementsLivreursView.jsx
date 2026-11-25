@@ -41,6 +41,8 @@ export function PaiementsLivreurs() {
             <div className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>Nombre de paiements</p><p className="font-display text-xl font-semibold">{d.nb}</p></div>
             {d.parBoutique.map((b) => <div key={b.boutique} className="rounded-xl p-4" style={carte}><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>{b.boutique}</p><p className="font-display text-xl font-semibold">{fmt(b.total)} F</p></div>)}
           </div>
+          {d.parMode?.length > 0 && <div className="rounded-xl p-4" style={carte}><p className="text-sm font-medium mb-2">Par moyen de paiement</p>
+            {d.parMode.map((m) => <div key={m.mode} className="flex justify-between text-sm py-1"><span>{m.mode}</span><strong>{fmt(m.total)} F</strong></div>)}</div>}
           {d.parLivreur.length > 0 && <div className="rounded-xl p-4" style={carte}><p className="text-sm font-medium mb-2">Par livreur</p>
             {d.parLivreur.map((l) => <div key={l.livreur} className="flex justify-between text-sm py-1"><span>{l.livreur}</span><strong>{fmt(l.total)} F</strong></div>)}</div>}
           <div className="rounded-xl p-4" style={carte}>
@@ -49,7 +51,7 @@ export function PaiementsLivreurs() {
             <div className="overflow-x-auto"><table className="w-full text-sm"><tbody>
               {d.paiements.map((p) => (
                 <tr key={p.id} style={{ borderTop: "1px solid #F1E9DC" }}>
-                  <td className="py-2">{new Date(p.date).toLocaleDateString("fr-FR")}</td><td>{p.numero}</td><td>{p.livreurNom}</td><td>{p.boutique || "—"}</td><td>{p.payeParNom || "—"}</td>
+                  <td className="py-2">{new Date(p.date).toLocaleDateString("fr-FR")}</td><td>{p.numero}</td><td>{p.livreurNom}</td><td>{p.boutique || "—"}</td><td>{p.mode}</td><td>{p.payeParNom || "—"}</td>
                   <td className="text-right font-medium">{fmt(p.montant)} F</td>
                   <td className="text-right"><button type="button" onClick={() => recu(p.id)} title="Réimprimer le reçu" style={{ color: "#6B5D52" }}><Printer size={15} /></button></td>
                 </tr>))}
