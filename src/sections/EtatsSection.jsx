@@ -7,6 +7,7 @@ import { ReceiptModal } from "./VentesSection.jsx";
 import { PairesParMarque, ClientesARemercier, ClientesARelancer } from "./SuiviClientesViews.jsx";
 import { Statistiques, FraisExpedition } from "./LieuxLivreursView.jsx";
 import { ValeurStock } from "./ValeurStockView.jsx";
+import { PaiementsLivreurs } from "./PaiementsLivreursView.jsx";
 import { FichesIncompletes, EtatBonus, NouvellesClientes } from "./EtatsClientesViews.jsx";
 import { PointuresParMarque, MeilleursMois, HabitudesClientes } from "./AnalysesViews.jsx";
 
@@ -23,7 +24,7 @@ function todayISO() {
 // Menu réorganisé (derrière l'interrupteur lot1) : les états sont rangés par thème au lieu d'une longue liste.
 const GROUPES_ETATS = [
   ["Ventes", ["date", "mode", "type", "vendeur", "recap"]],
-  ["Livraisons et expéditions", ["livraisons", "stats-lieux", "exp-ci", "exp-hci", "frais-exp"]],
+  ["Livraisons et expéditions", ["livraisons", "stats-lieux", "exp-ci", "exp-hci", "frais-exp", "paiements-livreurs"]],
   ["Clientes et fidélité", ["clients", "nouvelles-cl", "fiches-inc", "bonus-etat", "remercier", "relancer", "habitudes"]],
   ["Stock et analyses", ["paires", "pointures-marque", "meilleurs-mois", "valeur-stock"]],
   ["Contrôle", ["audit"]],
@@ -48,6 +49,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
   const lot2 = !!fonctions.lot2;
   const lot3 = !!fonctions.lot3;
   const lot7 = !!fonctions.lot7;
+  const lot10 = !!fonctions.lot10;
   const ONGLETS_LOT3 = ["pointures-marque", "meilleurs-mois", "habitudes"];
 
   const [sousOnglet, setSousOnglet] = useState("date");
@@ -236,6 +238,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
     ...(LIVRAISON_ACTIF ? [{ id: "livraisons", label: "Livraisons", icon: Truck }] : []),
     // Lot 1 (B5) : états des livraisons et des expéditions, déplacés depuis Administration
     ...(estAdmin && lot1 ? [{ id: "stats-lieux", label: "Livraisons et expéditions", icon: Truck }, { id: "exp-ci", label: "Expéditions Côte d'Ivoire", icon: Truck }, { id: "exp-hci", label: "Expéditions hors Côte d'Ivoire", icon: Truck }, { id: "frais-exp", label: "Frais d'expédition", icon: Truck }] : []),
+    ...(estAdmin && lot10 ? [{ id: "paiements-livreurs", label: "Paiements aux livreurs", icon: Truck }] : []),
     // Lot 7 (I1) : valeur du stock au prix d'achat et de vente, marge
     ...(estAdmin && lot7 ? [{ id: "valeur-stock", label: "Valeur du stock et marge", icon: Store }] : []),
     // Lot 2 (C1, D2, D3) : états sur les clientes et la fidélité
@@ -270,7 +273,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
         </div>
 
         <div className="flex-1 min-w-0">
-      {ongletSuivi || (lot1 && ["stats-lieux", "exp-ci", "exp-hci", "frais-exp"].includes(sousOnglet)) || (lot7 && sousOnglet === "valeur-stock") || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) || (lot3 && ONGLETS_LOT3.includes(sousOnglet)) ? (
+      {ongletSuivi || (lot1 && ["stats-lieux", "exp-ci", "exp-hci", "frais-exp"].includes(sousOnglet)) || (lot7 && sousOnglet === "valeur-stock") || (lot10 && sousOnglet === "paiements-livreurs") || (lot2 && ["fiches-inc", "bonus-etat", "nouvelles-cl"].includes(sousOnglet)) || (lot3 && ONGLETS_LOT3.includes(sousOnglet)) ? (
         <>
           {lot3 && sousOnglet === "pointures-marque" && <PointuresParMarque />}
           {lot3 && sousOnglet === "meilleurs-mois" && <MeilleursMois />}
@@ -283,6 +286,7 @@ export default function EtatsSection({ sousOngletInitial, onSousOngletInitialCon
           {sousOnglet === "exp-hci" && <Statistiques key="exp-hci" vueInitiale="expeditions" zoneInitiale="HORS_CI" fige />}
           {sousOnglet === "frais-exp" && <FraisExpedition />}
           {lot7 && sousOnglet === "valeur-stock" && <ValeurStock />}
+          {lot10 && sousOnglet === "paiements-livreurs" && <PaiementsLivreurs />}
           {sousOnglet === "paires" && <PairesParMarque />}
           {sousOnglet === "remercier" && <ClientesARemercier />}
           {sousOnglet === "relancer" && <ClientesARelancer />}

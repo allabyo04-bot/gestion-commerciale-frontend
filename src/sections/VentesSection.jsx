@@ -57,6 +57,10 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
   const [expeditionZone, setExpeditionZone] = useState("");
   const [expeditionLieu, setExpeditionLieu] = useState("");
+  // Lot 10 : livreur qui emmène le colis au point d'expédition (le logiciel signale s'il n'est pas choisi)
+  const [livreurDepotId, setLivreurDepotId] = useState("");
+  const [livreursListe, setLivreursListe] = useState([]);
+  useEffect(() => { if (fonctions.lot10) api.referentiels.livreurs().then((l) => setLivreursListe((l || []).filter((x) => x.actif !== false))).catch(() => {}); }, [fonctions.lot10]);
   // Lot 1 (B3) : frais d'expédition pris en charge par la boutique
   const [fraisPris, setFraisPris] = useState(false);
   const fraisEstimeSaisi = useRef(false); // vrai dès que la caissière tape elle-même le coût estimé
@@ -229,7 +233,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
-    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisEstime(""); fraisEstimeSaisi.current = false; setPartCliente("");
+    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setLivreurDepotId(""); setFraisPris(false); setFraisEstime(""); fraisEstimeSaisi.current = false; setPartCliente("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -278,6 +282,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
         ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisEstime: Number(fraisEstime) || 0, partCliente: Number(partCliente) || 0 } : {}),
         expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
+        livreurDepotId: fonctions.lot10 && modeVente === "Expédition" && livreurDepotId ? livreurDepotId : undefined,
         demandeRemiseId: demandeRemise && demandeRemise.statut !== "REFUSEE" ? demandeRemise.id : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
         cartesCadeauxAEmettre: cartesCadeauxPanier.map(({ numero }) => ({ numero })),
@@ -386,7 +391,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                 )}
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => { setModeVente(e.target.value); setExpeditionZone(""); setExpeditionLieu(""); }} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m} value={m}>{libelleModeVente(m, lot1)}</option>)}</select>
+                <Field label="Mode de vente"><select value={modeVente} onChange={(e) => { setModeVente(e.target.value); setExpeditionZone(""); setExpeditionLieu(""); setLivreurDepotId(""); }} style={inputStyle}>{MODES_VENTE.map((m) => <option key={m} value={m}>{libelleModeVente(m, lot1)}</option>)}</select>
                 </Field>
 <Field label="Type de vente">
                   <div className="flex gap-2 mt-1">
@@ -458,6 +463,17 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
               </div>
               {lot1 && !clientId && nouvelleCliente && <FicheNouvelleCliente nc={nouvelleCliente} onChange={setNouvelleCliente} modeVente={modeVente} />}
               {modeVente === "Expédition" && <DestinationExpedition zone={expeditionZone} onZone={setExpeditionZone} lieu={expeditionLieu} onLieu={setExpeditionLieu} />}
+              {fonctions.lot10 && modeVente === "Expédition" && (
+                <div className="mt-3">
+                  <Field label="Livreur qui emmène le colis">
+                    <select value={livreurDepotId} onChange={(e) => setLivreurDepotId(e.target.value)} style={inputStyle}>
+                      <option value="">— Choisir le livreur —</option>
+                      {livreursListe.map((l) => <option key={l.id} value={l.id}>{l.nom}</option>)}
+                    </select>
+                  </Field>
+                  {!livreurDepotId && <p className="text-xs mt-1 px-3 py-2 rounded-lg" style={{ background: "#FBF3E3", color: "#8A6A22" }}>⚠ Le livreur n'est pas renseigné. Choisis-le : sans lui, son dépôt du colis ne sera pas compté dans sa paie.</p>}
+                </div>
+              )}
               {lot1 && modeVente === "Expédition" && (
                 <div className="rounded-lg p-3 mt-3" style={{ background: "#FAF7F2", border: "1px solid #EFE7D9" }}>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">

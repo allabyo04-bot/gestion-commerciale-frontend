@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Camera, Check, X, Plus, Trash2, Banknote } from "lucide-react";
+import { Camera, Check, X, Plus, Trash2, Banknote, Printer } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { BOUTIQUES, fmt } from "../constants.js";
+import { PaiementsLivreurs } from "./PaiementsLivreursView.jsx";
+import { imprimerRecuLivreur } from "../recuLivreur.js";
 import { Field, ErrorBanner, ConfirmModal, inputStyle, selectStyle } from "../components/Shared.jsx";
 
 // Lot 1 (B3) et lot 10 : menu « Livreurs » — frais d'expédition à saisir au retour du livreur, remise de fin de journée
@@ -14,6 +16,18 @@ const jourIso = (d) => d.toISOString().slice(0, 10);
 const dateFr = (j) => (j ? new Date(j.length <= 10 ? `${j}T12:00:00` : j).toLocaleDateString("fr-FR") : "—");
 const STATUT_FRAIS = { EN_COURS: ["En cours", "#8A6A22", "#FBF3E3"], A_REMBOURSER: ["À rembourser", "#B04A3B", "#FBEAE7"], CLOTUREE: ["Clôturée", "#3F6B4A", "#E9F0EA"] };
 const STATUT_BON = { A_VERIFIER: ["À vérifier", "#8A6A22", "#FBF3E3"], VALIDE: ["Validé", "#3F6B4A", "#E9F0EA"], REFUSE: ["Refusé", "#B04A3B", "#FBEAE7"] };
+const BandeauRecu = ({ id, onFermer }) => {
+  const [err, setErr] = useState("");
+  const imprimer = async () => { try { imprimerRecuLivreur(await api.remisesLivreurs.recu(id)); } catch (e) { setErr(e.message); } };
+  return (
+    <div className="rounded-lg p-3 mb-3 text-sm flex flex-wrap items-center gap-3" style={{ background: "#E9F0EA", color: "#3F6B4A" }}>
+      <span>Paiement enregistré. Imprime le reçu en double : la caissière et le livreur le signent.</span>
+      <button type="button" onClick={imprimer} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Printer size={14} /> Imprimer le reçu</button>
+      <button type="button" onClick={onFermer} style={contour}>Fermer</button>
+      {err && <span style={{ color: "#B04A3B" }}>{err}</span>}
+    </div>
+  );
+};
 const Pastille = ({ t }) => <span className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: t[1], background: t[2] }}>{t[0]}</span>;
 
 export default function LivreursSection() {
@@ -23,7 +37,7 @@ export default function LivreursSection() {
   const onglets = [
     ...(lot1 ? [["frais", "Frais d'expédition"]] : []),
     ...(lot10 ? [["remises", "Remises de fin de journée"]] : []),
-    ...(lot10 ? [["apayer", "À payer"]] : []),
+    ...(lot10 ? [["apayer", "À payer"], ["paiements", "Paiements faits"]] : []),
     ...(lot10 && estAdmin ? [["comptes", "Comptes des livreurs"], ["tarifs", "Tarifs"]] : []),
   ];
   const [onglet, setOnglet] = useState(onglets[0]?.[0] || "frais");
@@ -40,6 +54,7 @@ export default function LivreursSection() {
       {onglet === "frais" && lot1 && <FraisAttente estAdmin={estAdmin} />}
       {onglet === "remises" && lot10 && <Remises estAdmin={estAdmin} />}
       {onglet === "apayer" && lot10 && <APayer />}
+      {onglet === "paiements" && lot10 && <PaiementsLivreurs />}
       {onglet === "comptes" && lot10 && estAdmin && <Comptes />}
       {onglet === "tarifs" && lot10 && estAdmin && <Tarifs />}
     </div>
@@ -186,8 +201,10 @@ function RemiseDetail({ id, estAdmin, onClose }) {
   const [refus, setRefus] = useState({});
   const [apercu, setApercu] = useState(null);
   const [sug, setSug] = useState(null);
+  const [recuId, setRecuId] = useState(null);
+  const [paiements, setPaiements] = useState([]);
   const photo = useRef(null);
-  const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); } catch (e) { setError(e.message); } }, [id]);
+  const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); api.remisesLivreurs.paiements(id).then(setPaiements).catch(() => {}); } catch (e) { setError(e.message); } }, [id]);
   useEffect(() => { recharger(); }, [recharger]);
   useEffect(() => { if (r?.statut === "OUVERTE") api.remisesLivreurs.suggestion(id).then(setSug).catch(() => setSug(null)); }, [id, r?.statut, r?.remuneration]);
   useEffect(() => { if (r?.livreurId && r.statut === "OUVERTE") api.remisesLivreurs.fraisARembourser(r.livreurId).then(setARembourser).catch(() => {}); }, [r?.livreurId, r?.statut, r?.bons?.length]);
@@ -203,6 +220,7 @@ function RemiseDetail({ id, estAdmin, onClose }) {
           <button onClick={onClose}><X size={18} color="#6B5D52" /></button>
         </div>
         <ErrorBanner error={error} onClose={() => setError("")} />
+        {recuId && <BandeauRecu id={recuId} onFermer={() => setRecuId(null)} />}
         <div className="grid grid-cols-3 gap-3 mb-4">
           <Field label="Encaissé (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.encaisse} onBlur={(e) => Number(e.target.value) !== r.encaisse && agir(api.remisesLivreurs.modifier)(r.id, { encaisse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
           <Field label="Remis en main propre (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.verse} onBlur={(e) => Number(e.target.value) !== r.verse && agir(api.remisesLivreurs.modifier)(r.id, { verse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
@@ -274,9 +292,17 @@ function RemiseDetail({ id, estAdmin, onClose }) {
           <div className="flex justify-between pt-1" style={{ borderTop: "1px solid #DDD3C4" }}><span><strong>{r.solde > 0 ? "La boutique doit encore" : r.solde < 0 ? "Le livreur doit à la boutique" : "Solde"}</strong></span><strong style={{ color: r.solde > 0 ? "#B04A3B" : "#3F6B4A" }}>{fmt(Math.abs(r.solde))} F</strong></div>
         </div>
 
+        {paiements.length > 0 && (
+          <div className="mb-3 text-sm"><p className="text-xs mb-1" style={{ color: "#6B5D52" }}>Paiements faits sur cette remise :</p>
+            {paiements.map((p) => (
+              <div key={p.id} className="flex justify-between items-center py-0.5"><span>{p.numero} · {new Date(p.createdAt).toLocaleDateString("fr-FR")}</span>
+                <span className="flex items-center gap-2">{fmt(p.montant)} F <button type="button" title="Imprimer le reçu" onClick={() => setRecuId(p.id)} style={{ color: "#6B5D52" }}><Printer size={14} /></button></span></div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           {ouverte && <button type="button" onClick={() => agir(api.remisesLivreurs.valider)(r.id)} style={bouton()}>Valider la remise</button>}
-          {!ouverte && r.solde > 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.payer)(r.id)} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
+          {!ouverte && r.solde > 0 && <button type="button" onClick={async () => { try { setError(""); const x = await api.remisesLivreurs.payer(r.id); setR(x); setRecuId(x.paiementId); setPaiements(await api.remisesLivreurs.paiements(r.id)); } catch (e) { setError(e.message); } }} style={bouton("#3F6B4A")} className="inline-flex items-center gap-1"><Banknote size={14} /> Payer {fmt(r.solde)} F au livreur</button>}
           {estAdmin && !ouverte && r.paye === 0 && <button type="button" onClick={() => agir(api.remisesLivreurs.rouvrir)(r.id)} style={contour}>Rouvrir</button>}
         </div>
       </div>
@@ -340,11 +366,13 @@ function APayer() {
   const [error, setError] = useState("");
   const charger = useCallback(async () => { try { setD(await api.remisesLivreurs.aPayer()); } catch (e) { setError(e.message); } }, []);
   useEffect(() => { charger(); }, [charger]);
-  const payer = async (id) => { try { await api.remisesLivreurs.payer(id); charger(); } catch (e) { setError(e.message); } };
+  const [recuId, setRecuId] = useState(null);
+  const payer = async (id) => { try { const x = await api.remisesLivreurs.payer(id); setRecuId(x.paiementId); charger(); } catch (e) { setError(e.message); } };
   if (!d) return <ErrorBanner error={error} onClose={() => setError("")} />;
   return (
     <div>
       <ErrorBanner error={error} onClose={() => setError("")} />
+      {recuId && <BandeauRecu id={recuId} onFermer={() => setRecuId(null)} />}
       <div className="rounded-xl p-4 mb-4" style={carte}><p className="text-xs" style={{ color: "#6B5D52" }}>Total à payer aux livreurs</p><p className="font-display text-3xl font-semibold">{fmt(d.total)} F</p></div>
       {!d.livreurs.length && <p className="text-sm" style={{ color: "#6B5D52" }}>Rien à payer : tous les livreurs sont à jour.</p>}
       <div className="space-y-3">
