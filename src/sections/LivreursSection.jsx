@@ -23,7 +23,7 @@ export default function LivreursSection() {
   const onglets = [
     ...(lot1 ? [["frais", "Frais d'expédition"]] : []),
     ...(lot10 ? [["remises", "Remises de fin de journée"]] : []),
-    ...(lot10 && estAdmin ? [["apayer", "À payer"], ["comptes", "Comptes des livreurs"]] : []),
+    ...(lot10 && estAdmin ? [["apayer", "À payer"], ["comptes", "Comptes des livreurs"], ["tarifs", "Tarifs"]] : []),
   ];
   const [onglet, setOnglet] = useState(onglets[0]?.[0] || "frais");
   return (
@@ -40,6 +40,7 @@ export default function LivreursSection() {
       {onglet === "remises" && lot10 && <Remises estAdmin={estAdmin} />}
       {onglet === "apayer" && lot10 && estAdmin && <APayer />}
       {onglet === "comptes" && lot10 && estAdmin && <Comptes />}
+      {onglet === "tarifs" && lot10 && estAdmin && <Tarifs />}
     </div>
   );
 }
@@ -183,9 +184,11 @@ function RemiseDetail({ id, estAdmin, onClose }) {
   const [aRembourser, setARembourser] = useState([]);
   const [refus, setRefus] = useState({});
   const [apercu, setApercu] = useState(null);
+  const [sug, setSug] = useState(null);
   const photo = useRef(null);
   const recharger = useCallback(async () => { try { setR(await api.remisesLivreurs.lire(id)); } catch (e) { setError(e.message); } }, [id]);
   useEffect(() => { recharger(); }, [recharger]);
+  useEffect(() => { if (estAdmin && r?.statut === "OUVERTE") api.remisesLivreurs.suggestion(id).then(setSug).catch(() => setSug(null)); }, [estAdmin, id, r?.statut, r?.remuneration]);
   useEffect(() => { if (r?.livreurId && r.statut === "OUVERTE") api.remisesLivreurs.fraisARembourser(r.livreurId).then(setARembourser).catch(() => {}); }, [r?.livreurId, r?.statut, r?.bons?.length]);
   const agir = (f) => async (...a) => { try { setError(""); const x = await f(...a); if (x && x.id) setR(x); else await recharger(); } catch (e) { setError(e.message); } };
   const ouvrirPhoto = async (fichier) => { if (!fichier) return; try { setBon((b) => ({ ...b, preuve: "" })); setBon((b) => ({ ...b })); const p = await reduirePhoto(fichier); setBon((b) => ({ ...b, preuve: p })); } catch (e) { setError(e.message); } };
@@ -202,9 +205,21 @@ function RemiseDetail({ id, estAdmin, onClose }) {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <Field label="Encaissé (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.encaisse} onBlur={(e) => Number(e.target.value) !== r.encaisse && agir(api.remisesLivreurs.modifier)(r.id, { encaisse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
           <Field label="Remis en main propre (F)"><input type="number" min="0" disabled={!ouverte && !estAdmin} defaultValue={r.verse} onBlur={(e) => Number(e.target.value) !== r.verse && agir(api.remisesLivreurs.modifier)(r.id, { verse: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
-          <Field label="Rémunération (F)"><input type="number" min="0" disabled={!estAdmin || !ouverte} defaultValue={r.remuneration} onBlur={(e) => Number(e.target.value) !== r.remuneration && agir(api.remisesLivreurs.modifier)(r.id, { remuneration: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
+          <Field label="Rémunération (F)"><input type="number" min="0" disabled={!estAdmin || !ouverte} key={`remu${r.remuneration}`} defaultValue={r.remuneration} onBlur={(e) => Number(e.target.value) !== r.remuneration && agir(api.remisesLivreurs.modifier)(r.id, { remuneration: Number(e.target.value) || 0 })} style={inputStyle} /></Field>
         </div>
 
+
+        {estAdmin && ouverte && sug && (sug.lignes.length > 0 || sug.sansTarif.length > 0) && (
+          <div className="rounded-lg p-3 mb-4" style={{ background: "#F3F7F3", border: "1px solid #D5E3D6" }}>
+            <p className="text-sm font-medium mb-1">Rémunération calculée d'après les tarifs : {fmt(sug.total)} F</p>
+            <ul className="text-xs mb-2" style={{ color: "#6B5D52" }}>
+              {sug.lignes.map((l) => <li key={l.type + l.refId}>{l.libelle} — {fmt(l.montant)} F</li>)}
+              {sug.sansTarif.map((x) => <li key={x} style={{ color: "#B04A3B" }}>{x} — pas de tarif (non compté)</li>)}
+            </ul>
+            {sug.total !== r.remuneration && <button type="button" onClick={() => agir(api.remisesLivreurs.appliquerRemuneration)(r.id)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: "#3F6B4A", color: "#F3F7F3" }}>Appliquer cette rémunération</button>}
+            {sug.total === r.remuneration && <p className="text-xs" style={{ color: "#3F6B4A" }}>Déjà appliquée.</p>}
+          </div>
+        )}
         <p className="text-sm font-medium mb-2">Bons de frais avancés par le livreur</p>
         {!r.bons.length && <p className="text-sm mb-2" style={{ color: "#6B5D52" }}>Aucun bon pour le moment.</p>}
         <div className="space-y-2 mb-3">
@@ -273,6 +288,51 @@ function RemiseDetail({ id, estAdmin, onClose }) {
     </div>
   );
 }
+
+// ── Tarifs : ce que touche le livreur par lieu, et les frais d'expédition estimés par paire ──────────
+function Tarifs() {
+  const [t, setT] = useState(null);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const charger = useCallback(async () => { try { setT(await api.tarifsLivreur.lire()); } catch (e) { setError(e.message); } }, []);
+  useEffect(() => { charger(); }, [charger]);
+  const enregistrer = async (type, cle, valeur, ancien) => {
+    const v = valeur === "" ? "" : Number(valeur);
+    if ((v === "" && ancien == null) || v === ancien) return;
+    try { setError(""); await api.tarifsLivreur.regler(type, cle, v); setOk("Enregistré."); setTimeout(() => setOk(""), 1500); await charger(); } catch (e) { setError(e.message); }
+  };
+  const Ligne = ({ type, cle, titre, montant }) => (
+    <div className="flex items-center justify-between gap-3 py-1.5" style={{ borderBottom: "1px solid #EFE7D9" }}>
+      <span className="text-sm">{titre || cle}</span>
+      <span className="flex items-center gap-1"><input type="number" min="0" inputMode="numeric" defaultValue={montant ?? ""} key={`${type}${cle}${montant}`} placeholder="—"
+        onBlur={(e) => enregistrer(type, cle, e.target.value, montant)} style={{ ...inputStyle, marginTop: 0, width: 110, textAlign: "right" }} /><span className="text-xs" style={{ color: "#6B5D52" }}>F</span></span>
+    </div>
+  );
+  if (!t) return <ErrorBanner error={error} onClose={() => setError("")} />;
+  return (
+    <div className="max-w-xl space-y-5">
+      <ErrorBanner error={error} onClose={() => setError("")} />
+      {ok && <p className="text-xs" style={{ color: "#3F6B4A" }}>{ok}</p>}
+      <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="text-sm font-medium mb-1">Livraison à Abidjan — montant du livreur par commune</p>
+        <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Une commune sans tarif n'est pas comptée dans la rémunération calculée du soir. Une commune absente de cette liste s'ajoute dans Administration &gt; Listes.</p>
+        {t.livraison.map((l) => <Ligne key={l.cle} type="LIVRAISON" cle={l.cle} montant={l.montant} />)}
+      </div>
+      <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="text-sm font-medium mb-1">Expédition — montant du livreur qui dépose le colis (gare ou compagnie de transport)</p>
+        <Ligne type="DEPOT" cle="CI" titre="À l'intérieur de la Côte d'Ivoire (gare)" montant={t.depot.CI} />
+        <Ligne type="DEPOT" cle="HORS_CI" titre="Hors Côte d'Ivoire (compagnie de transport)" montant={t.depot.HORS_CI} />
+      </div>
+      <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EAE1D2" }}>
+        <p className="text-sm font-medium mb-1">Expédition — frais de transport estimés, par paire</p>
+        <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Proposés à la caisse comme coût estimé du colis (nombre de paires × ce montant). Le coût réel se saisit au retour du livreur. En Côte d'Ivoire, le montant réel est entre 1 000 et 1 500 F par paire : on part de 1 500 F.</p>
+        <Ligne type="FRAIS_PAIRE" cle="CI" titre="Côte d'Ivoire (par paire)" montant={t.fraisPaire.CI} />
+        <Ligne type="FRAIS_PAIRE" cle="HORS_CI" titre="Hors Côte d'Ivoire (par paire)" montant={t.fraisPaire.HORS_CI} />
+      </div>
+    </div>
+  );
+}
+
 
 // ── À payer (administratrice) ────────────────────────────────────────────────
 function APayer() {

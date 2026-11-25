@@ -154,6 +154,13 @@ export const api = {
     valider: (id) => request(`/api/remises-livreurs/${id}/valider`, { method: "POST", body: {} }),
     payer: (id, montant) => request(`/api/remises-livreurs/${id}/payer`, { method: "POST", body: montant ? { montant } : {} }),
     rouvrir: (id) => request(`/api/remises-livreurs/${id}/rouvrir`, { method: "POST", body: {} }),
+    suggestion: (id) => request(`/api/remises-livreurs/${id}/remuneration-suggeree`),
+    appliquerRemuneration: (id) => request(`/api/remises-livreurs/${id}/appliquer-remuneration`, { method: "POST", body: {} }),
+  },
+  tarifsLivreur: {
+    lire: () => request("/api/tarifs-livreur"),
+    regler: (type, cle, montant) => request("/api/tarifs-livreur", { method: "PUT", body: { type, cle, montant } }),
+    estimation: (zone, paires) => request(`/api/tarifs-livreur/estimation?zone=${encodeURIComponent(zone)}&paires=${paires}`),
   },
   bonsAchat: {
     liste: () => request("/api/bons-achat"),

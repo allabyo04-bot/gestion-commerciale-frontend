@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Trash2, X, ShoppingCart, Printer, Wallet, Search, Minus, PauseCircle, PlayCircle, RotateCcw, Gift, Percent, Clock, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -59,6 +59,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   const [expeditionLieu, setExpeditionLieu] = useState("");
   // Lot 1 (B3) : frais d'expédition pris en charge par la boutique
   const [fraisPris, setFraisPris] = useState(false);
+  const fraisEstimeSaisi = useRef(false); // vrai dès que la caissière tape elle-même le coût estimé
   const [fraisEstime, setFraisEstime] = useState("");
   const [partCliente, setPartCliente] = useState("");
   const [modeVente, setModeVente] = useState(MODES_VENTE[0]);
@@ -91,6 +92,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, [boutique]);
   useEffect(() => { load(); }, [load]);
+  // Lot 10 : coût estimé de l'expédition proposé d'après le nombre de paires et le tarif par paire de la zone (la caissière peut le corriger).
+  const nbPairesPanier = lignes.filter((l) => l.pointure).reduce((n, l) => n + l.quantite, 0);
+  useEffect(() => {
+    if (!fonctions.lot10 || !fonctions.lot1 || modeVente !== "Expédition" || !fraisPris || !expeditionZone || fraisEstimeSaisi.current) return;
+    api.tarifsLivreur.estimation(expeditionZone, nbPairesPanier).then((r) => { if (r.estime != null && !fraisEstimeSaisi.current) setFraisEstime(String(r.estime)); }).catch(() => {});
+  }, [fonctions.lot10, fonctions.lot1, modeVente, fraisPris, expeditionZone, nbPairesPanier]);
 
   useEffect(() => {
     api.denominationsCartesCadeaux.lister().then(setDenominationsCartes).catch(() => {});
@@ -222,7 +229,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
-    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisEstime(""); setPartCliente("");
+    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setFraisPris(false); setFraisEstime(""); fraisEstimeSaisi.current = false; setPartCliente("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -459,7 +466,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   {fraisPris && (
                     <>
                       <div className="grid grid-cols-2 gap-3 mt-3">
-                        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Coût estimé de l'expédition (F)</label><input type="number" min="0" inputMode="numeric" value={fraisEstime} onChange={(e) => setFraisEstime(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
+                        <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Coût estimé de l'expédition (F)</label><input type="number" min="0" inputMode="numeric" value={fraisEstime} onChange={(e) => { fraisEstimeSaisi.current = true; setFraisEstime(e.target.value); }} style={{ ...inputStyle, marginTop: 0 }} /></div>
                         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Part payée par la cliente (F, 0 si rien)</label><input type="number" min="0" inputMode="numeric" value={partCliente} onChange={(e) => setPartCliente(e.target.value)} style={{ ...inputStyle, marginTop: 0 }} /></div>
                       </div>
                       <p className="text-xs mt-2" style={{ color: "#6B5D52" }}>À la charge de la boutique (estimation) : <strong>{fmt(Math.max(0, (Number(fraisEstime) || 0) - (Number(partCliente) || 0)))} F</strong>. Le coût réel se saisit au retour du livreur (menu Livreurs).</p>
