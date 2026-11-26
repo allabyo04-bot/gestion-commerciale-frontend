@@ -105,7 +105,7 @@ useEffect(() => { if (tab === "historique") loadMouvements(articleFiltreId); }, 
     try {
       let articleId = form.id;
       if (form.isNew) articleId = (await api.articles.create(form)).id;
-      else await api.articles.update(form.id, { designation: form.designation, prixVente: form.prixVente, actif: form.actif });
+      else await api.articles.update(form.id, { designation: form.designation, prixVente: form.prixVente, actif: form.actif, ...(lot5 && estAdmin ? { prixAchat: form.prixAchat, prixAchatEuro: form.prixAchatEuro } : {}) });
       if (lot5 && form.caracValeurs && Object.keys(form.caracValeurs).length) { await api.caracteristiques.setArticle(articleId, form.caracValeurs); await carac.recharger(); }
       setModalArticle(null); setError(""); load();
     } catch (e) { setError(e.message); }
@@ -401,8 +401,16 @@ const ajouterStock = async (articleId, boutique, pointure, quantite) => {
 
 function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
   const { actif: publicsActifs, publics } = usePointures();
-  const [form, setForm] = useState(article);
+  const { user: utilisateur, fonctions: fonctionsFiche } = useAuth();
+  const voitAchat = !!fonctionsFiche?.lot5 && !!utilisateur?.role?.systeme; // prix d'achat : réservé à l'administratrice
+  const [form, setForm] = useState({ ...article, prixAchat: article.prixAchat != null ? String(article.prixAchat) : "", prixAchatEuro: article.prixAchatEuro != null ? String(article.prixAchatEuro).replace(".", ",") : "" });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const changerEuro = (v) => {
+    const e = Number(String(v).replace(",", "."));
+    setForm((f) => ({ ...f, prixAchatEuro: v, ...(v !== "" && Number.isFinite(e) ? { prixAchat: String(Math.round(e * 655.957)) } : {}) }));
+  };
+  const achatF = Number(form.prixAchat), venteF = Number(form.prixVente);
+  const margeF = form.prixAchat !== "" && venteF > 0 ? venteF - achatF : null;
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-10" style={{ background: "rgba(43,35,32,0.45)" }}>
       <div className="rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: "#FFFDF9" }}>
@@ -432,6 +440,16 @@ function ArticleModal({ article, brands, carac, onError, onCancel, onSubmit }) {
           </Field>
           <Field label="Prix de vente (F CFA)"><input value={form.prixVente} onChange={(e) => set("prixVente", e.target.value.replace(/\D/g, ""))} style={inputStyle} inputMode="numeric" /></Field>
         </div>
+        {voitAchat && (
+          <div className="mt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Prix d'achat (€)"><input value={form.prixAchatEuro} onChange={(e) => changerEuro(e.target.value.replace(/[^0-9.,]/g, ""))} style={inputStyle} inputMode="decimal" /></Field>
+              <Field label="Prix d'achat (F CFA)"><input value={form.prixAchat} onChange={(e) => setForm((f) => ({ ...f, prixAchat: e.target.value.replace(/\D/g, ""), prixAchatEuro: "" }))} style={inputStyle} inputMode="numeric" /></Field>
+            </div>
+            {margeF !== null && <p className="text-xs -mt-2 mb-2" style={{ color: margeF >= 0 ? "#3F6B3A" : "#B3261E" }}>Marge : {fmt(margeF)} F — taux de marque {Math.round((margeF / venteF) * 1000) / 10} %</p>}
+            <p className="text-xs mb-2" style={{ color: "#6B5D52" }}>Visible uniquement par l'administratrice. 1 € = 655,957 F.</p>
+          </div>
+        )}
         <ChampsCaracteristiques carac={carac} famille={form.famille} valeurs={form.caracValeurs || {}} onChange={(v) => set("caracValeurs", v)} onError={onError} />
         {!form.isNew && (
           <p className="text-xs mt-3" style={{ color: "#6B5D52" }}>La famille et la marque ne sont pas modifiables après création (ça changerait la structure du stock déjà en place).</p>
