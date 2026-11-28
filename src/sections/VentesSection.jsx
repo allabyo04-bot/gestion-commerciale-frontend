@@ -55,6 +55,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   // Cliente dont le numéro n'a pas de fiche : la caissière peut la créer sans quitter la vente. La fiche n'est créée
   // qu'à la validation de la vente (jamais pendant la saisie), et ne bloque jamais la vente.
   const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
+  const [carteConflit, setCarteConflit] = useState(null); // propriétaire d'une carte de fidélité déjà attribuée
   const [consentementWa, setConsentementWa] = useState(false); // la cliente accepte ses reçus sur WhatsApp (demandé une seule fois)
   useEffect(() => { setConsentementWa(false); }, [clientId, nouvelleCliente?.telephone]); // propre à chaque cliente
   const [expeditionZone, setExpeditionZone] = useState("");
@@ -293,9 +294,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
       });
       setReceipt(vente);
       resetVente();
-      setError("");
+      setError(""); setCarteConflit(null);
       load();
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      setError(e.message);
+      setCarteConflit(e.data?.carteProprietaire || null);
+    }
   };
 
   const mettreEnAttente = async () => {
@@ -467,6 +471,15 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                 </Field>
                 </div>
               </div>
+              {carteConflit && nouvelleCliente && (
+                <div className="mt-2 p-3 rounded-lg text-sm" style={{ background: "#FFF4E5", border: "1px solid #F0D4A8", color: "#7A4A12" }}>
+                  <p>Cette carte est déjà à <b>{carteConflit.nomPrenoms}</b>{carteConflit.telephone ? ` (${carteConflit.telephone})` : ""}.</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <button type="button" onClick={() => { setClientId(carteConflit.id); setNouvelleCliente(null); setCarteConflit(null); setError(""); }} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC" }}>C'est elle : utiliser sa fiche</button>
+                    <button type="button" onClick={() => { setNouvelleCliente({ ...nouvelleCliente, carteFidelite: "" }); setCarteConflit(null); setError(""); }} className="px-3 py-1.5 rounded-lg text-xs" style={{ border: "1px solid #F0D4A8" }}>Ce n'est pas elle : continuer sans la carte</button>
+                  </div>
+                </div>
+              )}
               {fonctions.recuWhatsapp && (nouvelleCliente || (clientId && !clients.find((c) => c.id === clientId)?.consentementWhatsapp)) && (
                 <label className="flex items-start gap-2 text-xs mt-2 p-2 rounded-lg" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", color: "#2F5A3A" }}>
                   <input type="checkbox" checked={consentementWa} onChange={(e) => setConsentementWa(e.target.checked)} className="mt-0.5" />
@@ -954,6 +967,11 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
           <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>{MESSAGE_FIN_TICKET}</p>
         </div>
 
+        {vente.ficheCliente?.carteDejaAttribuee && (
+          <div className="no-print mt-4 p-2 rounded-lg text-xs" style={{ background: "#FFF4E5", border: "1px solid #F0D4A8", color: "#7A4A12", fontFamily: "'Inter', sans-serif" }}>
+            Carte enregistrée : <b>{vente.ficheCliente.carteDejaAttribuee}</b>. Carte saisie : <b>{vente.ficheCliente.carteSaisie}</b>, non retenue. Djenie en est informée dans le journal d'audit.
+          </div>
+        )}
         {recuWaActif && (
           <div className="no-print mt-4 p-3 rounded-lg text-sm" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", fontFamily: "'Inter', sans-serif" }}>
             <p className="font-medium mb-2" style={{ color: "#2F5A3A" }}>Envoyer le reçu en PDF par WhatsApp</p>

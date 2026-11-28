@@ -13,6 +13,7 @@ const ACTION_LABELS = {
   ROLE_MODIFIE: "Rôle modifié",
   REPRISE_LIVRAISONS: "Reprise des livraisons",
   REPRISE_LIVRAISONS_ANNULEE: "Reprise annulée",
+  CARTE_NON_RETENUE: "Carte de fidélité non retenue",
 };
 const ACTION_COLORS = {
   PRIX_MODIFIE: { fg: "#A8823D", bg: "#FBF3E3" },
@@ -22,6 +23,7 @@ const ACTION_COLORS = {
   ROLE_MODIFIE: { fg: "#8C3B2E", bg: "#FBF3EC" },
   REPRISE_LIVRAISONS: { fg: "#3F6B4A", bg: "#E9F0EA" },
   REPRISE_LIVRAISONS_ANNULEE: { fg: "#B04A3B", bg: "#FBEAE7" },
+  CARTE_NON_RETENUE: { fg: "#A8823D", bg: "#FBF3E3" },
 };
 
 function Onglets({ vue, setVue }) {
