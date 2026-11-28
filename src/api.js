@@ -174,7 +174,7 @@ export const api = {
   },
   valeurStock: (params = {}) => request(`/api/etats/valeur-stock?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   prixAchatEuro: (articleId, prixAchatEuro) => request(`/api/articles/${articleId}/prix-achat-euro`, { method: "PUT", body: { prixAchatEuro } }),
-  whatsapp: { etat: () => request("/api/whatsapp/etat") },
+  whatsapp: { etat: () => request("/api/whatsapp/etat"), modeleRecu: () => request("/api/whatsapp/modele-recu") },
   // Reçu de vente en PDF envoyé par WhatsApp (interrupteur « recuWhatsapp »).
   recuWhatsapp: {
     etat: (venteId) => request(`/api/recu-whatsapp/${venteId}/etat`),

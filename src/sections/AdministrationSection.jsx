@@ -71,6 +71,13 @@ function Interrupteurs() {
 function WhatsappEtat() {
   const [etat, setEtat] = useState(null);
   const [message, setMessage] = useState("");
+  const [modele, setModele] = useState(null); // statut du modèle de reçu chez Meta
+  const [modeleEnCours, setModeleEnCours] = useState(false);
+  const verifierModele = async () => {
+    setModeleEnCours(true); setModele(null);
+    try { setModele(await api.whatsapp.modeleRecu()); } catch (e) { setModele({ erreur: e.message }); } finally { setModeleEnCours(false); }
+  };
+  const LIBELLE_STATUT = { APPROVED: "Approuvé ✓", PENDING: "En attente de Meta…", REJECTED: "Refusé ✗", PAUSED: "En pause", DISABLED: "Désactivé", IN_APPEAL: "En appel" };
   const charger = async () => { try { setMessage(""); setEtat(await api.whatsapp.etat()); } catch (e) { setMessage(e.message); } };
   useEffect(() => { charger(); }, []);
   const base = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, "");
@@ -92,6 +99,16 @@ function WhatsappEtat() {
         </div>
       )}
       <button type="button" onClick={charger} className="mt-3 px-3 py-1.5 rounded-full text-xs" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>Actualiser</button>
+      <button type="button" onClick={verifierModele} disabled={modeleEnCours} className="mt-3 ml-2 px-3 py-1.5 rounded-full text-xs" style={{ border: "1px solid #DDD3C4", color: "#6B5D52" }}>{modeleEnCours ? "Vérification…" : "Vérifier le modèle du reçu"}</button>
+      {modele && (
+        <div className="mt-3 text-xs" style={{ color: "#6B5D52" }}>
+          {modele.erreur && <p style={{ color: "#B04A3B" }}>{modele.erreur}</p>}
+          {!modele.erreur && modele.trouves.length === 0 && <p style={{ color: "#B04A3B" }}>Aucun modèle nommé « {modele.nom} » trouvé (360dialog en liste {modele.nbModeles}). Vérifie le nom exact du modèle.</p>}
+          {!modele.erreur && modele.trouves.map((t, i) => (
+            <p key={i}>Modèle <b>{t.nom}</b> ({t.langue}, {t.categorie || "catégorie inconnue"}) : <b style={{ color: t.statut === "APPROVED" ? "#2F5A3A" : t.statut === "REJECTED" ? "#B04A3B" : "#6B5D52" }}>{LIBELLE_STATUT[t.statut] || t.statut}</b>{t.raisonRefus && t.raisonRefus !== "NONE" ? ` — raison : ${t.raisonRefus}` : ""}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
