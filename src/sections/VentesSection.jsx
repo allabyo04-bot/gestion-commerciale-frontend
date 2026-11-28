@@ -402,6 +402,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                     <button type="button" onClick={() => setTypeVente("Credit")} className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={typeVente === "Credit" ? { background: "#8C3B2E", color: "#FBF3EC" } : { border: "1px solid #DDD3C4", color: "#6B5D52" }}>Credit</button>
                   </div>
                 </Field>
+                <div className="sm:col-span-2">
                 <Field label="Client (nom, n° carte ou téléphone)">
                   {clientId ? (
                     <div className="flex items-center justify-between mt-1 px-3 py-2 rounded-lg" style={{ background: "#F1E9DC" }}>
@@ -463,6 +464,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                     </div>
                   )}
                 </Field>
+                </div>
               </div>
               {fonctions.recuWhatsapp && (nouvelleCliente || (clientId && !clients.find((c) => c.id === clientId)?.consentementWhatsapp)) && (
                 <label className="flex items-start gap-2 text-xs mt-2 p-2 rounded-lg" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", color: "#2F5A3A" }}>
