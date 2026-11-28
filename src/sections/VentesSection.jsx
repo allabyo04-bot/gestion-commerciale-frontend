@@ -55,6 +55,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   // Cliente dont le numéro n'a pas de fiche : la caissière peut la créer sans quitter la vente. La fiche n'est créée
   // qu'à la validation de la vente (jamais pendant la saisie), et ne bloque jamais la vente.
   const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
+  const [consentementWa, setConsentementWa] = useState(false); // la cliente accepte ses reçus sur WhatsApp (demandé une seule fois)
   const [expeditionZone, setExpeditionZone] = useState("");
   const [expeditionLieu, setExpeditionLieu] = useState("");
   // Lot 10 : livreur qui emmène le colis au point d'expédition (le logiciel signale s'il n'est pas choisi)
@@ -233,7 +234,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
 
   const resetVente = () => {
     setLignes([]); setPaiements([]); setClientId(""); setClientSearch(""); setModeVente(MODES_VENTE[0]);
-    setNouvelleCliente(null); setExpeditionZone(""); setExpeditionLieu(""); setLivreurDepotId(""); setFraisPris(false); setFraisEstime(""); fraisEstimeSaisi.current = false; setPartCliente("");
+    setNouvelleCliente(null); setConsentementWa(false); setExpeditionZone(""); setExpeditionLieu(""); setLivreurDepotId(""); setFraisPris(false); setFraisEstime(""); fraisEstimeSaisi.current = false; setPartCliente("");
     setVendeurId(""); setDemandeRemise(null); setRemiseFormOuvert(false); setRemiseValeur("");
     setCartesCadeauxPanier([]); setCarteFormOuvert(false); setCarteNumeroForm("");
   };
@@ -279,6 +280,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
         nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined, whatsapp: (nouvelleCliente.whatsapp || "").trim() || undefined, adresse: (nouvelleCliente.adresse || "").trim() || undefined } : undefined,
+        consentementWhatsapp: fonctions.recuWhatsapp && consentementWa ? true : undefined,
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
         ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisEstime: Number(fraisEstime) || 0, partCliente: Number(partCliente) || 0 } : {}),
         expeditionLieu: modeVente === "Expédition" ? expeditionLieu.trim() : undefined,
@@ -461,6 +463,12 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                   )}
                 </Field>
               </div>
+              {fonctions.recuWhatsapp && (nouvelleCliente || (clientId && !clients.find((c) => c.id === clientId)?.consentementWhatsapp)) && (
+                <label className="flex items-start gap-2 text-xs mt-2 p-2 rounded-lg" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", color: "#2F5A3A" }}>
+                  <input type="checkbox" checked={consentementWa} onChange={(e) => setConsentementWa(e.target.checked)} className="mt-0.5" />
+                  <span>La cliente accepte de recevoir ses reçus sur WhatsApp (à demander une seule fois).</span>
+                </label>
+              )}
               {lot1 && !clientId && nouvelleCliente && <FicheNouvelleCliente nc={nouvelleCliente} onChange={setNouvelleCliente} modeVente={modeVente} />}
               {modeVente === "Expédition" && <DestinationExpedition zone={expeditionZone} onZone={setExpeditionZone} lieu={expeditionLieu} onLieu={setExpeditionLieu} />}
               {fonctions.lot10 && modeVente === "Expédition" && (
@@ -955,7 +963,8 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
                     <span>La cliente accepte de recevoir son reçu sur WhatsApp (et, plus tard, les nouveautés de la boutique).</span>
                   </label>
                 )}
-                {waEtat.dejaEnvoyeLe && <p className="text-xs mb-2" style={{ color: "#2F5A3A" }}>Déjà envoyé le {new Date(waEtat.dejaEnvoyeLe).toLocaleString("fr-FR")}.</p>}
+                {waEtat.dejaEnvoyeLe && <p className="text-xs mb-2" style={{ color: "#2F5A3A" }}>Reçu envoyé sur WhatsApp le {new Date(waEtat.dejaEnvoyeLe).toLocaleString("fr-FR")} ✓</p>}
+                {!waEtat.dejaEnvoyeLe && waEtat.dernierEchec && <p className="text-xs mb-2" style={{ color: "#B04A3B" }}>Dernier envoi échoué : {waEtat.dernierEchec}</p>}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => envoyerRecuPdf(!!waEtat.dejaEnvoyeLe)} disabled={waEnCours || (!waEtat.consentement && !waAccord)}
                     className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: waEnCours || (!waEtat.consentement && !waAccord) ? "#9DBFA4" : "#25D366", color: "#fff" }}>

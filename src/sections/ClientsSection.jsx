@@ -484,6 +484,12 @@ function ClientModal({ client, onCancel, onSubmit }) {
         {lot2 && (
           <Field label="Comment nous a-t-elle connus ?"><select value={form.canalConnaissance || ""} onChange={(e) => set("canalConnaissance", e.target.value)} style={inputStyle}><option value="">— Non renseigné —</option>{canaux.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}</select></Field>
         )}
+        {fonctions?.recuWhatsapp && (
+          <label className="flex items-start gap-2 text-xs mb-3 p-2 rounded-lg" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", color: "#2F5A3A" }}>
+            <input type="checkbox" checked={!!form.consentementWhatsapp} onChange={(e) => set("consentementWhatsapp", e.target.checked)} className="mt-0.5" />
+            <span>La cliente accepte de recevoir ses reçus sur WhatsApp.</span>
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Carte de Fidélité"><input value={form.carteFidelite} onChange={(e) => set("carteFidelite", e.target.value)} style={inputStyle} /></Field>
           <Field label="Date de Délivrance"><input type="date" value={form.dateDelivrance} onChange={(e) => set("dateDelivrance", e.target.value)} style={inputStyle} /></Field>
