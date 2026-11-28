@@ -280,7 +280,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
     try {
       const vente = await api.ventes.create({
         boutique, vendeurId, modeVente, typeVente, clientId: clientId || null,
-        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined, whatsapp: (nouvelleCliente.whatsapp || "").trim() || undefined, adresse: (nouvelleCliente.adresse || "").trim() || undefined } : undefined,
+        nouvelleCliente: !clientId && nouvelleCliente ? { telephone: nouvelleCliente.telephone, nom: nouvelleCliente.nom.trim(), pointure: nouvelleCliente.pointure || undefined, civilite: nouvelleCliente.civilite, jourAnniv: nouvelleCliente.jourAnniv || undefined, moisAnniv: nouvelleCliente.moisAnniv || undefined, commune: nouvelleCliente.commune || undefined, quartier: (nouvelleCliente.quartier || "").trim() || undefined, whatsapp: (nouvelleCliente.whatsapp || "").trim() || undefined, adresse: (nouvelleCliente.adresse || "").trim() || undefined, carteFidelite: (nouvelleCliente.carteFidelite || "").trim() || undefined } : undefined,
         consentementWhatsapp: fonctions.recuWhatsapp && consentementWa ? true : undefined,
         expeditionZone: modeVente === "Expédition" ? expeditionZone : undefined,
         ...(lot1 && modeVente === "Expédition" && fraisPris ? { fraisPrisEnCharge: true, fraisEstime: Number(fraisEstime) || 0, partCliente: Number(partCliente) || 0 } : {}),
@@ -440,6 +440,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
                           {COMMUNES.map((c) => <option key={c}>{c}</option>)}
                         </select>
                         <input value={nouvelleCliente.quartier} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, quartier: e.target.value })} placeholder="Quartier (facultatif)" style={{ ...inputStyle, marginTop: 0 }} />
+                        <input value={nouvelleCliente.carteFidelite || ""} onChange={(e) => setNouvelleCliente({ ...nouvelleCliente, carteFidelite: e.target.value })} placeholder="N° carte de fidélité (facultatif)" style={{ ...inputStyle, marginTop: 0 }} className="col-span-2" />
                       </div>}
                       <p className="text-xs mt-2" style={{ color: "#8A6A22" }}>Sa fiche sera créée à la validation de la vente. Seuls le nom et le téléphone sont obligatoires.</p>
                     </div>
@@ -817,6 +818,7 @@ function FicheNouvelleCliente({ nc, onChange, modeVente }) {
           <select value={nc.jourAnniv} onChange={maj("jourAnniv")} style={st}><option value="">—</option>{JOURS.map((j) => <option key={j}>{j}</option>)}</select></div>
         <div><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Anniversaire (mois)</label>
           <select value={nc.moisAnniv} onChange={maj("moisAnniv")} style={st}><option value="">—</option>{MOIS.map((m) => <option key={m}>{m}</option>)}</select></div>
+        <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>N° de carte de fidélité (facultatif)</label><input value={nc.carteFidelite || ""} onChange={maj("carteFidelite")} style={st} /></div>
         {fonctions.lot2 && <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>Comment nous a-t-elle connus ? (facultatif)</label><select value={nc.canal || ""} onChange={maj("canal")} style={st}><option value="">—</option>{canaux.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}</select></div>}
         <div className="sm:col-span-3"><label className="block text-xs mb-1" style={{ color: "#6B5D52" }}>WhatsApp (si différent du téléphone)</label><input value={nc.whatsapp || ""} onChange={maj("whatsapp")} style={st} inputMode="tel" /></div>
         {!expedition && (
