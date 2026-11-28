@@ -206,6 +206,7 @@ export default function LivraisonSection() {
 function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, onClientCree }) {
   const { user: utilisateur, fonctions } = useAuth();
   const lot1 = !!fonctions.lot1;
+  const [consentementWa, setConsentementWa] = useState(false); // la cliente accepte ses reçus sur WhatsApp (demandé une seule fois)
   const cleBrouillon = `gc_brouillon_bon_${utilisateur?.id || ""}`;
   const [boutique, setBoutique] = useState(boutiqueDefaut);
   const [clientId, setClientId] = useState("");
@@ -286,6 +287,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     ? (clients || []).filter((c) => c.nomPrenoms.toLowerCase().includes(rechercheClient.trim().toLowerCase()) || (c.telephone || "").includes(rechercheClient.trim())).slice(0, 8)
     : [];
   const choisirClient = (c) => { setClientId(c.id); setClientNom(c.nomPrenoms); setClientTelephone(c.telephone || ""); setClientPointure(c.pointure || ""); setRechercheClient(""); };
+  useEffect(() => { setConsentementWa(false); }, [clientTelephone]); // le consentement est propre à chaque cliente
   const retirerClient = () => { setClientId(""); setClientNom(""); setClientTelephone(""); setClientPointure(""); setRechercheTel(null); };
 
   const resultatsRecherche = rechercheArticle.trim()
@@ -342,6 +344,7 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
     try {
       const bon = await api.bonsLivraison.creer({
         boutique, clientNom: clientNom.trim() || "Cliente", clientTelephone: clientTelephone.trim(), clientId: clientId || undefined,
+        consentementWhatsapp: fonctions.recuWhatsapp && consentementWa ? true : undefined,
         clientPointure: clientPointure || undefined, commune, quartier: quartier.trim() || undefined, livreurId, notes: notes || undefined,
         avance: avanceNum, avanceModePaiement: avanceNum > 0 ? avanceModePaiement : undefined,
         lignes: lignes.map(({ articleId, pointure, quantite }) => ({ articleId, pointure, quantite })),
@@ -389,6 +392,13 @@ function NouveauBonForm({ articles, boutiqueDefaut, clients, onCree, onError, on
               telephone={clientTelephone} onTelephone={(v) => { setClientTelephone(v); if (clientId) setClientId(""); }}
               nom={clientNom} onNom={setClientNom} pointure={clientPointure} onPointure={setClientPointure}
               pointureObligatoire masquerPointureSiConnue={lot1} autoFocus onResolution={setRechercheTel} />
+
+            {fonctions.recuWhatsapp && (
+              <label className="flex items-start gap-2 text-xs mt-3 p-2 rounded-lg" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", color: "#2F5A3A" }}>
+                <input type="checkbox" checked={consentementWa} onChange={(e) => setConsentementWa(e.target.checked)} className="mt-0.5" />
+                <span>La cliente accepte de recevoir ses reçus sur WhatsApp (à demander une seule fois).</span>
+              </label>
+            )}
 
             <details className="mt-3">
               <summary className="text-xs cursor-pointer" style={{ color: "#8C3B2E" }}>Chercher la cliente par son nom</summary>

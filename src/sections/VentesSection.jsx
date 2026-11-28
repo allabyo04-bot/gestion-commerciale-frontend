@@ -56,6 +56,7 @@ export default function VentesSection({ subTabInitial, onSubTabInitialConsomme }
   // qu'à la validation de la vente (jamais pendant la saisie), et ne bloque jamais la vente.
   const [nouvelleCliente, setNouvelleCliente] = useState(null); // { telephone, nom, pointure }
   const [consentementWa, setConsentementWa] = useState(false); // la cliente accepte ses reçus sur WhatsApp (demandé une seule fois)
+  useEffect(() => { setConsentementWa(false); }, [clientId, nouvelleCliente?.telephone]); // propre à chaque cliente
   const [expeditionZone, setExpeditionZone] = useState("");
   const [expeditionLieu, setExpeditionLieu] = useState("");
   // Lot 10 : livreur qui emmène le colis au point d'expédition (le logiciel signale s'il n'est pas choisi)
