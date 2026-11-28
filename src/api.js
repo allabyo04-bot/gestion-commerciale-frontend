@@ -175,6 +175,16 @@ export const api = {
   valeurStock: (params = {}) => request(`/api/etats/valeur-stock?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   prixAchatEuro: (articleId, prixAchatEuro) => request(`/api/articles/${articleId}/prix-achat-euro`, { method: "PUT", body: { prixAchatEuro } }),
   whatsapp: { etat: () => request("/api/whatsapp/etat") },
+  // Reçu de vente en PDF envoyé par WhatsApp (interrupteur « recuWhatsapp »).
+  recuWhatsapp: {
+    etat: (venteId) => request(`/api/recu-whatsapp/${venteId}/etat`),
+    envoyer: (venteId, corps) => request(`/api/recu-whatsapp/${venteId}/envoyer`, { method: "POST", body: corps }),
+    apercu: async (venteId) => {
+      const res = await fetch(`${API_URL}/api/recu-whatsapp/${venteId}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      return URL.createObjectURL(await res.blob());
+    },
+  },
   rappels: {
     apercu: () => request("/api/rappels/apercu"),
     envoyer: () => request("/api/rappels/envoyer", { method: "POST", body: {} }),

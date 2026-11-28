@@ -848,6 +848,28 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
   const numeroClient = vente.client && (vente.client.whatsapp || vente.client.telephone);
   const numeroWA = numeroWhatsApp(numeroClient, vente.client?.pays || "Côte d'Ivoire");
 
+  // Reçu en PDF envoyé automatiquement par WhatsApp (interrupteur « recuWhatsapp ») : consentement de la cliente d'abord.
+  const recuWaActif = !!fonctions.recuWhatsapp && !!vente.client && vente.statut !== "Annulee";
+  const [waEtat, setWaEtat] = useState(null);
+  const [waAccord, setWaAccord] = useState(false);
+  const [waMessage, setWaMessage] = useState(null); // { ok, texte }
+  const [waEnCours, setWaEnCours] = useState(false);
+  useEffect(() => {
+    if (!recuWaActif) return;
+    api.recuWhatsapp.etat(vente.id).then(setWaEtat).catch(() => setWaEtat(null));
+  }, [recuWaActif, vente.id]);
+  const envoyerRecuPdf = async (renvoyer = false) => {
+    setWaEnCours(true); setWaMessage(null);
+    try {
+      await api.recuWhatsapp.envoyer(vente.id, { consentement: waAccord || undefined, renvoyer: renvoyer || undefined });
+      setWaMessage({ ok: true, texte: "Reçu envoyé sur WhatsApp." });
+      setWaEtat(await api.recuWhatsapp.etat(vente.id));
+    } catch (e) { setWaMessage({ ok: false, texte: e.message }); } finally { setWaEnCours(false); }
+  };
+  const voirApercu = async () => {
+    try { window.open(await api.recuWhatsapp.apercu(vente.id), "_blank"); } catch (e) { setWaMessage({ ok: false, texte: e.message }); }
+  };
+
   const envoyerSurWhatsApp = () => {
     const message = [
       "Merci pour votre achat de ce jour chez La Pointure Españole !",
@@ -919,9 +941,36 @@ const totalPayeRecu = vente.paiements.reduce((s, p) => s + p.montant, 0);
           <p className="text-xs text-center whitespace-pre-line leading-relaxed" style={{ color: "#6B5D52" }}>{MESSAGE_FIN_TICKET}</p>
         </div>
 
+        {recuWaActif && (
+          <div className="no-print mt-4 p-3 rounded-lg text-sm" style={{ background: "#F3F7F3", border: "1px solid #D6E4D6", fontFamily: "'Inter', sans-serif" }}>
+            <p className="font-medium mb-2" style={{ color: "#2F5A3A" }}>Envoyer le reçu en PDF par WhatsApp</p>
+            {!waEtat && <p className="text-xs" style={{ color: "#6B5D52" }}>Vérification…</p>}
+            {waEtat && !waEtat.numeroValide && <p className="text-xs" style={{ color: "#B04A3B" }}>Le numéro de la cliente est absent ou son pays est inconnu : complète sa fiche.</p>}
+            {waEtat && !waEtat.cleConfiguree && <p className="text-xs" style={{ color: "#B04A3B" }}>La clé WhatsApp n'est pas configurée sur le serveur.</p>}
+            {waEtat && waEtat.numeroValide && waEtat.cleConfiguree && (
+              <>
+                {!waEtat.consentement && (
+                  <label className="flex items-start gap-2 text-xs mb-2" style={{ color: "#3A332E" }}>
+                    <input type="checkbox" checked={waAccord} onChange={(e) => setWaAccord(e.target.checked)} className="mt-0.5" />
+                    <span>La cliente accepte de recevoir son reçu sur WhatsApp (et, plus tard, les nouveautés de la boutique).</span>
+                  </label>
+                )}
+                {waEtat.dejaEnvoyeLe && <p className="text-xs mb-2" style={{ color: "#2F5A3A" }}>Déjà envoyé le {new Date(waEtat.dejaEnvoyeLe).toLocaleString("fr-FR")}.</p>}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => envoyerRecuPdf(!!waEtat.dejaEnvoyeLe)} disabled={waEnCours || (!waEtat.consentement && !waAccord)}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: waEnCours || (!waEtat.consentement && !waAccord) ? "#9DBFA4" : "#25D366", color: "#fff" }}>
+                    {waEnCours ? "Envoi…" : waEtat.dejaEnvoyeLe ? "Renvoyer" : "Envoyer"}
+                  </button>
+                  <button type="button" onClick={voirApercu} className="px-3 py-2 rounded-lg text-sm" style={{ border: "1px solid #D6E4D6", color: "#2F5A3A" }}>Voir le PDF</button>
+                </div>
+              </>
+            )}
+            {waMessage && <p className="text-xs mt-2" style={{ color: waMessage.ok ? "#2F5A3A" : "#B04A3B" }}>{waMessage.texte}</p>}
+          </div>
+        )}
         <div className="no-print flex gap-2 mt-5">
           <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#8C3B2E", color: "#FBF3EC", fontFamily: "'Inter', sans-serif" }}><Printer size={15} /> Imprimer</button>
-          {WHATSAPP_RECU_ACTIF && numeroWA && (
+          {WHATSAPP_RECU_ACTIF && !recuWaActif && numeroWA && (
             <button onClick={envoyerSurWhatsApp} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "#25D366", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
               <MessageCircle size={15} /> WhatsApp
             </button>
